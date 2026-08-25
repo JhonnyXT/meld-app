@@ -1,0 +1,31 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "dev": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": { "APP_VARIANT": "dev" },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      }
+    },
+    "test": {
+      "distribution": "internal",
+      "env": { "APP_VARIANT": "test" },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "prod": {
+      "autoIncrement": true,
+      "env": { "APP_VARIANT": "prod" },
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  }
+}

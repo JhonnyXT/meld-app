@@ -1,0 +1,810 @@
+{
+  "version": "2.17",
+  "children": [
+    {
+      "type": "frame",
+      "id": "xKGbh",
+      "x": 0,
+      "y": 0,
+      "name": "Task Detail Sheet",
+      "clip": true,
+      "width": 520,
+      "fill": "$canvas-bg",
+      "cornerRadius": 20,
+      "layout": "vertical",
+      "gap": 20,
+      "padding": [
+        28,
+        32,
+        32,
+        32
+      ],
+      "children": [
+        {
+          "type": "text",
+          "id": "VsPkL",
+          "name": "Canvas Title",
+          "fill": "#B8B8BE",
+          "content": "Task Detail Sheet",
+          "fontFamily": "$font",
+          "fontSize": 19,
+          "fontWeight": "500"
+        },
+        {
+          "type": "frame",
+          "id": "R8MeU2",
+          "name": "Phone",
+          "clip": true,
+          "width": "fill_container",
+          "height": 830,
+          "fill": "#EFEFF2",
+          "cornerRadius": 26,
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "ktVnd",
+              "name": "Status Bar",
+              "width": "fill_container",
+              "height": 44,
+              "fill": "#EFEFF2",
+              "padding": [
+                0,
+                22,
+                0,
+                26
+              ],
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "P7dqR",
+                  "name": "Time",
+                  "fill": "$text-primary",
+                  "content": "9:41",
+                  "fontFamily": "$font",
+                  "fontSize": 15,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "GBYZH",
+                  "name": "Status Icons",
+                  "gap": 6,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "JKFXb",
+                      "name": "Signal",
+                      "width": 17,
+                      "height": 17,
+                      "icon": "signal-high",
+                      "library": "lucide",
+                      "fill": "$text-primary"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "BN6Aw",
+                      "name": "Wifi",
+                      "width": 17,
+                      "height": 17,
+                      "icon": "wifi",
+                      "library": "lucide",
+                      "fill": "$text-primary"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "Pab7R",
+                      "name": "Battery",
+                      "width": 17,
+                      "height": 17,
+                      "icon": "battery-medium",
+                      "library": "lucide",
+                      "fill": "$text-primary"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "l1tEq",
+              "name": "Sheet",
+              "clip": true,
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "$sheet-bg",
+              "cornerRadius": [
+                22,
+                22,
+                0,
+                0
+              ],
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "mp9rN",
+                  "name": "Grabber Row",
+                  "width": "fill_container",
+                  "padding": [
+                    10,
+                    0,
+                    6,
+                    0
+                  ],
+                  "justifyContent": "center",
+                  "children": [
+                    {
+                      "type": "rectangle",
+                      "cornerRadius": 3,
+                      "id": "o9GB2w",
+                      "name": "Grabber",
+                      "fill": "#D2D2D7",
+                      "width": 38,
+                      "height": 5
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "UXrtt",
+                  "name": "Sheet Body",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "padding": [
+                    6,
+                    24,
+                    0,
+                    24
+                  ],
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "Vglpd",
+                      "name": "Header",
+                      "width": "fill_container",
+                      "padding": [
+                        0,
+                        0,
+                        14,
+                        0
+                      ],
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "PPKKs",
+                          "name": "Sheet Kind",
+                          "fill": "$text-primary",
+                          "content": "Task",
+                          "fontFamily": "$font",
+                          "fontSize": 16,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "q06Cr",
+                          "name": "Done Action",
+                          "fill": "$accent-blue",
+                          "content": "Done",
+                          "fontFamily": "$font",
+                          "fontSize": 16,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "p4JuYc",
+                      "name": "Title Row",
+                      "width": "fill_container",
+                      "gap": 14,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "J2Cw5T",
+                          "name": "Checkbox Slot",
+                          "padding": [
+                            4,
+                            0,
+                            0,
+                            0
+                          ],
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 7,
+                              "id": "ZIN5p",
+                              "name": "Task Checkbox",
+                              "width": 26,
+                              "height": 26,
+                              "stroke": "#C7C7CC",
+                              "strokeWidth": 1.6
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "pXLSN",
+                          "name": "Task Title",
+                          "fill": "$text-primary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Prepare the Framer workshop slides",
+                          "lineHeight": 1.2,
+                          "fontFamily": "$font",
+                          "fontSize": 27,
+                          "fontWeight": "700",
+                          "letterSpacing": -0.4
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Svk8p",
+                      "name": "Description Row",
+                      "width": "fill_container",
+                      "padding": [
+                        12,
+                        0,
+                        20,
+                        40
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "k4DKys",
+                          "name": "Task Description",
+                          "fill": "$text-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Draft the structure, add product examples, and leave time for rehearsal.",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 14,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "pWPGH",
+                      "name": "Meta Rows",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "EUVcV",
+                          "name": "Date & time Row",
+                          "width": "fill_container",
+                          "height": 45,
+                          "stroke": "$divider",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 12,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "r2hjE",
+                              "name": "Left",
+                              "gap": 12,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "UuqIm",
+                                  "name": "Date & time Icon",
+                                  "width": 19,
+                                  "height": 19,
+                                  "icon": "calendar",
+                                  "library": "lucide",
+                                  "fill": "#4A4A4F"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "aaJmb",
+                                  "name": "Date & time Label",
+                                  "fill": "$text-primary",
+                                  "content": "Date & time",
+                                  "fontFamily": "$font",
+                                  "fontSize": 14.5,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "z1phOe",
+                              "name": "Date & time Value",
+                              "fill": "$text-secondary",
+                              "content": "Tomorrow · 10:00 AM",
+                              "fontFamily": "$font",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "GbMjy",
+                          "name": "Duration Row",
+                          "width": "fill_container",
+                          "height": 45,
+                          "stroke": "$divider",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 12,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "W0iQoo",
+                              "name": "Left",
+                              "gap": 12,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "ZxlV5",
+                                  "name": "Duration Icon",
+                                  "width": 19,
+                                  "height": 19,
+                                  "icon": "clock-3",
+                                  "library": "lucide",
+                                  "fill": "#4A4A4F"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "qmM9k",
+                                  "name": "Duration Label",
+                                  "fill": "$text-primary",
+                                  "content": "Duration",
+                                  "fontFamily": "$font",
+                                  "fontSize": 14.5,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "W2DijK",
+                              "name": "Duration Value",
+                              "fill": "$text-secondary",
+                              "content": "1 hour",
+                              "fontFamily": "$font",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "lVcGa",
+                          "name": "Reminder Row",
+                          "width": "fill_container",
+                          "height": 45,
+                          "stroke": "$divider",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 12,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "B80C4G",
+                              "name": "Left",
+                              "gap": 12,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "qKFwn",
+                                  "name": "Reminder Icon",
+                                  "width": 19,
+                                  "height": 19,
+                                  "icon": "bell",
+                                  "library": "lucide",
+                                  "fill": "#4A4A4F"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "t2UVv",
+                                  "name": "Reminder Label",
+                                  "fill": "$text-primary",
+                                  "content": "Reminder",
+                                  "fontFamily": "$font",
+                                  "fontSize": 14.5,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "iwZQT",
+                              "name": "Reminder Value",
+                              "fill": "$text-secondary",
+                              "content": "30 minutes before",
+                              "fontFamily": "$font",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "RpCzK",
+                          "name": "Repeat Row",
+                          "width": "fill_container",
+                          "height": 45,
+                          "stroke": "$divider",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 12,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "UOzkC",
+                              "name": "Left",
+                              "gap": 12,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "SEO8S",
+                                  "name": "Repeat Icon",
+                                  "width": 19,
+                                  "height": 19,
+                                  "icon": "repeat",
+                                  "library": "lucide",
+                                  "fill": "#4A4A4F"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "ertNB",
+                                  "name": "Repeat Label",
+                                  "fill": "$text-primary",
+                                  "content": "Repeat",
+                                  "fontFamily": "$font",
+                                  "fontSize": 14.5,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "h1S9b",
+                              "name": "Repeat Value",
+                              "fill": "$text-secondary",
+                              "content": "Never",
+                              "fontFamily": "$font",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "VZhJZ",
+                          "name": "Category Row",
+                          "width": "fill_container",
+                          "height": 45,
+                          "stroke": "$divider",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 12,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "l1PPK",
+                              "name": "Left",
+                              "gap": 12,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "SH8nj",
+                                  "name": "Category Icon",
+                                  "width": 19,
+                                  "height": 19,
+                                  "icon": "briefcase",
+                                  "library": "lucide",
+                                  "fill": "#4A4A4F"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "v4pQa",
+                                  "name": "Category Label",
+                                  "fill": "$text-primary",
+                                  "content": "Category",
+                                  "fontFamily": "$font",
+                                  "fontSize": 14.5,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "y24FCf",
+                              "name": "Category Value",
+                              "fill": "$text-secondary",
+                              "content": "Work",
+                              "fontFamily": "$font",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "weBcA",
+                          "name": "Priority Row",
+                          "width": "fill_container",
+                          "height": 45,
+                          "stroke": "$divider",
+                          "gap": 12,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "SVl89",
+                              "name": "Left",
+                              "gap": 12,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "vjL1H",
+                                  "name": "Priority Icon",
+                                  "width": 19,
+                                  "height": 19,
+                                  "icon": "flag",
+                                  "library": "lucide",
+                                  "fill": "#4A4A4F"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "XR1qG",
+                                  "name": "Priority Label",
+                                  "fill": "$text-primary",
+                                  "content": "Priority",
+                                  "fontFamily": "$font",
+                                  "fontSize": 14.5,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "frT23",
+                              "name": "Priority Value",
+                              "fill": "$accent-red",
+                              "content": "High",
+                              "fontFamily": "$font",
+                              "fontSize": 13.5,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "R8xFm",
+                      "name": "Subtasks",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 2,
+                      "padding": [
+                        22,
+                        0,
+                        0,
+                        0
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "EYChD",
+                          "name": "Subtasks Heading",
+                          "fill": "$text-primary",
+                          "content": "Subtasks",
+                          "fontFamily": "$font",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "CafG0",
+                          "name": "Outline the workshop",
+                          "width": "fill_container",
+                          "height": 42,
+                          "gap": 13,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 6,
+                              "id": "X162TI",
+                              "name": "Checkbox",
+                              "width": 21,
+                              "height": 21,
+                              "stroke": "#C7C7CC",
+                              "strokeWidth": 1.6
+                            },
+                            {
+                              "type": "text",
+                              "id": "O5QNpO",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "Outline the workshop",
+                              "fontFamily": "$font",
+                              "fontSize": 14,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "B8ycvA",
+                          "name": "Add interaction examples",
+                          "width": "fill_container",
+                          "height": 42,
+                          "gap": 13,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 6,
+                              "id": "DBpTG",
+                              "name": "Checkbox",
+                              "width": 21,
+                              "height": 21,
+                              "stroke": "#C7C7CC",
+                              "strokeWidth": 1.6
+                            },
+                            {
+                              "type": "text",
+                              "id": "vWacc",
+                              "name": "Label",
+                              "fill": "$text-primary",
+                              "content": "Add interaction examples",
+                              "fontFamily": "$font",
+                              "fontSize": 14,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "bGYgk",
+                      "name": "Spacer",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "layout": "vertical"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "WE5LJ",
+                      "name": "Footer",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 12,
+                      "padding": [
+                        14,
+                        0,
+                        10,
+                        0
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "U7rIdj",
+                          "name": "Update Task Button",
+                          "width": "fill_container",
+                          "height": 52,
+                          "fill": "#111112",
+                          "cornerRadius": 13,
+                          "gap": 9,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "DQwrR",
+                              "name": "Check Icon",
+                              "width": 18,
+                              "height": 18,
+                              "icon": "check",
+                              "library": "lucide",
+                              "fill": "#FFFFFF"
+                            },
+                            {
+                              "type": "text",
+                              "id": "Z95qe",
+                              "name": "Button Label",
+                              "fill": "#FFFFFF",
+                              "content": "Update Task",
+                              "fontFamily": "$font",
+                              "fontSize": 16,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 3,
+                          "id": "js3Pg",
+                          "name": "Home Indicator",
+                          "fill": "#111112",
+                          "width": 132,
+                          "height": 5
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "text-primary": {
+      "type": "color",
+      "value": "#111112"
+    },
+    "text-secondary": {
+      "type": "color",
+      "value": "#6E6E73"
+    },
+    "divider": {
+      "type": "color",
+      "value": "#E8E8ED"
+    },
+    "accent-blue": {
+      "type": "color",
+      "value": "#0A84FF"
+    },
+    "accent-red": {
+      "type": "color",
+      "value": "#E5484D"
+    },
+    "sheet-bg": {
+      "type": "color",
+      "value": "#FFFFFF"
+    },
+    "canvas-bg": {
+      "type": "color",
+      "value": "#1C1C1E"
+    },
+    "font": {
+      "type": "string",
+      "value": "Inter"
+    }
+  },
+  "fileToken": "b1291506-ff48-4074-96af-b18e346f547c"
+}
