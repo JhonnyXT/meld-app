@@ -6,12 +6,13 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  Linking,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Alert,
 } from 'react-native';
+import { GestureHandlerRootView, GestureDetector } from 'react-native-gesture-handler';
+import Animated from 'react-native-reanimated';
 import { Icon } from '@/components/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -24,12 +25,15 @@ import { syncReminderNotification } from '@/services/notifications';
 import { toDateKey } from '@/domain/date';
 import { minutesToHour24, hour24ToMinutes, ANY_TIME_HHMM, ANY_TIME_MINUTES } from '@/domain/time';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { useVoiceDictation } from '@/hooks/useVoiceDictation';
+import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss';
 import { FieldRow } from '@/components/quickAdd/FieldRow';
 import { PresetFieldRow } from '@/components/quickAdd/PresetFieldRow';
 import { TimeFieldRow } from '@/components/quickAdd/TimeFieldRow';
 import { HealthAutoTrackFieldRow } from '@/components/quickAdd/HealthAutoTrackFieldRow';
 import { DateFieldRow } from '@/components/quickAdd/DateFieldRow';
 import { DurationFieldRow } from '@/components/quickAdd/DurationFieldRow';
+import { LinkFieldRow } from '@/components/quickAdd/LinkFieldRow';
 import { CategoryChips } from '@/components/quickAdd/CategoryChips';
 import { PriorityTabs } from '@/components/quickAdd/PriorityTabs';
 import { TypeTabs } from '@/components/quickAdd/TypeTabs';
@@ -74,10 +78,12 @@ export function ItemDetailSheet() {
   const insets = useSafeAreaInsets();
   const itemId = useItemDetailStore((s) => s.itemId);
   const close = useItemDetailStore((s) => s.close);
+  const { gesture: dragGesture, animatedStyle: dragStyle } = useSheetDragDismiss(!!itemId, close);
 
   const [item, setItem] = useState<DayItem | null>(null);
   const [type, setType] = useState<QuickAddType>('task');
   const [title, setTitle] = useState('');
+  const dictation = useVoiceDictation(lang, setTitle);
   const [status, setStatus] = useState<'inbox' | 'scheduled' | 'done'>('scheduled');
   const [category, setCategory] = useState<{ label: string; color: string } | null>(null);
   const [priority, setPriority] = useState<PriorityLevel>('none');
@@ -85,6 +91,9 @@ export function ItemDetailSheet() {
 
   const [taskReminderMinutes, setTaskReminderMinutes] = useState<number | null>(null);
   const [taskRepeat, setTaskRepeat] = useState('Never');
+
+  // Link (task + event) — se conserva al alternar entre esos dos tipos.
+  const [link, setLink] = useState('');
 
   const [eventStartMinutes, setEventStartMinutes] = useState(9 * 60);
   const [eventDurationMinutes, setEventDurationMinutes] = useState(60);
@@ -96,6 +105,7 @@ export function ItemDetailSheet() {
   const recorder = useVoiceRecorder();
 
   const [noteReminderMinutes, setNoteReminderMinutes] = useState<number | null>(null);
+  const [richTextBody, setRichTextBody] = useState('');
 
   const [habitSchedule, setHabitSchedule] = useState(HABIT_SCHEDULE_OPTIONS[0]);
   const [habitPreferredTime, setHabitPreferredTime] = useState('Anytime');
@@ -119,30 +129,26 @@ export function ItemDetailSheet() {
     setRecordedUri(null);
     setRecordedSeconds(0);
     setNoteReminderMinutes(null);
+    setRichTextBody('');
     setHabitSchedule(HABIT_SCHEDULE_OPTIONS[0]);
     setHabitPreferredTime('Anytime');
     setHabitHealthMetric(null);
     setHabitHealthMetricTarget(null);
   };
 
-  const handleToggleRecording = async () => {
-    try {
-      if (recorder.isRecording) {
-        const result = await recorder.stop();
-        if (result) {
-          setRecordedUri(result.uri);
-          setRecordedSeconds(result.durationSeconds);
-        }
-      } else {
-        const granted = await recorder.start();
-        if (!granted) {
-          Alert.alert(t('micPermissionDeniedTitle'), t('micPermissionDeniedMessage'));
-        }
-      }
-    } catch (error) {
-      console.error('[ItemDetail] voice recording failed', error);
-      Alert.alert(t('recordingErrorTitle'), t('recordingErrorMessage'));
-    }
+  const handleVoiceRecorded = (uri: string, seconds: number) => {
+    setRecordedUri(uri);
+    setRecordedSeconds(seconds);
+  };
+  const handleVoiceDelete = () => {
+    setRecordedUri(null);
+    setRecordedSeconds(0);
+  };
+  const handleVoicePermissionDenied = () => {
+    Alert.alert(t('micPermissionDeniedTitle'), t('micPermissionDeniedMessage'));
+  };
+  const handleVoiceError = () => {
+    Alert.alert(t('recordingErrorTitle'), t('recordingErrorMessage'));
   };
 
   useEffect(() => {
@@ -158,6 +164,7 @@ export function ItemDetailSheet() {
       setCategory(loaded.category && loaded.categoryColor ? { label: loaded.category, color: loaded.categoryColor } : null);
       setPriority(loaded.priority);
       setDateKey(loaded.date);
+      setLink(loaded.type === 'task' || loaded.type === 'event' ? (loaded.link ?? '') : '');
 
       setTaskReminderMinutes(null);
       setTaskRepeat('Never');
@@ -192,6 +199,7 @@ export function ItemDetailSheet() {
         setRecordedSeconds(loaded.durationSeconds);
       } else if (loaded.type === 'note') {
         setNoteReminderMinutes(reminderMinutesOrNull(loaded.reminderAt));
+        setRichTextBody(loaded.richTextBody ?? '');
       } else if (loaded.type === 'habit') {
         setHabitSchedule(loaded.targetFrequency);
         setHabitPreferredTime('Anytime');
@@ -241,7 +249,7 @@ export function ItemDetailSheet() {
         type: 'task',
         reminderAt,
         repeatRule: taskRepeat === 'Never' ? null : taskRepeat,
-        link: item.type === 'task' ? item.link : null,
+        link: link.trim() || null,
       };
     } else if (type === 'event') {
       const start24 = minutesToHour24(eventStartMinutes);
@@ -256,6 +264,7 @@ export function ItemDetailSheet() {
         startTime: start24,
         endTime: end24,
         calendarSource: item.type === 'event' ? item.calendarSource : null,
+        link: link.trim() || null,
       };
     } else if (type === 'voiceMemo') {
       const reminderAt = reminderAtFromMinutes(dateKey, voiceReminderMinutes);
@@ -272,7 +281,7 @@ export function ItemDetailSheet() {
         ...base,
         type: 'note',
         reminderAt,
-        richTextBody: item.type === 'note' ? item.richTextBody : '',
+        richTextBody: richTextBody.trim(),
       };
     } else {
       const hasTime = habitPreferredTime !== 'Anytime' && dateKey !== null;
@@ -302,15 +311,21 @@ export function ItemDetailSheet() {
 
   const meta = QUICK_ADD_META[type];
   const typeLabel = t(meta.tabLabelKey);
-  const hasLink = type === 'task' && item.type === 'task' && !!item.link;
   const saveDisabled = type === 'voiceMemo' && !recordedUri;
 
   return (
     <Modal visible={!!itemId} animationType="slide" transparent onRequestClose={close}>
-      <Pressable style={styles.backdrop} onPress={close} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetWrap} pointerEvents="box-none">
-        <View style={[styles.sheet, { backgroundColor: palette.surface, paddingBottom: insets.bottom + 16 }]}>
-          <View style={[styles.handle, { backgroundColor: palette.surfaceHigh }]} />
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Pressable style={styles.backdrop} onPress={close} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetWrap} pointerEvents="box-none">
+          <Animated.View
+            style={[styles.sheet, { backgroundColor: palette.surface, paddingBottom: insets.bottom + 16 }, dragStyle]}
+          >
+          <GestureDetector gesture={dragGesture}>
+            <View style={styles.handleGrabArea}>
+              <View style={[styles.handle, { backgroundColor: palette.surfaceHigh }]} />
+            </View>
+          </GestureDetector>
 
           <View style={styles.header}>
             <Text style={{ fontFamily: font.extrabold, fontSize: 24, color: palette.text }}>{typeLabel}</Text>
@@ -346,29 +361,36 @@ export function ItemDetailSheet() {
                 <TextInput
                   value={title}
                   onChangeText={setTitle}
-                  placeholder={t(meta.placeholderKey)}
+                  placeholder={dictation.listening ? t('listeningPlaceholder') : t(meta.placeholderKey)}
                   placeholderTextColor={palette.textDim}
                   autoCorrect={false}
                   spellCheck={false}
-                  style={{ fontFamily: font.medium, fontSize: 16, color: palette.text, padding: 0 }}
+                  style={{ fontFamily: font.medium, fontSize: 16, color: palette.text, padding: 0, paddingRight: 36 }}
                 />
+                <Pressable
+                  onPress={dictation.toggle}
+                  style={[styles.micButton, { backgroundColor: dictation.listening ? palette.accent : palette.surfaceHigh }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11yDictateTitle')}
+                >
+                  <Icon name="mic" size={15} color={dictation.listening ? '#fff' : palette.textDim} />
+                </Pressable>
               </View>
             </View>
 
-            {hasLink && item.type === 'task' && item.link ? (
-              <Pressable
-                onPress={() => Linking.openURL(item.link!)}
-                style={[styles.linkCard, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}
-              >
-                <View style={[styles.linkIcon, { backgroundColor: palette.surfaceHigh }]}>
-                  <Icon name="link" size={18} color={palette.textDim} />
-                </View>
-                <Text numberOfLines={1} style={{ flex: 1, fontFamily: font.regular, fontSize: 13, color: palette.textDim }}>
-                  {item.link}
-                </Text>
-                <Icon name="north-east" size={16} color={palette.textDim} />
-              </Pressable>
-            ) : null}
+            {type === 'note' && (
+              <View style={[styles.noteBodyBox, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
+                <TextInput
+                  value={richTextBody}
+                  onChangeText={setRichTextBody}
+                  placeholder={t('notePlaceholderBody')}
+                  placeholderTextColor={palette.textDim}
+                  multiline
+                  textAlignVertical="top"
+                  style={{ fontFamily: font.regular, fontSize: 15, color: palette.text, minHeight: 120 }}
+                />
+              </View>
+            )}
 
             <View style={[styles.configBox, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
               <View>
@@ -385,6 +407,7 @@ export function ItemDetailSheet() {
                   <>
                     <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={taskReminderMinutes} onChange={setTaskReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime />
                     <PresetFieldRow icon="repeat" label={t('fieldRepeat')} options={REPEAT_OPTIONS} value={taskRepeat} onChange={setTaskRepeat} lang={lang} />
+                    <LinkFieldRow value={link} onChange={setLink} />
                   </>
                 )}
 
@@ -393,6 +416,7 @@ export function ItemDetailSheet() {
                     <TimeFieldRow icon="schedule" label={t('fieldStarts')} minutes={eventStartMinutes} onChange={(m) => setEventStartMinutes(m ?? eventStartMinutes)} offLabel="" />
                     <DurationFieldRow icon="schedule" label={t('fieldDuration')} minutes={eventDurationMinutes} onChange={setEventDurationMinutes} />
                     <PresetFieldRow icon="notifications" label={t('fieldEarlyAlert')} options={EARLY_ALERT_OPTIONS} value={eventEarlyAlert} onChange={setEventEarlyAlert} lang={lang} />
+                    <LinkFieldRow value={link} onChange={setLink} />
                   </>
                 )}
 
@@ -402,10 +426,13 @@ export function ItemDetailSheet() {
                       <FieldRow icon="graphic-eq" label={t('fieldRecorded')} value={item.audioFileUri ? formatDuration(item.durationSeconds) : t('audioDeleted')} onPress={() => {}} />
                     ) : (
                       <VoiceRecordRow
-                        isRecording={recorder.isRecording}
-                        durationSeconds={recorder.isRecording ? recorder.durationSeconds : recordedSeconds}
-                        hasRecording={!!recordedUri}
-                        onPress={handleToggleRecording}
+                        recorder={recorder}
+                        recordedUri={recordedUri}
+                        recordedSeconds={recordedSeconds}
+                        onRecorded={handleVoiceRecorded}
+                        onDelete={handleVoiceDelete}
+                        onPermissionDenied={handleVoicePermissionDenied}
+                        onError={handleVoiceError}
                       />
                     )}
                     <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={voiceReminderMinutes} onChange={setVoiceReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime />
@@ -432,10 +459,10 @@ export function ItemDetailSheet() {
                     />
                   </>
                 )}
-              </View>
 
-              <CategoryChips value={category?.label ?? null} onChange={(label, color) => setCategory({ label, color })} showBorder />
-              <PriorityTabs value={priority} onChange={setPriority} />
+                <CategoryChips value={category?.label ?? null} onChange={(label, color) => setCategory({ label, color })} showBorder />
+                <PriorityTabs value={priority} onChange={setPriority} />
+              </View>
             </View>
 
             <Pressable
@@ -447,8 +474,9 @@ export function ItemDetailSheet() {
               <Text style={{ fontFamily: font.bold, fontSize: 17, color: '#fff' }}>{t(meta.ctaUpdateKey)}</Text>
             </Pressable>
           </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
+        </Animated.View>
+        </KeyboardAvoidingView>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -457,7 +485,8 @@ const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheetWrap: { flex: 1, justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: 20, maxHeight: '90%' },
-  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 16 },
+  handleGrabArea: { paddingTop: 12, paddingBottom: 16, alignItems: 'center' },
+  handle: { width: 36, height: 4, borderRadius: 2 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 20 },
   closeButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
@@ -465,12 +494,24 @@ const styles = StyleSheet.create({
   inputBox: {
     borderRadius: 16,
     padding: 18,
+    paddingBottom: 40,
+    minHeight: 76,
     borderWidth: 1,
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
+  },
+  micButton: {
+    position: 'absolute',
+    right: 12,
+    bottom: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   linkCard: {
     flexDirection: 'row',
@@ -487,6 +528,12 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   linkIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  noteBodyBox: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+  },
   configBox: {
     borderRadius: 24,
     padding: 20,

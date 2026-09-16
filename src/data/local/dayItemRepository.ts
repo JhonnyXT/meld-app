@@ -1,4 +1,4 @@
-import { eq, and, ne, isNull, isNotNull, gte, lte, like, asc } from 'drizzle-orm';
+import { eq, and, ne, lt, isNull, isNotNull, gte, lte, like, asc } from 'drizzle-orm';
 import { db } from './db';
 import { dayItems, habitCompletions } from './schema';
 import type { DayItem } from '@/domain/dayItem';
@@ -58,7 +58,7 @@ function toRow(item: DayItem): NewRow {
     case 'task':
       return { ...base, repeatRule: item.repeatRule, link: item.link };
     case 'event':
-      return { ...base, startTime: item.startTime, endTime: item.endTime, calendarSource: item.calendarSource };
+      return { ...base, startTime: item.startTime, endTime: item.endTime, calendarSource: item.calendarSource, link: item.link };
     case 'habit':
       return {
         ...base,
@@ -82,6 +82,21 @@ function toRow(item: DayItem): NewRow {
 export const dayItemRepository = {
   async listByDate(date: string): Promise<DayItem[]> {
     const rows = await db.select().from(dayItems).where(eq(dayItems.date, date));
+    return rows.map(toDomain);
+  },
+
+  /** Tareas pendientes (`status: 'scheduled'`) con fecha ANTERIOR a
+   * `beforeDateKey` — el "rollover" de tareas no cumplidas (pedido explícito
+   * del usuario, 2026-09-16). Se mergean en Today sin tocar su `date` real
+   * (ver `dayItemsStore.reload`), mismo patrón no-destructivo que ya usan
+   * las ocurrencias recurrentes de hábitos — la tarea sigue viéndose en su
+   * día original en Calendario, solo Today la "adelanta" hasta que se
+   * completa. */
+  async listOverdueTasks(beforeDateKey: string): Promise<DayItem[]> {
+    const rows = await db
+      .select()
+      .from(dayItems)
+      .where(and(eq(dayItems.type, 'task'), eq(dayItems.status, 'scheduled'), lt(dayItems.date, beforeDateKey)));
     return rows.map(toDomain);
   },
 
@@ -212,5 +227,19 @@ export const dayItemRepository = {
       .from(habitCompletions)
       .where(and(gte(habitCompletions.date, fromDate), lte(habitCompletions.date, toDate)));
     return rows.map((r) => ({ habitId: r.habitId, date: r.date }));
+  },
+
+  /** `category`/`status` de todos los ítems que tienen categoría asignada —
+   * usado por `categoriesStore` para calcular, por categoría, cuántos ítems
+   * están pendientes vs. cuántos hay en total (Ajustes > Categorías, badge
+   * "N" o "Completado"). Liviano: se trae todo y se agrupa en memoria en vez
+   * de un `GROUP BY` — el volumen de ítems de esta app es chico y así no
+   * hace falta una segunda forma de armar la consulta con Drizzle. */
+  async listCategoryUsage(): Promise<{ category: string; status: 'inbox' | 'scheduled' | 'done' }[]> {
+    const rows = await db
+      .select({ category: dayItems.category, status: dayItems.status })
+      .from(dayItems)
+      .where(isNotNull(dayItems.category));
+    return rows.map((r) => ({ category: r.category!, status: r.status }));
   },
 };

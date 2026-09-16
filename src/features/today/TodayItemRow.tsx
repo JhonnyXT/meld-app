@@ -5,6 +5,7 @@ import { useVoiceMemoPlayer } from '@/hooks/useVoiceMemoPlayer';
 import { useTimeDragStore } from '@/store/timeDragStore';
 import { useItemDetailStore } from '@/store/itemDetailStore';
 import { useDayItemsStore } from '@/store/dayItemsStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import { nowMinutes, minutesTo12h } from '@/domain/time';
 import { useTranslation } from '@/i18n';
 import type { DayItem } from '@/domain/dayItem';
@@ -39,26 +40,27 @@ export function TodayItemRow({
   const [playerExpanded, setPlayerExpanded] = useState(false);
   const isDraggingThis = useTimeDragStore((s) => s.active && s.itemId === item.id);
   const draggingMinutes = useTimeDragStore((s) => s.currentMinutes);
-  const row = toRowViewModel(item, habitCompletedToday);
+  const coolHabitsEnabled = useSettingsStore((s) => s.coolHabitsEnabled);
+  const row = toRowViewModel(item, habitCompletedToday, coolHabitsEnabled);
 
   if (isDraggingThis) {
     row.timeMarker = { kind: 'dragging', ...minutesTo12h(draggingMinutes) };
   }
 
-  const trailing =
-    item.type === 'voiceMemo'
-      ? hasAudio
-        ? {
-            kind: 'playback' as const,
-            label: formatDuration(item.durationSeconds),
-            isPlaying: voice.isPlaying,
-            onPress: () => {
-              setPlayerExpanded(true);
-              voice.toggle();
-            },
-          }
-        : { kind: 'duration' as const, label: t('audioDeleted') }
-      : row.trailing;
+  const isVoice = item.type === 'voiceMemo';
+  const playback =
+    isVoice && hasAudio
+      ? {
+          label: formatDuration((item as Extract<DayItem, { type: 'voiceMemo' }>).durationSeconds),
+          isPlaying: voice.isPlaying,
+          onPress: () => {
+            setPlayerExpanded(true);
+            voice.toggle();
+          },
+        }
+      : undefined;
+  const audioDeletedLabel = isVoice && !hasAudio ? t('audioDeleted') : undefined;
+  const linkUrl = (item.type === 'task' || item.type === 'event') && item.link ? item.link : null;
 
   const playbackExpanded =
     hasAudio && playerExpanded
@@ -83,7 +85,9 @@ export function TodayItemRow({
       timeMarker={row.timeMarker}
       leading={row.leading}
       title={row.title}
-      trailing={trailing}
+      trailing={row.trailing}
+      playback={playback}
+      audioDeletedLabel={audioDeletedLabel}
       hasLink={row.hasLink}
       completed={row.completed}
       playbackExpanded={playbackExpanded}
@@ -92,7 +96,7 @@ export function TodayItemRow({
       onToggleHabitComplete={
         row.leading.kind === 'habitIcon' && onToggleHabitComplete ? () => onToggleHabitComplete(item.id) : undefined
       }
-      onLinkPress={item.type === 'task' && item.link ? () => Linking.openURL(item.link!) : undefined}
+      onLinkPress={linkUrl ? () => Linking.openURL(linkUrl) : undefined}
       onDashPress={() => useTimeDragStore.getState().start(item.id, initialDragMinutes(item, nowMinutes()))}
       onDelete={() => (onDelete ? onDelete(item.id) : useDayItemsStore.getState().remove(item.id))}
     />

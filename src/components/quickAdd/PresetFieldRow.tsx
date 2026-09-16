@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Text, Pressable, StyleSheet } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { Icon, type IconName } from '@/components/Icon';
 import { useTheme } from '@/theme/ThemeProvider';
 import { presetLabel } from '@/domain/quickAdd';
 import type { Language } from '@/i18n';
 import { FieldRow } from './FieldRow';
+import { ACCORDION_LAYOUT, ACCORDION_ENTER, ACCORDION_EXIT } from './accordionMotion';
 
 interface PresetFieldRowProps {
   icon: IconName;
@@ -24,7 +26,7 @@ export function PresetFieldRow({ icon, label, options, value, onChange, lang, sh
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <View>
+    <Animated.View layout={ACCORDION_LAYOUT}>
       <FieldRow
         icon={icon}
         label={label}
@@ -34,7 +36,7 @@ export function PresetFieldRow({ icon, label, options, value, onChange, lang, sh
         expanded={expanded}
       />
       {expanded && (
-        <View style={styles.optionsList}>
+        <Animated.View entering={ACCORDION_ENTER} exiting={ACCORDION_EXIT} style={styles.optionsList}>
           {options.map((option, index) => {
             const selected = option === value;
             const isLast = index === options.length - 1;
@@ -60,9 +62,9 @@ export function PresetFieldRow({ icon, label, options, value, onChange, lang, sh
               </Pressable>
             );
           })}
-        </View>
+        </Animated.View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 

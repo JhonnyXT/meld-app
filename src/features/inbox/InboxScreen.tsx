@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, Pressable, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect } from 'expo-router';
@@ -8,10 +8,11 @@ import { Icon } from '@/components/Icon';
 import { InboxItemRow } from '@/components/dayItem/InboxItemRow';
 import { FloatingBar } from '@/components/FloatingBar';
 import { EmptyState } from '@/components/EmptyState';
+import { ListSkeleton } from '@/components/ListSkeleton';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useTranslation } from '@/i18n';
 import { useInboxStore } from '@/store/inboxStore';
-import { useQuickAddStore } from '@/store/quickAddStore';
+import { useAddMenuStore } from '@/store/addMenuStore';
 import { useNavigateMenuStore } from '@/store/navigateMenuStore';
 import { useItemDetailStore } from '@/store/itemDetailStore';
 import { toInboxRowViewModel, type InboxRowViewModel } from './mapInboxItemToRow';
@@ -20,8 +21,10 @@ export function InboxScreen() {
   const { palette, font } = useTheme();
   const { t, lang } = useTranslation();
   const items = useInboxStore((s) => s.items);
+  const loading = useInboxStore((s) => s.loading);
   const reload = useInboxStore((s) => s.reload);
   const [captureText, setCaptureText] = useState('');
+  const captureInputRef = useRef<TextInput>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectionMode = selectedIds.size > 0;
 
@@ -66,12 +69,12 @@ export function InboxScreen() {
         style={{ paddingHorizontal: 16 }}
         title={
           selectionMode ? (
-            <Text style={{ fontFamily: font.extrabold, fontSize: 34, lineHeight: 36, letterSpacing: -1, color: palette.text }}>
+            <Text style={{ fontFamily: font.extrabold, fontSize: 34, lineHeight: 46, letterSpacing: -1, color: palette.text }}>
               {t('selectedCount', { count: selectedIds.size })}
             </Text>
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-              <Text style={{ fontFamily: font.extrabold, fontSize: 34, lineHeight: 36, letterSpacing: -1, color: palette.text }}>
+              <Text style={{ fontFamily: font.extrabold, fontSize: 34, lineHeight: 46, letterSpacing: -1, color: palette.text }}>
                 {t('inbox')}
               </Text>
               <Text style={{ fontFamily: font.semibold, fontSize: 15, color: palette.textDim }}>{items.length}</Text>
@@ -100,6 +103,7 @@ export function InboxScreen() {
         <View style={[styles.captureRow, { backgroundColor: palette.surfaceLow }]}>
           <Icon name="add" size={18} color={palette.textDim} />
           <TextInput
+            ref={captureInputRef}
             value={captureText}
             onChangeText={setCaptureText}
             onSubmitEditing={submitCapture}
@@ -116,32 +120,46 @@ export function InboxScreen() {
         </View>
       </View>
 
-      <FlashList<InboxRowViewModel>
-        style={{ flex: 1, marginTop: 16 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 160 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        data={rows}
-        keyExtractor={(row) => row.id}
-        extraData={selectionMode ? selectedIds : selectionMode}
-        ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-        ListEmptyComponent={<EmptyState icon="inbox" title={t('inboxEmptyTitle')} message={t('inboxEmptyMessage')} />}
-        renderItem={({ item: row }) => (
-          <InboxItemRow
-            item={row}
-            selectionMode={selectionMode}
-            selected={selectedIds.has(row.id)}
-            onPress={() => (selectionMode ? toggleSelected(row.id) : useItemDetailStore.getState().open(row.id))}
-            onLongPress={() => toggleSelected(row.id)}
-            onDelete={() => useInboxStore.getState().remove(row.id)}
-            onScheduleToday={() => useInboxStore.getState().scheduleToday(row.id)}
+      {loading && rows.length === 0 ? (
+        <View style={{ flex: 1, paddingHorizontal: 16, marginTop: 16 }}>
+          <ListSkeleton />
+        </View>
+      ) : rows.length === 0 ? (
+        <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 160 }}>
+          <EmptyState
+            icon="inbox"
+            title={t('inboxEmptyTitle')}
+            message={t('inboxEmptyMessage')}
+            ctaLabel={t('inboxEmptyCta')}
+            onPressCta={() => captureInputRef.current?.focus()}
           />
-        )}
-      />
+        </View>
+      ) : (
+        <FlashList<InboxRowViewModel>
+          style={{ flex: 1, marginTop: 16 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 160 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          data={rows}
+          keyExtractor={(row) => row.id}
+          extraData={selectionMode ? selectedIds : selectionMode}
+          ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          renderItem={({ item: row }) => (
+            <InboxItemRow
+              item={row}
+              selectionMode={selectionMode}
+              selected={selectedIds.has(row.id)}
+              onPress={() => (selectionMode ? toggleSelected(row.id) : useItemDetailStore.getState().open(row.id))}
+              onLongPress={() => toggleSelected(row.id)}
+              onDelete={() => useInboxStore.getState().remove(row.id)}
+              onScheduleToday={() => useInboxStore.getState().scheduleToday(row.id)}
+            />
+          )}
+        />
+      )}
 
       <FloatingBar
-        fabSize={48}
-        onAddPress={selectionMode ? handleBulkDelete : () => useQuickAddStore.getState().open('task')}
+        onAddPress={selectionMode ? handleBulkDelete : () => useAddMenuStore.getState().open()}
         onMenuPress={selectionMode ? cancelSelection : () => useNavigateMenuStore.getState().open()}
         fabIcon={selectionMode ? 'delete-outline' : 'add'}
         fabColor={selectionMode ? palette.danger : undefined}
@@ -187,7 +205,7 @@ const styles = StyleSheet.create({
   pill: {
     flex: 1,
     height: 48,
-    borderRadius: 12,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },

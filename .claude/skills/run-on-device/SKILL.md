@@ -1,9 +1,9 @@
 ---
 name: run-on-device
 description: |
-  Compilar e instalar Trove (Expo/React Native) en el Moto E7 Plus conectado por
+  Compilar e instalar Meld (Expo/React Native) en el Moto E7 Plus conectado por
   USB, y levantar Metro para desarrollo. Usar cuando el usuario pida correr, probar,
-  ver en el celular, o verificar visualmente un cambio de Trove. Cubre el puerto
+  ver en el celular, o verificar visualmente un cambio de Meld. Cubre el puerto
   8081 ocupado por otro proyecto (my-wallet-app), el workaround de adb en este
   sandbox, y los pasos de rebuild nativo cuando se agregan dependencias nativas.
 license: MIT
@@ -15,7 +15,7 @@ metadata:
 ## Contexto del entorno
 
 - Este sandbox ya corre otro proyecto Expo (`my-wallet-app`) con su Metro
-  **permanentemente en el puerto 8081**. Nunca lo mates. Trove usa **8082**
+  **permanentemente en el puerto 8081**. Nunca lo mates. Meld usa **8082**
   (o el siguiente libre).
 - El celular del usuario (Motorola Moto E7 Plus) está conectado por **USB**, no por
   Wi-Fi — `adb devices` ya lo detecta. No perder tiempo con `--tunnel` (falla,
@@ -85,9 +85,9 @@ ss -ltnp 2>/dev/null | grep -E "8081|8082|8083"
 ```
 
 - Si el 8081 tiene un proceso `my-wallet-app` → dejarlo, usar 8082.
-- Si el 8082 ya tiene un proceso **de Trove** corriendo → no relanzar, solo seguir
+- Si el 8082 ya tiene un proceso **de Meld** corriendo → no relanzar, solo seguir
   con el reload de la app.
-- Si hay un proceso de Trove viejo/colgado en 8082 → matar por **PID exacto**
+- Si hay un proceso de Meld viejo/colgado en 8082 → matar por **PID exacto**
   (`kill <pid>`), nunca `pkill -f "expo start"` — el patrón hace self-match contra
   el propio comando del tool Bash y aborta la sesión.
 
@@ -107,7 +107,7 @@ tail -30 /tmp/expo-start.log
 ```
 
 `adb reverse tcp:8081 tcp:8082` hace que el celular, al pedir el bundle en su
-puerto nativo 8081, en realidad hable con el Metro de Trove en el 8082 de esta
+puerto nativo 8081, en realidad hable con el Metro de Meld en el 8082 de esta
 máquina — sin esto la app carga el bundle equivocado (el de `my-wallet-app`) o
 nada.
 
@@ -116,9 +116,9 @@ nada.
 ```bash
 export ANDROID_HOME="$HOME/Android/Sdk"
 ADB="$ANDROID_HOME/platform-tools/adb"
-"$ADB" shell am force-stop app.trove.mobile
+"$ADB" shell am force-stop app.meld.mobile
 sleep 1
-"$ADB" shell am start -n app.trove.mobile/.MainActivity
+"$ADB" shell am start -n app.meld.mobile/.MainActivity
 sleep 12
 "$ADB" exec-out screencap -p > /tmp/anchor-check.png
 ```
@@ -152,7 +152,7 @@ hay datos de pruebas anteriores:
 
 ```bash
 export ANDROID_HOME="$HOME/Android/Sdk"
-"$ANDROID_HOME/platform-tools/adb" shell pm clear app.trove.mobile
+"$ANDROID_HOME/platform-tools/adb" shell pm clear app.meld.mobile
 ```
 
 Esto borra todos los datos de la app (vuelve al estado de instalación limpia) —

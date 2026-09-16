@@ -33,7 +33,7 @@ export const QUICK_ADD_META: Record<
     ctaUpdateKey: 'ctaUpdateEvent',
   },
   voiceMemo: {
-    icon: 'equalizer',
+    icon: 'mic',
     tabLabelKey: 'typeVoiceNote',
     sheetTitleKey: 'newVoiceNote',
     placeholderKey: 'placeholderVoiceNote',
@@ -58,13 +58,53 @@ export const QUICK_ADD_META: Record<
   },
 };
 
-// `label` es el valor canónico que se persiste en `DayItem.category` — siempre
-// en inglés, independiente del idioma de la UI (ver `presetLabel` arriba).
-// `labelKey` es la traducción que se muestra en el chip.
+// Categorías por default (siembra de la tabla `categories`, ver `db.ts`) y
+// fallback de palabras clave de `voiceParser.ts` — desde 2026-09-11 las
+// categorías reales son configurables por el usuario en Ajustes (tabla
+// `categories`, `store/categoriesStore.ts`), esta lista fija ya NO es lo que
+// lee `CategoryChips` en Quick Add/`ItemDetailSheet`. `label` es el valor
+// canónico que se persiste en `DayItem.category` — siempre en inglés,
+// independiente del idioma de la UI (ver `presetLabel` arriba). `labelKey`
+// es la traducción que se muestra en el chip.
 export const QUICK_ADD_CATEGORIES: { label: string; labelKey: TranslationKey; color: string }[] = [
   { label: 'Work', labelKey: 'categoryWork', color: '#4F84FF' },
   { label: 'Personal', labelKey: 'categoryPersonal', color: '#A55CFF' },
   { label: 'Health', labelKey: 'categoryHealth', color: '#5dde97' },
+];
+
+/** Paleta acotada de colores elegibles al crear/editar una categoría (Ajustes
+ * > Categorías) — mismo criterio que `accentPalette` de `theme/tokens.ts`
+ * (swatches fijos, no un color picker libre). */
+export const CATEGORY_COLOR_PALETTE = [
+  '#4F84FF',
+  '#A55CFF',
+  '#5dde97',
+  '#F2A93B',
+  '#E5484D',
+  '#4F9DDE',
+  '#e2793d',
+  '#8E8E93',
+] as const;
+
+/** Set acotado de íconos elegibles para una categoría — ver
+ * `components/settings/CategoryFormModal.tsx`. */
+export const CATEGORY_ICON_OPTIONS: IconName[] = [
+  'briefcase',
+  'person',
+  'favorite',
+  'book-open',
+  'home',
+  'star',
+  'cart',
+  'music',
+  'photo-camera',
+  'dumbbell',
+  'view-grid',
+  'checklist',
+  'plane',
+  'folder',
+  'sparkles',
+  'palette',
 ];
 
 export const PRIORITY_OPTIONS: { id: PriorityLevel; labelKey: TranslationKey; color: string }[] = [
@@ -73,6 +113,16 @@ export const PRIORITY_OPTIONS: { id: PriorityLevel; labelKey: TranslationKey; co
   { id: 'medium', labelKey: 'priorityMed', color: '#F2A93B' },
   { id: 'high', labelKey: 'priorityHigh', color: '#E5484D' },
 ];
+
+/** Color de la bandera de prioridad por nivel — misma paleta que
+ * `PRIORITY_OPTIONS`, expuesto aparte para la fila (`DayItemRow`) sin tener
+ * que hacer `.find` en cada render. */
+export const PRIORITY_COLOR: Record<PriorityLevel, string> = {
+  none: '#8E8E93',
+  low: '#4F9DDE',
+  medium: '#F2A93B',
+  high: '#E5484D',
+};
 
 // Los valores de estos presets son el estado interno real (se guardan tal
 // cual en el dominio — p. ej. `repeatRule`, o se parsean con labelToHour24 /

@@ -29,9 +29,10 @@ export function SegmentedToggle<T extends string>({ options, value, onChange }: 
             ]}
           >
             <Text
+              numberOfLines={1}
               style={{
                 fontFamily: font.semibold,
-                fontSize: 12,
+                fontSize: 13,
                 color: active ? palette.text : palette.textDim,
               }}
             >
@@ -45,6 +46,6 @@ export function SegmentedToggle<T extends string>({ options, value, onChange }: 
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: 'row', borderRadius: 8, padding: 4, gap: 4 },
-  segment: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 6 },
+  track: { flexDirection: 'row', width: '100%', borderRadius: 12, padding: 4, gap: 4 },
+  segment: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: 8 },
 });

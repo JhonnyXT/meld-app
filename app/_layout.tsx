@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
+import * as Linking from 'expo-linking';
+import { useQuickAddStore } from '@/store/quickAddStore';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
@@ -17,21 +19,45 @@ import { JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 import { AnimatedSplash } from '@/components/AnimatedSplash';
 import { initDb } from '@/data/local/db';
+import { useCategoriesStore } from '@/store/categoriesStore';
 import { QuickAddSheet } from '@/components/quickAdd/QuickAddSheet';
-import { NavigateMenu } from '@/components/NavigateMenu';
+import { AddMenu } from '@/components/AddMenu';
+import { VoiceAddScreen } from '@/components/voiceAdd/VoiceAddScreen';
 import { ItemDetailSheet } from '@/components/itemDetail/ItemDetailSheet';
 import { TimeDragOverlay } from '@/components/TimeDragOverlay';
 import { RemindersSheet } from '@/components/reminders/RemindersSheet';
-import { primeNotificationPermissionOnLaunch } from '@/services/notifications';
+import { CategoriesManagerSheet } from '@/components/settings/CategoriesManagerSheet';
+import { OnboardingScreen } from '@/features/onboarding/OnboardingScreen';
+import { useSettingsStore } from '@/store/settingsStore';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function RootStack() {
   const { palette, scheme } = useTheme();
 
-  useEffect(() => {
-    primeNotificationPermissionOnLaunch();
+  // El permiso de notificaciones ya NO se pide al arrancar: se pide con
+  // contexto al final del onboarding (`NotificationsStep`). Ver CLAUDE.md.
+
+  // Deep link del widget "Agregar rápido" de Android/iOS (ver
+  // `src/widget/QuickAddAndroidWidget.tsx` / `TodayWidget.swift` →
+  // `QuickAddWidget`): tocarlo arma una URI con `Linking.createURL('/', {
+  // queryParams: { openQuickAdd: 'task' } })` — se resuelve al scheme real
+  // del variant (no hardcodeado). Acá se escucha esa URI tanto en frío (app
+  // cerrada, `getInitialURL`) como en caliente (app ya abierta, evento
+  // `url`) y se abre Quick Add directo, sin pasar por ninguna pantalla.
+  const handleDeepLink = useCallback((url: string | null) => {
+    if (!url) return;
+    const { queryParams } = Linking.parse(url);
+    if (queryParams?.openQuickAdd) {
+      useQuickAddStore.getState().open('task');
+    }
   }, []);
+
+  useEffect(() => {
+    Linking.getInitialURL().then(handleDeepLink);
+    const sub = Linking.addEventListener('url', ({ url }) => handleDeepLink(url));
+    return () => sub.remove();
+  }, [handleDeepLink]);
 
   return (
     <>
@@ -45,10 +71,12 @@ function RootStack() {
         <Stack.Screen name="(tabs)" />
       </Stack>
       <QuickAddSheet />
-      <NavigateMenu />
+      <AddMenu />
+      <VoiceAddScreen />
       <ItemDetailSheet />
       <TimeDragOverlay />
       <RemindersSheet />
+      <CategoriesManagerSheet />
     </>
   );
 }
@@ -56,6 +84,8 @@ function RootStack() {
 export default function RootLayout() {
   const [dbReady, setDbReady] = useState(false);
   const [introDone, setIntroDone] = useState(false);
+  const onboardingCompleted = useSettingsStore((s) => s.onboardingCompleted);
+  const setOnboardingCompleted = useSettingsStore((s) => s.setOnboardingCompleted);
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
@@ -67,6 +97,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     initDb();
+    useCategoriesStore.getState().load();
     setDbReady(true);
   }, []);
 
@@ -101,12 +132,14 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        {introDone ? (
+        {!introDone ? (
+          <AnimatedSplash onFinish={() => setIntroDone(true)} />
+        ) : !onboardingCompleted ? (
+          <OnboardingScreen onDone={() => setOnboardingCompleted(true)} />
+        ) : (
           <ThemeProvider>
             <RootStack />
           </ThemeProvider>
-        ) : (
-          <AnimatedSplash onFinish={() => setIntroDone(true)} />
         )}
       </SafeAreaProvider>
     </GestureHandlerRootView>

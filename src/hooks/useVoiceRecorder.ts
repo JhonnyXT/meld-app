@@ -27,10 +27,24 @@ export function useVoiceRecorder() {
     return { uri: recorder.uri, durationSeconds };
   }, [recorder, state.durationMillis]);
 
+  // Pausar/reanudar sin cortar la grabación — mismo `AudioRecorder` nativo,
+  // `pause()` la congela y volver a llamar `record()` la retoma donde quedó
+  // (no hace falta `prepareToRecordAsync` de nuevo). Ver diseño de "Nota de
+  // voz" en Quick Add — pedido explícito del usuario (2026-09-11).
+  const pause = useCallback(() => {
+    recorder.pause();
+  }, [recorder]);
+
+  const resume = useCallback(() => {
+    recorder.record();
+  }, [recorder]);
+
   return {
     isRecording: state.isRecording,
     durationSeconds: state.durationMillis / 1000,
     start,
+    pause,
+    resume,
     stop,
   };
 }

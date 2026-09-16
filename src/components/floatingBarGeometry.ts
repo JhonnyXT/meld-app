@@ -7,6 +7,7 @@
 export const FLOATING_BAR_MARGIN = 16;
 export const FLOATING_BAR_HEIGHT = 72;
 export const FLOATING_BAR_CONFIRM_ROW_HEIGHT = 56;
-/** Alto del divisor entre la fila de confirmación de hora y la barra principal
- * (ahora son una sola card continua, no dos pastillas separadas por un hueco). */
-export const FLOATING_BAR_ROW_GAP = 1;
+/** Hueco visible entre la card flotante extra (Confirmar hora / Deshacer /
+ * Volver a hoy) y el pill central — ahora son dos cards separadas flotando,
+ * no una sola card continua (pedido explícito, 2026-08-29). */
+export const FLOATING_BAR_ROW_GAP = 10;

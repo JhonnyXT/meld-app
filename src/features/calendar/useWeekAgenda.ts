@@ -19,10 +19,12 @@ export function useWeekAgenda(referenceDate: Date) {
   const { start, end } = useMemo(() => getWeekRange(referenceDate), [referenceDate]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(start, i)), [start]);
   const [itemsByDate, setItemsByDate] = useState<Record<string, DayItem[]>>({});
+  const [loading, setLoading] = useState(true);
 
   const reload = useCallback(() => {
     const startKey = toDateKey(start);
     const endKey = toDateKey(end);
+    setLoading(true);
     dayItemRepository.listByDateRange(startKey, endKey).then((items) => {
       const grouped: Record<string, DayItem[]> = {};
       for (const item of items) {
@@ -30,6 +32,7 @@ export function useWeekAgenda(referenceDate: Date) {
         (grouped[item.date] ??= []).push(item);
       }
       setItemsByDate(grouped);
+      setLoading(false);
     });
   }, [start, end]);
 
@@ -88,5 +91,5 @@ export function useWeekAgenda(referenceDate: Date) {
     [itemsByDate, patchItem],
   );
 
-  return { days, itemsByDate, reload, toggleComplete, remove, clearVoiceMemoAudio };
+  return { days, itemsByDate, loading, reload, toggleComplete, remove, clearVoiceMemoAudio };
 }

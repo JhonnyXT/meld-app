@@ -11,6 +11,8 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
+import { GestureHandlerRootView, GestureDetector } from 'react-native-gesture-handler';
+import Animated from 'react-native-reanimated';
 import { Icon } from '@/components/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -23,12 +25,15 @@ import { syncReminderNotification } from '@/services/notifications';
 import { toDateKey, addDays } from '@/domain/date';
 import { minutesToHour24, ANY_TIME_HHMM, ANY_TIME_MINUTES } from '@/domain/time';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { useVoiceDictation } from '@/hooks/useVoiceDictation';
+import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss';
 import { TypeTabs } from './TypeTabs';
 import { PresetFieldRow } from './PresetFieldRow';
 import { TimeFieldRow } from './TimeFieldRow';
 import { HealthAutoTrackFieldRow } from './HealthAutoTrackFieldRow';
 import { DateFieldRow } from './DateFieldRow';
 import { DurationFieldRow } from './DurationFieldRow';
+import { LinkFieldRow } from './LinkFieldRow';
 import { CategoryChips } from './CategoryChips';
 import { PriorityTabs } from './PriorityTabs';
 import { VoiceRecordRow } from './VoiceRecordRow';
@@ -62,16 +67,26 @@ export function QuickAddSheet() {
   const insets = useSafeAreaInsets();
   const visible = useQuickAddStore((s) => s.visible);
   const initialType = useQuickAddStore((s) => s.initialType);
+  const prefill = useQuickAddStore((s) => s.prefill);
   const close = useQuickAddStore((s) => s.close);
+  const { gesture: dragGesture, animatedStyle: dragStyle } = useSheetDragDismiss(visible, close);
 
   const [type, setType] = useState<QuickAddType>(initialType);
   const [title, setTitle] = useState('');
+  const dictation = useVoiceDictation(lang, setTitle);
   const [category, setCategory] = useState<{ label: string; color: string } | null>(null);
   const [priority, setPriority] = useState<PriorityLevel>('none');
+  // Fecha del ítem — vale para los 6 tipos, default hoy, elegible con el
+  // calendario. Quick Add nunca manda al Inbox (sin `allowInbox`); para eso
+  // está el campo de captura rápida de `InboxScreen`.
+  const [dateKey, setDateKey] = useState(toDateKey(new Date()));
 
   // Task
   const [taskReminderMinutes, setTaskReminderMinutes] = useState<number | null>(null);
   const [taskRepeat, setTaskRepeat] = useState(REPEAT_OPTIONS[0]);
+
+  // Link (task + event)
+  const [link, setLink] = useState('');
 
   // Event
   const [eventStartMinutes, setEventStartMinutes] = useState(DEFAULT_EVENT_START_MINUTES);
@@ -86,7 +101,7 @@ export function QuickAddSheet() {
 
   // Note
   const [noteReminderMinutes, setNoteReminderMinutes] = useState<number | null>(null);
-  const [noteDateKey, setNoteDateKey] = useState(toDateKey(new Date()));
+  const [richTextBody, setRichTextBody] = useState('');
 
   // Habit
   const [habitSchedule, setHabitSchedule] = useState(HABIT_SCHEDULE_OPTIONS[0]);
@@ -101,6 +116,7 @@ export function QuickAddSheet() {
     setPriority('none');
     setTaskReminderMinutes(null);
     setTaskRepeat(REPEAT_OPTIONS[0]);
+    setLink('');
     setEventStartMinutes(DEFAULT_EVENT_START_MINUTES);
     setEventDurationMinutes(60);
     setEventEarlyAlert('10 min before');
@@ -108,7 +124,8 @@ export function QuickAddSheet() {
     setRecordedUri(null);
     setRecordedSeconds(0);
     setNoteReminderMinutes(null);
-    setNoteDateKey(toDateKey(new Date()));
+    setRichTextBody('');
+    setDateKey(toDateKey(new Date()));
     setHabitSchedule(HABIT_SCHEDULE_OPTIONS[0]);
     setHabitPreferredTime(HABIT_PREFERRED_TIME_OPTIONS[0]);
     setHabitHealthMetric(null);
@@ -116,27 +133,46 @@ export function QuickAddSheet() {
   };
 
   useEffect(() => {
-    if (visible) resetForm(initialType);
-  }, [visible, initialType]);
-
-  const handleToggleRecording = async () => {
-    try {
-      if (recorder.isRecording) {
-        const result = await recorder.stop();
-        if (result) {
-          setRecordedUri(result.uri);
-          setRecordedSeconds(result.durationSeconds);
-        }
-      } else {
-        const granted = await recorder.start();
-        if (!granted) {
-          Alert.alert(t('micPermissionDeniedTitle'), t('micPermissionDeniedMessage'));
+    if (!visible) return;
+    resetForm(initialType);
+    // `prefill` viene del comando de voz/texto (`quickAddStore.openWithPrefill`
+    // → `parseVoiceInput`). Se aplica DESPUÉS de `resetForm` para pisar solo
+    // los campos detectados; el resto queda en su default y el usuario
+    // confirma. Ver `domain/voiceParser.ts`.
+    if (prefill) {
+      setTitle(prefill.title);
+      if (prefill.dateKey) setDateKey(prefill.dateKey);
+      if (prefill.priority) setPriority(prefill.priority);
+      if (prefill.category) setCategory(prefill.category);
+      if (prefill.timeMinutes != null) {
+        if (prefill.type === 'task') setTaskReminderMinutes(prefill.timeMinutes);
+        else if (prefill.type === 'note') setNoteReminderMinutes(prefill.timeMinutes);
+        else if (prefill.type === 'event') setEventStartMinutes(prefill.timeMinutes);
+        else if (prefill.type === 'habit') {
+          const h = prefill.timeMinutes;
+          setHabitPreferredTime(h < 12 * 60 ? 'Morning' : h < 17 * 60 ? 'Afternoon' : 'Evening');
         }
       }
-    } catch (error) {
-      console.error('[QuickAdd] voice recording failed', error);
-      Alert.alert(t('recordingErrorTitle'), t('recordingErrorMessage'));
+      if (prefill.repeat) {
+        if (prefill.type === 'task') setTaskRepeat(prefill.repeat);
+        else if (prefill.type === 'habit') setHabitSchedule(prefill.repeat);
+      }
     }
+  }, [visible, initialType, prefill]);
+
+  const handleVoiceRecorded = (uri: string, seconds: number) => {
+    setRecordedUri(uri);
+    setRecordedSeconds(seconds);
+  };
+  const handleVoiceDelete = () => {
+    setRecordedUri(null);
+    setRecordedSeconds(0);
+  };
+  const handleVoicePermissionDenied = () => {
+    Alert.alert(t('micPermissionDeniedTitle'), t('micPermissionDeniedMessage'));
+  };
+  const handleVoiceError = () => {
+    Alert.alert(t('recordingErrorTitle'), t('recordingErrorMessage'));
   };
 
   const refreshLists = () => {
@@ -146,7 +182,6 @@ export function QuickAddSheet() {
 
   const handleSave = async () => {
     const now = new Date().toISOString();
-    const todayKey = toDateKey(new Date());
     const id = `${type}-${Date.now()}`;
     const categoryLabel = category?.label ?? null;
     const categoryColor = category?.color ?? null;
@@ -154,12 +189,12 @@ export function QuickAddSheet() {
     let item: DayItem;
 
     if (type === 'task') {
-      const reminderAt = reminderAtFromMinutes(todayKey, taskReminderMinutes);
+      const reminderAt = reminderAtFromMinutes(dateKey, taskReminderMinutes);
       item = {
         id,
         createdAt: now,
         updatedAt: now,
-        date: todayKey,
+        date: dateKey,
         title: title.trim() || t('untitledTask'),
         category: categoryLabel,
         categoryColor,
@@ -168,18 +203,18 @@ export function QuickAddSheet() {
         type: 'task',
         priority,
         repeatRule: taskRepeat === 'Never' ? null : taskRepeat,
-        link: null,
+        link: link.trim() || null,
       };
     } else if (type === 'event') {
       const start24 = minutesToHour24(eventStartMinutes);
       const end24 = addMinutesToHour24(start24, eventDurationMinutes);
       const alertMinutes = earlyAlertToMinutes(eventEarlyAlert);
-      const reminderAt = alertMinutes != null ? `${todayKey}T${addMinutesToHour24(start24, -alertMinutes)}:00.000Z` : null;
+      const reminderAt = alertMinutes != null ? `${dateKey}T${addMinutesToHour24(start24, -alertMinutes)}:00.000Z` : null;
       item = {
         id,
         createdAt: now,
         updatedAt: now,
-        date: todayKey,
+        date: dateKey,
         title: title.trim() || t('untitledEvent'),
         category: categoryLabel,
         categoryColor,
@@ -190,14 +225,15 @@ export function QuickAddSheet() {
         startTime: start24,
         endTime: end24,
         calendarSource: null,
+        link: link.trim() || null,
       };
     } else if (type === 'voiceMemo') {
-      const reminderAt = reminderAtFromMinutes(todayKey, voiceReminderMinutes);
+      const reminderAt = reminderAtFromMinutes(dateKey, voiceReminderMinutes);
       item = {
         id,
         createdAt: now,
         updatedAt: now,
-        date: todayKey,
+        date: dateKey,
         title: title.trim() || t('untitledVoiceNote'),
         category: categoryLabel,
         categoryColor,
@@ -209,7 +245,6 @@ export function QuickAddSheet() {
         durationSeconds: recordedSeconds,
       };
     } else if (type === 'note') {
-      const dateKey = noteDateKey;
       const reminderAt = reminderAtFromMinutes(dateKey, noteReminderMinutes);
       item = {
         id,
@@ -223,17 +258,17 @@ export function QuickAddSheet() {
         status: 'scheduled',
         type: 'note',
         priority,
-        richTextBody: '',
+        richTextBody: richTextBody.trim(),
       };
     } else {
       const hasTime = habitPreferredTime !== 'Anytime';
-      const reminderAt = hasTime ? `${todayKey}T${labelToHour24(habitPreferredTime)}:00.000Z` : null;
+      const reminderAt = hasTime ? `${dateKey}T${labelToHour24(habitPreferredTime)}:00.000Z` : null;
       const target = frequencyTarget(habitSchedule);
       item = {
         id,
         createdAt: now,
         updatedAt: now,
-        date: todayKey,
+        date: dateKey,
         title: title.trim() || t('untitledHabit'),
         category: categoryLabel,
         categoryColor,
@@ -262,14 +297,21 @@ export function QuickAddSheet() {
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
-      <Pressable style={styles.backdrop} onPress={close} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.sheetWrap}
-        pointerEvents="box-none"
-      >
-        <View style={[styles.sheet, { backgroundColor: palette.surface, paddingBottom: insets.bottom + 16 }]}>
-          <View style={[styles.handle, { backgroundColor: palette.surfaceHigh }]} />
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Pressable style={styles.backdrop} onPress={close} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.sheetWrap}
+          pointerEvents="box-none"
+        >
+          <Animated.View
+            style={[styles.sheet, { backgroundColor: palette.surface, paddingBottom: insets.bottom + 16 }, dragStyle]}
+          >
+          <GestureDetector gesture={dragGesture}>
+            <View style={styles.handleGrabArea}>
+              <View style={[styles.handle, { backgroundColor: palette.surfaceHigh }]} />
+            </View>
+          </GestureDetector>
 
           <View style={styles.header}>
             <Text style={{ fontFamily: font.extrabold, fontSize: 24, color: palette.text }}>{t(meta.sheetTitleKey)}</Text>
@@ -290,68 +332,96 @@ export function QuickAddSheet() {
               <TextInput
                 value={title}
                 onChangeText={setTitle}
-                placeholder={t(meta.placeholderKey)}
+                placeholder={dictation.listening ? t('listeningPlaceholder') : t(meta.placeholderKey)}
                 placeholderTextColor={palette.textDim}
                 autoCorrect={false}
                 spellCheck={false}
-                style={{ fontFamily: font.medium, fontSize: 16, color: palette.text, padding: 0 }}
+                style={{ fontFamily: font.medium, fontSize: 16, color: palette.text, padding: 0, paddingRight: 36 }}
               />
+              <Pressable
+                onPress={dictation.toggle}
+                style={[styles.micButton, { backgroundColor: dictation.listening ? palette.accent : palette.surfaceHigh }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('a11yDictateTitle')}
+              >
+                <Icon name="mic" size={15} color={dictation.listening ? '#fff' : palette.textDim} />
+              </Pressable>
             </View>
 
+            {type === 'note' && (
+              <View style={[styles.noteBodyBox, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
+                <TextInput
+                  value={richTextBody}
+                  onChangeText={setRichTextBody}
+                  placeholder={t('notePlaceholderBody')}
+                  placeholderTextColor={palette.textDim}
+                  multiline
+                  textAlignVertical="top"
+                  style={{ fontFamily: font.regular, fontSize: 15, color: palette.text, minHeight: 120 }}
+                />
+              </View>
+            )}
+
             <View style={[styles.configBox, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
-              {type === 'task' && (
-                <View style={styles.fieldGroup}>
-                  <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={taskReminderMinutes} onChange={setTaskReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime />
-                  <PresetFieldRow icon="repeat" label={t('fieldRepeat')} options={REPEAT_OPTIONS} value={taskRepeat} onChange={setTaskRepeat} lang={lang} />
-                </View>
-              )}
+              <View style={styles.fieldGroup}>
+                <DateFieldRow icon="calendar-month" label={t('fieldDay')} dateKey={dateKey} onChange={(k) => setDateKey(k ?? dateKey)} />
 
-              {type === 'event' && (
-                <View style={styles.fieldGroup}>
-                  <TimeFieldRow icon="schedule" label={t('fieldStarts')} minutes={eventStartMinutes} onChange={(m) => setEventStartMinutes(m ?? DEFAULT_EVENT_START_MINUTES)} offLabel="" />
-                  <DurationFieldRow icon="schedule" label={t('fieldDuration')} minutes={eventDurationMinutes} onChange={setEventDurationMinutes} />
-                  <PresetFieldRow icon="notifications" label={t('fieldEarlyAlert')} options={EARLY_ALERT_OPTIONS} value={eventEarlyAlert} onChange={setEventEarlyAlert} lang={lang} />
-                </View>
-              )}
+                {type === 'task' && (
+                  <>
+                    <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={taskReminderMinutes} onChange={setTaskReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime />
+                    <PresetFieldRow icon="repeat" label={t('fieldRepeat')} options={REPEAT_OPTIONS} value={taskRepeat} onChange={setTaskRepeat} lang={lang} />
+                    <LinkFieldRow value={link} onChange={setLink} />
+                  </>
+                )}
 
-              {type === 'voiceMemo' && (
-                <View style={styles.fieldGroup}>
-                  <VoiceRecordRow
-                    isRecording={recorder.isRecording}
-                    durationSeconds={recorder.isRecording ? recorder.durationSeconds : recordedSeconds}
-                    hasRecording={!!recordedUri}
-                    onPress={handleToggleRecording}
-                  />
-                  <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={voiceReminderMinutes} onChange={setVoiceReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime />
-                </View>
-              )}
+                {type === 'event' && (
+                  <>
+                    <TimeFieldRow icon="schedule" label={t('fieldStarts')} minutes={eventStartMinutes} onChange={(m) => setEventStartMinutes(m ?? DEFAULT_EVENT_START_MINUTES)} offLabel="" />
+                    <DurationFieldRow icon="schedule" label={t('fieldDuration')} minutes={eventDurationMinutes} onChange={setEventDurationMinutes} />
+                    <PresetFieldRow icon="notifications" label={t('fieldEarlyAlert')} options={EARLY_ALERT_OPTIONS} value={eventEarlyAlert} onChange={setEventEarlyAlert} lang={lang} />
+                    <LinkFieldRow value={link} onChange={setLink} />
+                  </>
+                )}
 
-              {type === 'note' && (
-                <View style={styles.fieldGroup}>
+                {type === 'voiceMemo' && (
+                  <>
+                    <VoiceRecordRow
+                      recorder={recorder}
+                      recordedUri={recordedUri}
+                      recordedSeconds={recordedSeconds}
+                      onRecorded={handleVoiceRecorded}
+                      onDelete={handleVoiceDelete}
+                      onPermissionDenied={handleVoicePermissionDenied}
+                      onError={handleVoiceError}
+                    />
+                    <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={voiceReminderMinutes} onChange={setVoiceReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime />
+                  </>
+                )}
+
+                {type === 'note' && (
                   <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={noteReminderMinutes} onChange={setNoteReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime />
-                  <DateFieldRow icon="calendar-month" label={t('fieldDay')} dateKey={noteDateKey} onChange={(k) => setNoteDateKey(k ?? noteDateKey)} />
-                </View>
-              )}
+                )}
 
-              {type === 'habit' && (
-                <View style={styles.fieldGroup}>
-                  <PresetFieldRow icon="repeat" label={t('fieldSchedule')} options={HABIT_SCHEDULE_OPTIONS} value={habitSchedule} onChange={setHabitSchedule} lang={lang} />
-                  <PresetFieldRow icon="schedule" label={t('fieldPreferredTime')} options={HABIT_PREFERRED_TIME_OPTIONS} value={habitPreferredTime} onChange={setHabitPreferredTime} lang={lang} />
-                  <HealthAutoTrackFieldRow
-                    icon="favorite"
-                    label={t('fieldAutoTrack')}
-                    metricId={habitHealthMetric}
-                    target={habitHealthMetricTarget}
-                    onChange={(nextId, nextTarget) => {
-                      setHabitHealthMetric(nextId);
-                      setHabitHealthMetricTarget(nextTarget);
-                    }}
-                  />
-                </View>
-              )}
+                {type === 'habit' && (
+                  <>
+                    <PresetFieldRow icon="repeat" label={t('fieldSchedule')} options={HABIT_SCHEDULE_OPTIONS} value={habitSchedule} onChange={setHabitSchedule} lang={lang} />
+                    <PresetFieldRow icon="schedule" label={t('fieldPreferredTime')} options={HABIT_PREFERRED_TIME_OPTIONS} value={habitPreferredTime} onChange={setHabitPreferredTime} lang={lang} />
+                    <HealthAutoTrackFieldRow
+                      icon="favorite"
+                      label={t('fieldAutoTrack')}
+                      metricId={habitHealthMetric}
+                      target={habitHealthMetricTarget}
+                      onChange={(nextId, nextTarget) => {
+                        setHabitHealthMetric(nextId);
+                        setHabitHealthMetricTarget(nextTarget);
+                      }}
+                    />
+                  </>
+                )}
 
-              <CategoryChips value={category?.label ?? null} onChange={(label, color) => setCategory({ label, color })} showBorder />
-              <PriorityTabs value={priority} onChange={setPriority} />
+                <CategoryChips value={category?.label ?? null} onChange={(label, color) => setCategory({ label, color })} showBorder />
+                <PriorityTabs value={priority} onChange={setPriority} />
+              </View>
             </View>
 
             <Pressable
@@ -363,8 +433,9 @@ export function QuickAddSheet() {
               <Text style={{ fontFamily: font.bold, fontSize: 17, color: '#fff' }}>{t(meta.ctaAddKey)}</Text>
             </Pressable>
           </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
+        </Animated.View>
+        </KeyboardAvoidingView>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -378,12 +449,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     maxHeight: '88%',
   },
-  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 16 },
+  // Área de agarre más alta que la barrita visual en sí (`handle`) — mismo
+  // criterio que cualquier target táctil chico (hitSlop): el gesto de
+  // arrastrar-para-cerrar necesita más superficie que 4px de alto para ser
+  // usable con el dedo.
+  handleGrabArea: { paddingTop: 12, paddingBottom: 16, alignItems: 'center' },
+  handle: { width: 36, height: 4, borderRadius: 2 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   closeButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   inputBox: {
     borderRadius: 16,
     padding: 18,
+    paddingBottom: 40,
+    minHeight: 76,
     marginBottom: 20,
     borderWidth: 1,
     shadowColor: '#000',
@@ -391,6 +469,22 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
+  },
+  micButton: {
+    position: 'absolute',
+    right: 12,
+    bottom: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noteBodyBox: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
   },
   configBox: {
     borderRadius: 24,

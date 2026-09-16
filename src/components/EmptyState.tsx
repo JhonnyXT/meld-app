@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated, {
   FadeIn,
   useSharedValue,
@@ -17,14 +17,19 @@ interface EmptyStateProps {
   icon: IconName;
   title: string;
   message: string;
+  ctaLabel?: string;
+  onPressCta?: () => void;
 }
 
 /** Estado vacío compartido para pantallas de lista (Today, Inbox, búsqueda…):
  * ícono flotante con animación sutil de vaivén + título + mensaje contextual
  * (invita a usar "+" o guardar en la Bandeja). Inspirado en el patrón de
  * `habit-tracker` (`core/ui/empty-state.tsx`), simplificado al sistema visual
- * de Trove (tokens de `theme/tokens.ts`, `Icon` de Lucide). */
-export function EmptyState({ icon, title, message }: EmptyStateProps) {
+ * de Meld (tokens de `theme/tokens.ts`, `Icon` de Lucide). `ctaLabel`/
+ * `onPressCta` (opcionales) agregan el botón "+ Add a task" del diseño Pen
+ * "Empty State / No Tasks Today" — hoy solo lo usa Today, Inbox sigue sin
+ * botón (su propio campo de captura rápida ya cumple ese rol). */
+export function EmptyState({ icon, title, message, ctaLabel, onPressCta }: EmptyStateProps) {
   const { palette, font } = useTheme();
   const reducedMotion = useReducedMotion();
   const float = useSharedValue(0);
@@ -47,8 +52,17 @@ export function EmptyState({ icon, title, message }: EmptyStateProps) {
       <Animated.View style={[styles.iconWell, { backgroundColor: palette.surfaceLow }, floatStyle]}>
         <Icon name={icon} size={28} color={palette.textDim} />
       </Animated.View>
-      <Text style={[styles.title, { fontFamily: font.semibold, color: palette.text }]}>{title}</Text>
+      <Text style={[styles.title, { fontFamily: font.bold, color: palette.text }]}>{title}</Text>
       <Text style={[styles.message, { fontFamily: font.regular, color: palette.textDim }]}>{message}</Text>
+      {ctaLabel && onPressCta ? (
+        <Pressable
+          onPress={onPressCta}
+          style={({ pressed }) => [styles.cta, { backgroundColor: palette.text, opacity: pressed ? 0.85 : 1 }]}
+        >
+          <Icon name="add" size={16} color={palette.bg} />
+          <Text style={[styles.ctaLabel, { fontFamily: font.bold, color: palette.bg }]}>{ctaLabel}</Text>
+        </Pressable>
+      ) : null}
     </Animated.View>
   );
 }
@@ -63,6 +77,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 14,
   },
-  title: { fontSize: 16, textAlign: 'center' },
+  title: { fontSize: 18, textAlign: 'center' },
   message: { fontSize: 13, textAlign: 'center', lineHeight: 19, maxWidth: 260 },
+  cta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 22,
+    marginTop: 14,
+  },
+  ctaLabel: { fontSize: 14.5 },
 });

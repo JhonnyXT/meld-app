@@ -32,6 +32,10 @@ export interface Event extends DayItemBase {
   startTime: string;
   endTime: string;
   calendarSource: string | null;
+  /** URL opcional asociada al evento (link de la reunión, doc, etc.) —
+   * editable en Quick Add / detalle, se muestra como botón de acceso rápido
+   * en la fila. Misma columna SQL `link` que usa Task. */
+  link: string | null;
 }
 
 export type HabitColorStyle = 'default' | 'cool';

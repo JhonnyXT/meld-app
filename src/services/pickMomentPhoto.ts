@@ -1,15 +1,16 @@
 import * as ImagePicker from 'expo-image-picker';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
 import { toDateKey } from '@/domain/date';
-import type { WeekInfo } from '@/domain/week';
+import { getISOWeek } from '@/domain/week';
 import type { Moment } from '@/domain/dayItem';
 
 /**
- * Abre el picker de fotos y guarda el resultado como el Moment de esa semana.
- * MVP: se guarda la URI que entrega el picker directamente (no se copia a
+ * Abre el picker de fotos y guarda el resultado como un Momento del día de
+ * HOY. Se pueden guardar varias fotos por día (id único por foto). MVP: se
+ * guarda la URI que entrega el picker directamente (no se copia a
  * almacenamiento propio todavía).
  */
-export async function pickMomentPhotoForWeek(week: WeekInfo): Promise<Moment | null> {
+export async function pickMomentPhotoForToday(): Promise<Moment | null> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) return null;
 
@@ -19,13 +20,14 @@ export async function pickMomentPhotoForWeek(week: WeekInfo): Promise<Moment | n
   });
   if (result.canceled || !result.assets?.[0]) return null;
 
-  const now = new Date().toISOString();
+  const now = new Date();
+  const iso = now.toISOString();
   const moment: Moment = {
-    id: `moment-${week.year}-${week.weekNumber}`,
-    createdAt: now,
-    updatedAt: now,
-    date: toDateKey(week.start),
-    title: `Week ${week.weekNumber}`,
+    id: `moment-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+    createdAt: iso,
+    updatedAt: iso,
+    date: toDateKey(now),
+    title: `Momento ${toDateKey(now)}`,
     category: null,
     categoryColor: null,
     reminderAt: null,
@@ -33,7 +35,7 @@ export async function pickMomentPhotoForWeek(week: WeekInfo): Promise<Moment | n
     priority: 'none',
     type: 'moment',
     mediaUri: result.assets[0].uri,
-    weekOfYear: week.weekNumber,
+    weekOfYear: getISOWeek(now),
   };
 
   await dayItemRepository.upsert(moment);

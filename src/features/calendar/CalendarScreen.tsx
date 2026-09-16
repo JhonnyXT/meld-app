@@ -1,40 +1,69 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View, Pressable, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FloatingBar } from '@/components/FloatingBar';
-import { CalendarViewSwitch } from '@/components/calendar/CalendarViewSwitch';
-import { CalendarFilterBar } from '@/components/calendar/CalendarFilterBar';
+import { Icon } from '@/components/Icon';
+import { SegmentedToggle } from '@/components/SegmentedToggle';
+import { DatePickerModal } from '@/components/datePicker/DatePickerModal';
 import { CalendarFilterSheet } from '@/components/calendar/CalendarFilterSheet';
 import { MonthHeatmapCard } from '@/components/calendar/MonthHeatmapCard';
 import { WeekdayHeaderRow } from '@/components/calendar/WeekdayHeaderRow';
 import { MonthDayCell } from '@/components/calendar/MonthDayCell';
 import { WeekDaySelector } from '@/components/calendar/WeekDaySelector';
+import { ListSkeleton } from '@/components/ListSkeleton';
 import { WeekAgendaView } from './WeekAgendaView';
 import { useWeekAgenda } from './useWeekAgenda';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useTranslation } from '@/i18n';
-import { formatMonthYearLabel, formatFullMonthYear, formatHeaderDate } from '@/domain/date';
+import { formatMonthYearLabel, formatFullMonthYear, formatHeaderDate, toDateKey, fromDateKey } from '@/domain/date';
 import { buildMonthHeatmap } from '@/domain/calendarHeatmap';
-import { computeHeatmapDotState } from '@/domain/habit';
+import { computeHeatmapDotState, isHabitScheduledOn } from '@/domain/habit';
 import { buildMonthGrid } from '@/domain/calendarGrid';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
-import { useQuickAddStore } from '@/store/quickAddStore';
+import { useAddMenuStore } from '@/store/addMenuStore';
 import { useNavigateMenuStore } from '@/store/navigateMenuStore';
 import { useCalendarFilterStore, matchesCalendarFilter } from '@/store/calendarFilterStore';
+import { CalendarTodayCard } from '@/components/calendar/CalendarTodayCard';
+import { useRouter } from 'expo-router';
 import type { DayItem, Habit } from '@/domain/dayItem';
 import { CALENDAR_VIEW_ORDER, type CalendarView } from './calendarView';
 
 export function CalendarScreen() {
   const { palette, font } = useTheme();
   const { t, lang } = useTranslation();
-  const [view, setView] = useState<CalendarView>('year');
+  const router = useRouter();
+  const [view, setView] = useState<CalendarView>('month');
   const today = useMemo(() => new Date(), []);
   const year = today.getFullYear();
+  // Ir al detalle de un día del grid de Mes (celda tocada) o de la
+  // `CalendarTodayCard` de abajo: reusa la misma pantalla Today que ya sabe
+  // mostrar "otro día" (DayBar, ver "Cambiar de día en Today" en CLAUDE.md) en
+  // vez de crear una pantalla de detalle de día nueva — Today ya trae la
+  // lista completa de ítems de esa fecha y la barra "Volver a hoy" cuando no
+  // es hoy. El día viaja por param de router (`?date=`, leído en
+  // `TodayScreen`) — escribir `dayItemsStore.selectedDateKey` directo NO
+  // alcanza, porque el estado real que pinta `DayBar`/el header de Today es
+  // local a ese componente (bug real: probado primero solo con el store y no
+  // navegaba al día tocado).
+  const goToDay = (dateKey: string) => {
+    router.push({ pathname: '/', params: { date: dateKey } });
+  };
+  // Mes que se está navegando en la vista Mes — separado de `today` a
+  // propósito (agregado 2026-08-26, fiel al chevron/botón de calendario del
+  // mock de Pen "Calendar Screen"): antes el grid de Mes SIEMPRE mostraba el
+  // mes actual, sin poder navegar a otro. El día del mes no importa, solo
+  // año/mes. La vista Año sigue anclada a `today.getFullYear()` — no está en
+  // el alcance de este cambio.
+  const [viewedMonth, setViewedMonth] = useState(() => new Date());
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
 
-  const monthGrid = useMemo(() => buildMonthGrid(year, today.getMonth(), today), [year, today]);
+  const monthGrid = useMemo(
+    () => buildMonthGrid(viewedMonth.getFullYear(), viewedMonth.getMonth(), today),
+    [viewedMonth, today],
+  );
   const [itemsByDate, setItemsByDate] = useState<Record<string, DayItem[]>>({});
   const calendarFilter = useCalendarFilterStore((s) => s.filter);
 
@@ -111,13 +140,6 @@ export function CalendarScreen() {
       }
     });
 
-  const monthItemsCount = useMemo(() => {
-    if (view !== 'month') return 0;
-    return monthGrid
-      .filter((cell) => cell.inCurrentMonth)
-      .reduce((sum, cell) => sum + (itemsByDate[cell.dateKey] ?? []).filter((item) => matchesCalendarFilter(item, calendarFilter)).length, 0);
-  }, [view, monthGrid, itemsByDate, calendarFilter]);
-
   useEffect(() => {
     if (view !== 'month' || monthGrid.length === 0) return;
     const startKey = monthGrid[0].dateKey;
@@ -132,25 +154,91 @@ export function CalendarScreen() {
     });
   }, [view, monthGrid]);
 
+  // Estadísticas de HOY para `CalendarTodayCard` — siempre el día actual, sin
+  // importar qué mes esté mirando el grid. Tasks/Moments salen de
+  // `itemsByDate` (hoy siempre cae dentro del mes mostrado, `monthGrid` se
+  // arma con `today.getMonth()`); Habits necesita su propio cálculo de
+  // ocurrencias programadas (mismo patrón que `dayItemsStore.reload()` →
+  // `loadHabitOccurrences`) porque un hábito solo vive en `itemsByDate` en su
+  // fecha de creación, no en cada día que recurre.
+  const todayKey = toDateKey(today);
+  const [todayHabitStats, setTodayHabitStats] = useState({ done: 0, total: 0 });
+
+  useEffect(() => {
+    if (view !== 'month') return;
+    let cancelled = false;
+    (async () => {
+      const allHabits = (await dayItemRepository.listActiveHabits()) as Habit[];
+      const scheduled = allHabits.filter((h) => isHabitScheduledOn(h.targetFrequency, today));
+      const completions = await dayItemRepository.listAllHabitCompletionsInRange(todayKey, todayKey);
+      const completedIds = new Set(completions.map((c) => c.habitId));
+      if (cancelled) return;
+      setTodayHabitStats({ done: scheduled.filter((h) => completedIds.has(h.id)).length, total: scheduled.length });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [view, todayKey, today]);
+
+  const todayItems = itemsByDate[todayKey] ?? [];
+  const todayTasks = todayItems.filter((i) => i.type === 'task');
+  const todayMoments = todayItems.filter((i) => i.type === 'moment');
+
   return (
     <Screen style={{ paddingHorizontal: 0 }}>
       <ScreenHeader
-        style={{ paddingHorizontal: 16 }}
+        style={{ paddingHorizontal: 16, paddingTop: 18, paddingBottom: 14 }}
         title={
-          <Text style={{ fontFamily: font.extrabold, fontSize: 34, lineHeight: 36, letterSpacing: -1, color: palette.text }}>
-            {view === 'year' ? year : formatFullMonthYear(today, lang)}
-          </Text>
+          <Pressable onPress={() => setMonthPickerOpen(true)} style={styles.titleWrap} hitSlop={8}>
+            <Text style={{ fontFamily: font.extrabold, fontSize: 28, letterSpacing: -0.4, color: palette.text }}>
+              {view === 'year' ? year : formatFullMonthYear(view === 'month' ? viewedMonth : today, lang)}
+            </Text>
+            <Icon name="chevron-down" size={20} color={palette.textDim} />
+          </Pressable>
         }
-        subtitle={
-          <Text style={{ fontFamily: font.regular, fontSize: 15, color: palette.textDim }}>
-            {view === 'year'
-              ? t('calendarYearSubtitle')
-              : view === 'month'
-                ? t('monthEventsCount', { count: monthItemsCount })
-                : formatHeaderDate(today, lang)}
-          </Text>
+        right={
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => setMonthPickerOpen(true)}
+              style={[styles.headerActionBtn, { backgroundColor: palette.surfaceLow }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('a11yCalendarMonthView')}
+            >
+              <Icon name="calendar-month" size={18} color={palette.text} />
+            </Pressable>
+            <Pressable
+              onPress={() => useCalendarFilterStore.getState().openSheet()}
+              style={[styles.headerActionBtn, { backgroundColor: palette.surfaceLow }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('filterLabel')}
+            >
+              <Icon name="more-horiz" size={18} color={palette.text} />
+            </Pressable>
+          </View>
         }
-        right={<CalendarViewSwitch value={view} onChange={setView} />}
+      />
+
+      <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
+        <SegmentedToggle
+          options={[
+            { value: 'month', label: t('viewMonth') },
+            { value: 'week', label: t('viewWeek') },
+            { value: 'year', label: t('viewYear') },
+          ]}
+          value={view}
+          onChange={setView}
+        />
+      </View>
+
+      <DatePickerModal
+        visible={monthPickerOpen}
+        selectedDateKey={toDateKey(view === 'month' ? viewedMonth : today)}
+        onCancel={() => setMonthPickerOpen(false)}
+        onSelect={(dateKey) => {
+          if (dateKey) setViewedMonth(fromDateKey(dateKey));
+          setView('month');
+          setMonthPickerOpen(false);
+        }}
       />
 
       {view === 'week' ? (
@@ -173,17 +261,21 @@ export function CalendarScreen() {
               contentContainerStyle={{ paddingHorizontal: 16 }}
               showsVerticalScrollIndicator={false}
             >
-              <WeekAgendaView
-                days={weekAgenda.days}
-                itemsByDate={weekAgenda.itemsByDate}
-                filter={calendarFilter}
-                onToggleComplete={weekAgenda.toggleComplete}
-                onDelete={weekAgenda.remove}
-                onClearVoiceMemoAudio={weekAgenda.clearVoiceMemoAudio}
-                onSectionLayout={(dateKey, y) => {
-                  weekSectionOffsets.current[dateKey] = y;
-                }}
-              />
+              {weekAgenda.loading && Object.keys(weekAgenda.itemsByDate).length === 0 ? (
+                <ListSkeleton count={6} />
+              ) : (
+                <WeekAgendaView
+                  days={weekAgenda.days}
+                  itemsByDate={weekAgenda.itemsByDate}
+                  filter={calendarFilter}
+                  onToggleComplete={weekAgenda.toggleComplete}
+                  onDelete={weekAgenda.remove}
+                  onClearVoiceMemoAudio={weekAgenda.clearVoiceMemoAudio}
+                  onSectionLayout={(dateKey, y) => {
+                    weekSectionOffsets.current[dateKey] = y;
+                  }}
+                />
+              )}
             </ScrollView>
           ) : view === 'year' ? (
             <ScrollView
@@ -199,7 +291,7 @@ export function CalendarScreen() {
             </ScrollView>
           ) : (
             <ScrollView
-              style={{ flex: 1, marginTop: 24 }}
+              style={{ flex: 1, marginTop: 18 }}
               contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 160 }}
               showsVerticalScrollIndicator={false}
             >
@@ -207,8 +299,20 @@ export function CalendarScreen() {
               <View style={styles.monthGrid}>
                 {monthGrid.map((cell) => {
                   const dayItems = (itemsByDate[cell.dateKey] ?? []).filter((item) => matchesCalendarFilter(item, calendarFilter));
-                  return <MonthDayCell key={cell.dateKey} cell={cell} labels={dayItems.map((item) => item.title)} />;
+                  return <MonthDayCell key={cell.dateKey} cell={cell} items={dayItems} onPress={goToDay} />;
                 })}
+              </View>
+              <View style={{ marginTop: 18 }}>
+                <CalendarTodayCard
+                  dateLabel={formatHeaderDate(today, lang)}
+                  tasksDone={todayTasks.filter((i) => i.status === 'done').length}
+                  tasksTotal={todayTasks.length}
+                  habitsDone={todayHabitStats.done}
+                  habitsTotal={todayHabitStats.total}
+                  momentsCount={todayMoments.length}
+                  momentThumbUri={todayMoments[0]?.mediaUri ?? null}
+                  onViewDay={() => goToDay(toDateKey(today))}
+                />
               </View>
             </ScrollView>
           )}
@@ -216,11 +320,10 @@ export function CalendarScreen() {
       </GestureDetector>
 
       <FloatingBar
-        barRadius={24}
-        onAddPress={() => useQuickAddStore.getState().open('event')}
+        onAddPress={() => useAddMenuStore.getState().open()}
         onMenuPress={() => useNavigateMenuStore.getState().open()}
         center={
-          <View style={styles.pill}>
+          <View style={[styles.pill, { backgroundColor: palette.pillSolid }]}>
             <Text style={{ fontFamily: font.semibold, fontSize: 17, color: palette.text }}>
               {formatMonthYearLabel(today, lang)}
             </Text>
@@ -230,7 +333,6 @@ export function CalendarScreen() {
           </View>
         }
       />
-      <CalendarFilterBar />
       <CalendarFilterSheet />
     </Screen>
   );
@@ -239,6 +341,9 @@ export function CalendarScreen() {
 const styles = StyleSheet.create({
   yearGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingBottom: 160 },
   yearCell: { width: '31%' },
-  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 },
-  pill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8 },
+  pill: { flex: 1, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  titleWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerActions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  headerActionBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 });

@@ -53,7 +53,7 @@ const ICON_SIZE = 160;
  *    El glow ambiental sí puede fundirse desde 0 sin problema (no existe
  *    versión nativa de él, no hay nada con qué solaparse) pulsando detrás
  *    (`RadialGradient` real, no un disco plano — mismo patrón que
- *    `AuraBackground.tsx`), wordmark "Trove" y lema en cascada.
+ *    `AuraBackground.tsx`), wordmark "Meld" y lema en cascada.
  * 2) Hold breve con todo visible.
  * 3) Expansión: el MISMO nodo del glow (no uno nuevo/duplicado — así el
  *    color es exactamente igual al que rodea el ícono, no una aproximación)
@@ -165,7 +165,7 @@ export function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
         />
       </View>
       <View style={styles.textBlock}>
-        <Animated.Text style={[styles.wordmark, wordmarkStyle]}>Trove</Animated.Text>
+        <Animated.Text style={[styles.wordmark, wordmarkStyle]}>Meld</Animated.Text>
         <Animated.Text style={[styles.tagline, taglineStyle]}>{t('appTagline')}</Animated.Text>
       </View>
     </View>

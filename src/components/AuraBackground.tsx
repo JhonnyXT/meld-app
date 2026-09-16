@@ -76,11 +76,13 @@ function NightfallBackground({ children }: { children?: React.ReactNode }) {
 }
 
 /**
- * "Abyssal Floor": glow teal/cian asomando desde ABAJO (radial centrado por
- * debajo del borde inferior, `cy` > 100%, aproxima "screen" + blur grande) +
- * un segundo lavado lineal más angosto de abajo hacia arriba (aproxima
- * "screen" + blur chico) — el efecto contrario a Nightfall (que viene de
- * arriba).
+ * "Abyssal Floor": glow coral (acento principal de la app, en un tono claro)
+ * asomando desde ABAJO (radial centrado por debajo del borde inferior, `cy`
+ * > 100%, aproxima "screen" + blur grande) + un segundo lavado lineal más
+ * angosto de abajo hacia arriba (aproxima "screen" + blur chico) — el efecto
+ * contrario a Nightfall (que viene de arriba). Antes era un teal/cian frío;
+ * cambiado a coral claro a pedido explícito del usuario para que el glow se
+ * sienta parte de la identidad de la marca en vez de un color suelto.
  */
 function AbyssalFloorBackground({ children }: { children?: React.ReactNode }) {
   return (
@@ -88,9 +90,9 @@ function AbyssalFloorBackground({ children }: { children?: React.ReactNode }) {
       <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
         <Defs>
           <RadialGradient id="abyssGlow" cx="50%" cy="115%" r="85%">
-            <Stop offset="0%" stopColor="rgb(0,90,110)" stopOpacity={0.55} />
-            <Stop offset="40%" stopColor="rgb(0,45,60)" stopOpacity={0.32} />
-            <Stop offset="75%" stopColor="rgb(0,45,60)" stopOpacity={0} />
+            <Stop offset="0%" stopColor="rgb(255,120,140)" stopOpacity={0.55} />
+            <Stop offset="40%" stopColor="rgb(180,50,70)" stopOpacity={0.32} />
+            <Stop offset="75%" stopColor="rgb(180,50,70)" stopOpacity={0} />
           </RadialGradient>
         </Defs>
         <Rect width="100%" height="100%" fill="url(#abyssGlow)" />
@@ -100,7 +102,7 @@ function AbyssalFloorBackground({ children }: { children?: React.ReactNode }) {
       <LinearGradient
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
-        colors={['transparent', 'rgba(0,130,150,0.22)']}
+        colors={['transparent', 'rgba(255,90,110,0.22)']}
         locations={[0.65, 1]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}

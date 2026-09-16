@@ -14,7 +14,7 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-/** Modal de confirmación propio del sistema de diseño de Trove — reemplaza el
+/** Modal de confirmación propio del sistema de diseño de Meld — reemplaza el
  * `Alert.alert` nativo del sistema operativo para acciones destructivas. */
 export function ConfirmDialog({
   visible,

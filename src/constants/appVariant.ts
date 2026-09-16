@@ -9,6 +9,11 @@ export const appVariant = (Constants.expoConfig?.extra?.appVariant ?? 'dev') as 
 
 export const appVersion = Constants.expoConfig?.version ?? '0.0.0';
 
+/** App Group compartido con el target de widget de iOS (`targets/widget/`) —
+ * ver `src/widget/refreshTodayWidget.ts`. No aplica en Android (usa su
+ * propio mecanismo de headless task, sin App Groups). */
+export const widgetAppGroup = (Constants.expoConfig?.extra?.widgetAppGroup ?? '') as string;
+
 export const isDev = appVariant === 'dev';
 export const isTest = appVariant === 'test';
 export const isProd = appVariant === 'prod';

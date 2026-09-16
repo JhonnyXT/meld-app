@@ -41,7 +41,7 @@ const darkBase = {
   textDim: '#8E8E93',
   textFaint: '#8E8E93',
   border: '#2C2C2E',
-  danger: '#ffb4ab',
+  danger: '#E5484D',
   success: '#5dde97',
 };
 
@@ -94,6 +94,20 @@ export function getPalette(scheme: 'light' | 'dark', accent: AccentId): Palette 
 export const categoryColors = {
   work: '#4F84FF',
   personal: '#A55CFF',
+} as const;
+
+/** Color fijo por TIPO de ítem (independiente del acento y del tema) — un
+ * color conocido por tipo, elegido por afinidad. Se usa para los puntos del
+ * grid de Mes en Calendario, para identificar de un vistazo qué tipo de
+ * cosas pasaron cada día. No confundir con `categoryColors` (Trabajo/
+ * Personal/Salud, que es una etiqueta que elige el usuario). */
+export const typeColors = {
+  task: '#3B82F6', // azul — "to-do" clásico
+  event: '#EF4444', // rojo — evento de calendario
+  habit: '#22C55E', // verde — racha / progreso
+  note: '#EAB308', // amarillo — sticky note
+  voiceMemo: '#8B5CF6', // morado — onda de sonido
+  moment: '#F97316', // naranja — foto / recuerdo
 } as const;
 
 export const spacing = {

@@ -2,7 +2,7 @@ import { openDatabaseSync } from 'expo-sqlite';
 import { drizzle } from 'drizzle-orm/expo-sqlite';
 import * as schema from './schema';
 
-const sqlite = openDatabaseSync('trove.db');
+const sqlite = openDatabaseSync('meld.db');
 
 export const db = drizzle(sqlite, { schema });
 
@@ -62,4 +62,26 @@ export function initDb() {
   sqlite.execSync(
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_habit_completions_habit_date ON habit_completions(habit_id, date);',
   );
+
+  sqlite.execSync(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id TEXT PRIMARY KEY NOT NULL,
+      label TEXT NOT NULL,
+      icon TEXT NOT NULL,
+      color TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+  // 3 categorías por default, una sola vez (tabla vacía = primer arranque o
+  // instalación nueva) — a partir de ahí son filas normales, el usuario
+  // puede renombrarlas/recolorearlas/borrarlas como a cualquier otra.
+  const categoryCount = sqlite.getFirstSync<{ c: number }>('SELECT COUNT(*) as c FROM categories;');
+  if (categoryCount && categoryCount.c === 0) {
+    sqlite.execSync(`
+      INSERT INTO categories (id, label, icon, color, sort_order) VALUES
+        ('cat-work', 'Work', 'briefcase', '#4F84FF', 0),
+        ('cat-personal', 'Personal', 'person', '#A55CFF', 1),
+        ('cat-health', 'Health', 'favorite', '#5dde97', 2);
+    `);
+  }
 }

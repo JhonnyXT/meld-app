@@ -16,7 +16,7 @@ case "$VARIANT" in
     # `test` es el variant para probar builds "limpios" — a diferencia de `dev`
     # (que conserva datos a propósito), cada build:test desinstala primero para
     # arrancar siempre con la base de datos vacía. Ver CLAUDE.md → Build variants.
-    PACKAGE_ID="app.trove.mobile.test"
+    PACKAGE_ID="app.meld.mobile.test"
     ;;
   prod)
     echo "El variant prod se construye con EAS, no en local:" >&2

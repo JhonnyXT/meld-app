@@ -41,7 +41,11 @@ export function WeekAgendaView({
         // comportamiento específico de Today; Calendar es justamente donde el
         // registro completo debe seguir siendo visible (ver
         // `dayItemsStore.toggleComplete`).
-        const dayItems = (itemsByDate[key] ?? []).filter((item) => matchesCalendarFilter(item, filter));
+        // Los Momentos viven en su propia pantalla — no se listan en la
+        // agenda semanal (sí siguen contando para la miniatura del grid de Mes).
+        const dayItems = (itemsByDate[key] ?? []).filter(
+          (item) => item.type !== 'moment' && matchesCalendarFilter(item, filter),
+        );
         return (
           <View
             key={key}

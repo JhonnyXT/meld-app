@@ -6,6 +6,7 @@ import { toDateKey } from '@/domain/date';
 import { useUndoStore } from '@/store/undoStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { translate } from '@/i18n';
+import { refreshWidgets } from '@/widget/refreshWidgets';
 
 interface InboxState {
   items: DayItem[];
@@ -27,7 +28,9 @@ interface InboxState {
 
 export const useInboxStore = create<InboxState>((set, get) => ({
   items: [],
-  loading: false,
+  // Arranca en `true` para pintar el skeleton desde el primer frame en vez
+  // del estado vacío, hasta que el primer `reload()` traiga los ítems.
+  loading: true,
 
   reload: async () => {
     set({ loading: true });
@@ -77,6 +80,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     const updated: DayItem = { ...item, date: toDateKey(new Date()), status: 'scheduled', updatedAt: new Date().toISOString() };
     await dayItemRepository.upsert(updated);
     set({ items: get().items.filter((i) => i.id !== id) });
+    refreshWidgets();
   },
 
   bulkRemove: async (ids: string[]) => {
@@ -113,5 +117,6 @@ export const useInboxStore = create<InboxState>((set, get) => ({
         dayItemRepository.upsert({ ...item, date: dateKey, status: 'scheduled', updatedAt: new Date().toISOString() }),
       ),
     );
+    refreshWidgets();
   },
 }));

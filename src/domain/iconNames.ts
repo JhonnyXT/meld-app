@@ -63,4 +63,21 @@ export type IconName =
   | 'bike'
   | 'dumbbell'
   | 'waves-horizontal'
-  | 'sunrise';
+  | 'sunrise'
+  | 'sun'
+  | 'more-horiz'
+  | 'palette'
+  | 'rows'
+  | 'check-circle'
+  | 'sparkles'
+  | 'checklist'
+  // Set de íconos elegibles al crear/editar una categoría (Ajustes >
+  // Categorías, ver `components/settings/CategoryFormModal.tsx`)
+  | 'briefcase'
+  | 'person'
+  | 'book-open'
+  | 'home'
+  | 'star'
+  | 'cart'
+  | 'music'
+  | 'plane';

@@ -60,3 +60,16 @@ export const habitCompletions = sqliteTable('habit_completions', {
   habitId: text('habit_id').notNull(),
   date: text('date').notNull(),
 });
+
+/** Catálogo de categorías configurable por el usuario (Ajustes > Categorías,
+ * ver `domain/category.ts`) — reemplaza la lista fija que vivía en
+ * `domain/quickAdd.ts`. `category`/`categoryColor` en `day_items` siguen
+ * siendo texto copiado al crear el ítem, no una referencia real a esta
+ * tabla. */
+export const categories = sqliteTable('categories', {
+  id: text('id').primaryKey(),
+  label: text('label').notNull(),
+  icon: text('icon').notNull(),
+  color: text('color').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+});

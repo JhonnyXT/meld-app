@@ -3,41 +3,37 @@ import { ScrollView, Text, View, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { FloatingBar } from '@/components/FloatingBar';
-import { MomentsWeekRow } from '@/components/moments/MomentsWeekRow';
-import { MomentsCollapsedWeekRow } from '@/components/moments/MomentsCollapsedWeekRow';
+import { EmptyState } from '@/components/EmptyState';
+import { ListSkeleton } from '@/components/ListSkeleton';
+import { MomentsDayRow } from '@/components/moments/MomentsDayRow';
+import { MomentPhotoViewer } from '@/components/moments/MomentPhotoViewer';
 import { useTheme } from '@/theme/ThemeProvider';
-import { toDateKey } from '@/domain/date';
-import { MONTH_FULL } from '@/i18n/translations';
+import { toDateKey, fromDateKey, addDays, formatShortDateLabel, formatFullMonthYear } from '@/domain/date';
 import { useTranslation } from '@/i18n';
-import { recentWeeks } from '@/domain/week';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
-import { pickMomentPhotoForWeek } from '@/services/pickMomentPhoto';
+import { pickMomentPhotoForToday } from '@/services/pickMomentPhoto';
 import { useNavigateMenuStore } from '@/store/navigateMenuStore';
 import type { Moment } from '@/domain/dayItem';
 
-const FULL_WEEKS_COUNT = 2;
-const COLLAPSED_WEEKS_COUNT = 3;
+/** Ventana de días hacia atrás que se muestra en Momentos. */
+const RANGE_DAYS = 90;
 
 export function MomentsScreen() {
   const { palette, font } = useTheme();
   const { t, lang } = useTranslation();
   const today = useMemo(() => new Date(), []);
-  const weeks = useMemo(
-    () => recentWeeks(today, FULL_WEEKS_COUNT + COLLAPSED_WEEKS_COUNT, lang),
-    [today, lang],
-  );
-  const [momentsByWeek, setMomentsByWeek] = useState<Record<number, Moment>>({});
+  const todayKey = toDateKey(today);
+  const [moments, setMoments] = useState<Moment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    const startKey = toDateKey(weeks[weeks.length - 1].start);
-    const endKey = toDateKey(weeks[0].end);
-    const items = await dayItemRepository.listByDateRange(startKey, endKey);
-    const grouped: Record<number, Moment> = {};
-    for (const item of items) {
-      if (item.type === 'moment') grouped[item.weekOfYear] = item;
-    }
-    setMomentsByWeek(grouped);
-  }, [weeks]);
+    setLoading(true);
+    const startKey = toDateKey(addDays(today, -RANGE_DAYS));
+    const items = await dayItemRepository.listByDateRange(startKey, todayKey);
+    setMoments(items.filter((i): i is Moment => i.type === 'moment'));
+    setLoading(false);
+  }, [today, todayKey]);
 
   useFocusEffect(
     useCallback(() => {
@@ -45,53 +41,94 @@ export function MomentsScreen() {
     }, [reload]),
   );
 
-  const handleAddPhoto = async (weekIndex: number) => {
-    const saved = await pickMomentPhotoForWeek(weeks[weekIndex]);
+  const handleAddPhoto = async () => {
+    const saved = await pickMomentPhotoForToday();
     if (saved) reload();
   };
+
+  // Agrupa por día y ordena los días de más reciente a más antiguo. El día de
+  // hoy SIEMPRE aparece (aunque no tenga fotos) para tener el "+" a mano.
+  const days = useMemo(() => {
+    const byDay = new Map<string, Moment[]>();
+    for (const m of moments) {
+      if (!m.date) continue;
+      const list = byDay.get(m.date);
+      if (list) list.push(m);
+      else byDay.set(m.date, [m]);
+    }
+    if (!byDay.has(todayKey)) byDay.set(todayKey, []);
+    return Array.from(byDay.entries())
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+      .map(([dateKey, photos]) => ({
+        dateKey,
+        label:
+          dateKey === todayKey
+            ? lang === 'es'
+              ? 'Hoy'
+              : 'Today'
+            : formatShortDateLabel(dateKey, lang, today),
+        photos: [...photos].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
+      }));
+  }, [moments, todayKey, lang, today]);
+
+  const hasAnyMoment = moments.length > 0;
 
   return (
     <Screen style={{ paddingHorizontal: 0 }}>
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.content, { paddingHorizontal: 16 }]}
+        contentContainerStyle={[styles.content, { paddingHorizontal: 16 }, !hasAnyMoment && styles.contentEmpty]}
         showsVerticalScrollIndicator={false}
       >
         <View style={{ gap: 4 }}>
-          <Text style={{ fontFamily: font.extrabold, fontSize: 34, lineHeight: 36, letterSpacing: -1, color: palette.text }}>
+          <Text style={{ fontFamily: font.extrabold, fontSize: 34, lineHeight: 46, letterSpacing: -1, color: palette.text }}>
             {t('momentsTitle')}
           </Text>
-          <Text style={{ fontFamily: font.regular, fontSize: 15, color: palette.textDim }}>
+          <Text style={{ fontFamily: font.regular, fontSize: 15, lineHeight: 20, color: palette.textDim }}>
             {t('momentsSubtitle')}
           </Text>
         </View>
 
-        <Text style={{ fontFamily: font.bold, fontSize: 22, color: palette.text }}>
-          {MONTH_FULL[lang][today.getMonth()]}
-        </Text>
-
-        {weeks.map((week, i) =>
-          i < FULL_WEEKS_COUNT ? (
-            <MomentsWeekRow
-              key={week.weekNumber}
-              week={week}
-              moment={momentsByWeek[week.weekNumber] ?? null}
-              onAddPhoto={() => handleAddPhoto(i)}
+        {loading && !hasAnyMoment ? (
+          <ListSkeleton variant="tiles" />
+        ) : !hasAnyMoment ? (
+          <>
+            <MomentsDayRow
+              label={lang === 'es' ? 'Hoy' : 'Today'}
+              photos={[]}
+              canAdd
+              onAddPhoto={handleAddPhoto}
             />
-          ) : (
-            <MomentsCollapsedWeekRow key={week.weekNumber} week={week} />
-          ),
+            <EmptyState
+              icon="photo-library"
+              title={t('momentsEmptyTitle')}
+              message={t('momentsEmptyMessage')}
+            />
+          </>
+        ) : (
+          days.map((day) => (
+            <MomentsDayRow
+              key={day.dateKey}
+              label={day.label}
+              photos={day.photos}
+              canAdd={day.dateKey === todayKey}
+              onAddPhoto={handleAddPhoto}
+              onPressPhoto={(m) => setViewerUri(m.mediaUri)}
+            />
+          ))
         )}
       </ScrollView>
 
+      <MomentPhotoViewer uri={viewerUri} onClose={() => setViewerUri(null)} />
+
       <FloatingBar
-        onAddPress={() => handleAddPhoto(0)}
+        onAddPress={handleAddPhoto}
         onMenuPress={() => useNavigateMenuStore.getState().open()}
         center={
-          <View style={styles.pill}>
+          <View style={[styles.pill, { backgroundColor: palette.pillSolid }]}>
             <Text style={{ fontFamily: font.bold, fontSize: 17, color: palette.text }}>{t('momentsTitle')}</Text>
             <Text style={{ fontFamily: font.regular, fontSize: 12, color: palette.textDim }}>
-              {MONTH_FULL[lang][today.getMonth()]}
+              {formatFullMonthYear(today, lang)}
             </Text>
           </View>
         }
@@ -101,6 +138,7 @@ export function MomentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { gap: 32, paddingTop: 12, paddingBottom: 160 },
-  pill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: { gap: 28, paddingTop: 12, paddingBottom: 160 },
+  contentEmpty: { flexGrow: 1 },
+  pill: { flex: 1, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
 });
