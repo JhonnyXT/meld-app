@@ -8,7 +8,7 @@ description: |
   sandbox, y los pasos de rebuild nativo cuando se agregan dependencias nativas.
 license: MIT
 metadata:
-  project: anchor-app
+  project: meld-app
   stack: expo-react-native
 ---
 
@@ -42,7 +42,7 @@ Hace falta solo si cambiaron dependencias con código nativo (cualquier paquete
 cambió JS/TSX, saltar al Paso 2 — Metro sirve el bundle nuevo al recargar.
 
 ```bash
-cd /home/usuario/Documentos/me/code/anchor-app
+cd /home/usuario/Documentos/me/code/meld-app
 export ANDROID_HOME="$HOME/Android/Sdk"
 export JAVA_HOME="$HOME/.local/jdk-17"
 nohup "$ANDROID_HOME/platform-tools/adb" nodaemon server -a > /tmp/adb-server.log 2>&1 &
@@ -85,7 +85,7 @@ sleep 2
 "$ADB" reverse --remove-all
 "$ADB" reverse tcp:8081 tcp:8082
 
-cd /home/usuario/Documentos/me/code/anchor-app
+cd /home/usuario/Documentos/me/code/meld-app
 nohup env APP_VARIANT=dev npx expo start --port 8082 > /tmp/expo-start.log 2>&1 &
 disown
 sleep 12

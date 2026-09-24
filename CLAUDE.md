@@ -7,7 +7,8 @@ hábitos, notas, notas de voz y fotos en una vista por día. El spec de producto
 completo está en el artifact "Meld — Spec de Desarrollo" (publicado por el dueño del
 proyecto — pedirle el link si hace falta releerlo). El proyecto se llamó "Anchor" y
 luego "Trove" antes de **Meld** (nombre definitivo); por eso quedan rastros como
-la carpeta `anchor-app` o `app.anchor.*` en data vieja.
+`app.anchor.*` en data vieja. La carpeta local del repo se llamó `anchor-app`
+hasta que se renombró a `meld-app`.
 
 Este archivo contiene solo las reglas vigentes y su razón. El historial de
 decisiones (qué se probó, qué se descartó, cuándo y a pedido de quién) está en
