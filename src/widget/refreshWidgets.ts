@@ -3,6 +3,7 @@ import { getTodayWidgetData } from './todayWidgetData';
 import { getHabitsWidgetData } from './habitsWidgetData';
 import { WIDGET_NAMES, buildAndroidWidgetTree } from './androidWidgetTree';
 import { widgetAppGroup } from '@/constants/appVariant';
+import { refreshAppBadge } from '@/services/appBadge';
 
 /** Llamar después de cualquier mutación que pueda cambiar lo que se ve en
  * alguno de los 4 widgets (`WIDGET_NAMES`: Hoy/Agregar rápido/Progreso/
@@ -16,6 +17,10 @@ import { widgetAppGroup } from '@/constants/appVariant';
  * "Agregar rápido" queda afuera a propósito — es estático (no muestra datos
  * de la DB), así que nunca necesita refrescarse por una mutación. */
 export async function refreshWidgets(): Promise<void> {
+  // El contador del ícono de la app depende de los mismos datos (tareas
+  // pendientes de hoy), así que se engancha acá y hereda todos los puntos de
+  // mutación que ya llaman a `refreshWidgets`.
+  refreshAppBadge();
   try {
     if (Platform.OS === 'android') {
       const { requestWidgetUpdate } = require('react-native-android-widget');

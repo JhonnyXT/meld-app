@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { View } from 'react-native';
+import { AppState, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import { useQuickAddStore } from '@/store/quickAddStore';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -19,6 +19,7 @@ import { JetBrainsMono_700Bold } from '@expo-google-fonts/jetbrains-mono';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 import { AnimatedSplash } from '@/components/AnimatedSplash';
 import { initDb } from '@/data/local/db';
+import { refreshAppBadge } from '@/services/appBadge';
 import { useCategoriesStore } from '@/store/categoriesStore';
 import { QuickAddSheet } from '@/components/quickAdd/QuickAddSheet';
 import { AddMenu } from '@/components/AddMenu';
@@ -99,6 +100,13 @@ export default function RootLayout() {
     initDb();
     useCategoriesStore.getState().load();
     setDbReady(true);
+    // Contador de tareas pendientes en el ícono: al abrir y cada vez que la
+    // app vuelve a primer plano (p. ej. al pasar la medianoche cambia "hoy").
+    refreshAppBadge();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshAppBadge();
+    });
+    return () => sub.remove();
   }, []);
 
   const ready = dbReady && fontsLoaded;

@@ -57,6 +57,10 @@ if (Platform.OS === 'android') {
           await toggleHabitCompleteFromWidget(id);
         }
       }
+      // También corre en el ciclo periódico del widget (`updatePeriodMillis`)
+      // con la app cerrada — así el contador del ícono se pone al día solo
+      // cuando cambia el día, sin tener que abrir la app.
+      await require('@/services/appBadge').refreshAppBadge();
 
       // Un solo handler cubre los 4 tipos de widget (`WIDGET_NAMES` en
       // `androidWidgetTree.ts`) — `widgetName` dice cuál. `WIDGET_RESIZED`

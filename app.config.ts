@@ -16,19 +16,16 @@ const variants = {
     name: 'Meld (Dev)',
     package: 'app.meld.mobile',
     scheme: 'meld',
-    iconBackground: '#121212',
   },
   test: {
     name: 'Meld (Test)',
     package: 'app.meld.mobile.test',
     scheme: 'meld-test',
-    iconBackground: '#8B5CF6',
   },
   prod: {
     name: 'Meld',
     package: 'app.meld',
     scheme: 'meld-prod',
-    iconBackground: '#FF4B66',
   },
 } as const satisfies Record<Variant, unknown>;
 
@@ -73,8 +70,13 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
   },
   android: {
     package: current.package,
+    // El ícono es el logo tal cual, igual en los 3 variants (a pedido
+    // explícito — antes cada variant teñía el fondo con su propio color y el
+    // logo quedaba "encajonado"). `backgroundImage` es el degradado negro
+    // del propio logo, `foregroundImage` el círculo con el check; los 3 PNG
+    // salen de `assets/logo.png`. `backgroundColor` es solo el respaldo.
     adaptiveIcon: {
-      backgroundColor: current.iconBackground,
+      backgroundColor: '#050508',
       foregroundImage: './assets/android-icon-foreground.png',
       backgroundImage: './assets/android-icon-background.png',
       monochromeImage: './assets/android-icon-monochrome.png',

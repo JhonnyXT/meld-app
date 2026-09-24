@@ -51,7 +51,8 @@ resueltas (puerto ocupado, adb, babel). No reinventar este flujo desde cero.
 
 Patrón portado de `my-wallet-app`/`habit-tracker` (repos hermanos). Config dinámica en
 `app.config.ts` (no `app.json` estático, que fue eliminado) — una tabla `variants` define
-`name`/`package`/`scheme`/`iconBackground` por variant, seleccionado con la env var
+`name`/`package`/`scheme` por variant (el ícono es IDÉNTICO en los 3 desde
+2026-09-23 — ya no hay `iconBackground` por variant, ver "Logo y splash screen"), seleccionado con la env var
 `APP_VARIANT` (`dev` por defecto si no se define). Un `APP_VARIANT` desconocido **lanza
 excepción** al resolver la config, no hay fallback silencioso.
 
@@ -550,7 +551,26 @@ referencia estilo Apple Health que el usuario pasó (capturas de un video):
   es la anotación completa de la función de plan Pro que pidió el usuario
   (dónde vive: este texto visible + el comentario largo sobre
   `Habit.autoTrack` en `domain/dayItem.ts` + la sección dedicada
-  "## Roadmap Pro", más abajo en este archivo, que junta TODO lo pendiente
+  "## Landing page (`landing/`, agregada 2026-09-23)
+
+Web de marketing en **Next.js 16 (App Router) + Tailwind v4**, dentro de
+`landing/` como proyecto npm APARTE (su propio `package.json`/`node_modules`
+— no es un workspace). `metro.config.js` de la raíz la excluye con
+`resolver.blockList` y el `tsconfig.json` raíz tiene `"exclude": ["landing"]`
+— sin eso Metro rastrea sus ~400 paquetes y `tsc` de Expo intenta chequear
+código de Next. Diseño = dirección **A+** del canvas de mockups (ver memoria
+`project-landing-page`): oscuro de marca, bilingüe `/es` + `/en`, CTA = lista
+de espera, Pro como "Próximamente". Detalle de estructura y pendientes en
+`landing/README.md`. **Esta versión de Next tiene cambios de API** (p. ej.
+`proxy.ts` en vez de `middleware.ts`, `params` como Promise) — leer
+`landing/node_modules/next/dist/docs/` antes de tocar código (lo pide
+`landing/AGENTS.md`). La portada tiene la pantalla Hoy funcionando en el navegador
+(`landing/src/demo/`, estado solo en memoria) — usa una COPIA de
+`src/domain/voiceParser.ts` (`landing/src/demo/voiceParser.ts`): si se cambia
+el parser en la app, copiar el cambio allá. La lista de espera guarda en **Resend** (contactos) vía
+`RESEND_API_KEY` — sin esa variable, en producción responde 503 a propósito.
+
+## Roadmap Pro", más abajo en este archivo, que junta TODO lo pendiente
   de plan Pro en un solo lugar) — nota explícita de producto, NO una feature
   implementada todavía; el tap manual (`onToggleHabitComplete`) sigue
   funcionando igual para hábitos con Auto-registro y seguiría funcionando
@@ -929,6 +949,30 @@ el check es un trazo superpuesto en vez de estar recortado del propio círculo �
 darlo por definitivo sin confirmar con el usuario. El wordmark de texto (splash,
 ver abajo) ya dice "Meld" — el logo en sí (la forma del ícono) no depende del nombre
 y no necesitó cambios por el rename.
+
+**Ícono del launcher (2026-09-23, a pedido explícito: "el logo como tal, sin
+cambiarle nada de fondo")**: antes el adaptive icon usaba `logo.png` entero como
+foreground (con su margen blanco) sobre un `backgroundColor` distinto por
+variant — se veía el cuadrado negro encajonado en un borde de color. Ahora las
+capas salen de `logo.png` recortado: `android-icon-background.png` = el
+degradado negro del cuadrado del logo (full-bleed), `android-icon-foreground.png`
+= el círculo coral con el check dentro de la zona segura (72/108), mismo
+tamaño relativo que en el logo; `android-icon-monochrome.png` = círculo sólido
+con el check calado (íconos temáticos); `icon.png` (iOS/legacy) = cuadrado
+completo sin márgenes. Los 3 variants se ven iguales (se distinguen por el
+nombre "(Dev)"/"(Test)"). `logo.png`/`splash-icon.png` NO se tocaron.
+
+**Contador de pendientes sobre el ícono (badge, 2026-09-23)**:
+`services/appBadge.ts` → `refreshAppBadge()` fija
+`Notifications.setBadgeCountAsync(n)` con n = tareas de hoy sin completar +
+atrasadas del rollover (mismo criterio que Today). Se llama desde
+`refreshWidgets()` (hereda TODOS los puntos de mutación), desde el headless
+task del widget (así se pone al día cada 30 min con la app cerrada, p. ej. al
+cambiar de día) y al volver la app a primer plano (`AppState`, en
+`app/_layout.tsx`). Android lo hace vía ShortcutBadger (dentro de
+`expo-notifications`): solo lo muestran launchers con badges numéricos
+(Samsung One UI sí; Pixel/Moto solo pintan un punto por notificaciones y lo
+ignoran — no es un bug del código). iOS requiere el permiso de notificaciones.
 
 ### Splash animado (`src/components/AnimatedSplash.tsx`)
 
