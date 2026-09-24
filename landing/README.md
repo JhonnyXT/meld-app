@@ -73,12 +73,32 @@ npm run build && npm start
   Momentos tiene hover por foto (CSS, `group-has`); el carrusel de
   pantallas es centrado con snap para que las flechas siempre tengan algo
   que mover.
-- **Desplegado**: proyecto `meld-landing` en Vercel (org
+- **Desplegado**: proyecto **`meld`** en Vercel (org
   `jonathanblandon1017-5123s-projects`), enlazado con `vercel link` — ver
   `.vercel/project.json` (no se commitea). `RESEND_API_KEY` y
-  `NEXT_PUBLIC_SITE_URL` ya cargadas en Production y Preview. URL actual:
-  `https://meld-landing-ashy.vercel.app` (alias `*.vercel.app`, sin dominio
-  propio todavía).
+  `NEXT_PUBLIC_SITE_URL` ya cargadas en Production y Preview. **URL pública:
+  `https://usemeld.vercel.app`** — `meld.vercel.app`/`meld-app.vercel.app`/
+  `meldapp.vercel.app` ya pertenecen a otra cuenta (no se pueden reclamar).
+  Protección SSO del proyecto DESACTIVADA (`vercel project protection
+  disable meld --sso`) — sin esto, cualquier alias que no sea el "dominio
+  primario" del proyecto (ver debajo) pedía loguearse con Vercel para verla,
+  algo que no tiene sentido en una landing pública.
+
+  **Gotcha real de este deploy — sin Git, cada `vercel deploy --prod` crea
+  una URL de deployment nueva.** El proyecto tiene DOS "dominios primarios"
+  que Vercel mueve solos a la última producción en cada deploy:
+  `meld-landing-ashy.vercel.app` (el que Vercel asignó solo en el primer
+  deploy, de cuando el proyecto todavía se llamaba `meld-landing` — quedó
+  pegado) y `meld-<org>.vercel.app`. **`usemeld.vercel.app` NO es uno de
+  esos** — se creó a mano con `vercel alias set <deployment> usemeld.vercel.app`,
+  así que apunta a un deployment fijo y NO seguirá los próximos
+  `--prod` solo. Tras cada deploy a producción, hay que re-apuntarlo:
+  ```bash
+  cd landing
+  vercel deploy --prod                      # anotar la URL de deployment que imprime
+  vercel alias set <esa-url> usemeld.vercel.app
+  ```
+  (Los otros dos alias primarios se actualizan solos, no hace falta tocarlos.)
 - **Pendiente**: dominio propio (ver "Dominio y verificación de Resend"
   abajo), completar los marcadores legales en `src/legal/docs.ts`, enlace de
   Soporte real (`Footer.tsx`) y una imagen Open Graph propia (hoy usa el
