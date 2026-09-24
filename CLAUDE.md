@@ -551,26 +551,7 @@ referencia estilo Apple Health que el usuario pasó (capturas de un video):
   es la anotación completa de la función de plan Pro que pidió el usuario
   (dónde vive: este texto visible + el comentario largo sobre
   `Habit.autoTrack` en `domain/dayItem.ts` + la sección dedicada
-  "## Landing page (`landing/`, agregada 2026-09-23)
-
-Web de marketing en **Next.js 16 (App Router) + Tailwind v4**, dentro de
-`landing/` como proyecto npm APARTE (su propio `package.json`/`node_modules`
-— no es un workspace). `metro.config.js` de la raíz la excluye con
-`resolver.blockList` y el `tsconfig.json` raíz tiene `"exclude": ["landing"]`
-— sin eso Metro rastrea sus ~400 paquetes y `tsc` de Expo intenta chequear
-código de Next. Diseño = dirección **A+** del canvas de mockups (ver memoria
-`project-landing-page`): oscuro de marca, bilingüe `/es` + `/en`, CTA = lista
-de espera, Pro como "Próximamente". Detalle de estructura y pendientes en
-`landing/README.md`. **Esta versión de Next tiene cambios de API** (p. ej.
-`proxy.ts` en vez de `middleware.ts`, `params` como Promise) — leer
-`landing/node_modules/next/dist/docs/` antes de tocar código (lo pide
-`landing/AGENTS.md`). La portada tiene la pantalla Hoy funcionando en el navegador
-(`landing/src/demo/`, estado solo en memoria) — usa una COPIA de
-`src/domain/voiceParser.ts` (`landing/src/demo/voiceParser.ts`): si se cambia
-el parser en la app, copiar el cambio allá. La lista de espera guarda en **Resend** (contactos) vía
-`RESEND_API_KEY` — sin esa variable, en producción responde 503 a propósito.
-
-## Roadmap Pro", más abajo en este archivo, que junta TODO lo pendiente
+  "## Roadmap Pro", más abajo en este archivo, que junta TODO lo pendiente
   de plan Pro en un solo lugar) — nota explícita de producto, NO una feature
   implementada todavía; el tap manual (`onToggleHabitComplete`) sigue
   funcionando igual para hábitos con Auto-registro y seguiría funcionando
@@ -2112,6 +2093,29 @@ se agregaron ~40 claves `onb*` (es + en) en `translations.ts` + (2026-08-29)
 **`designs/trove-splash.pen` sigue DESACTUALIZADO** respecto al onboarding
 real — el usuario pidió no tocar Pen en esta pasada. Si se retoma el diseño
 ahí, rehacer las pantallas para que combinen con el código.
+
+## Landing page (`landing/`, agregada 2026-09-23)
+
+Web de marketing en **Next.js 16 (App Router) + Tailwind v4**, dentro de
+`landing/` como proyecto npm APARTE (su propio `package.json`/`node_modules`
+— no es un workspace). `metro.config.js` de la raíz la excluye con
+`resolver.blockList` y el `tsconfig.json` raíz tiene `"exclude": ["landing"]`
+— sin eso Metro rastrea sus ~400 paquetes y `tsc` de Expo intenta chequear
+código de Next. Diseño = dirección **A+** del canvas de mockups (ver memoria
+`project-landing-page`): oscuro de marca, bilingüe `/es` + `/en`, CTA = lista
+de espera, Pro como "Próximamente". Detalle de estructura y pendientes en
+`landing/README.md`. **Esta versión de Next tiene cambios de API** (p. ej.
+`proxy.ts` en vez de `middleware.ts`, `params` como Promise) — leer
+`landing/node_modules/next/dist/docs/` antes de tocar código (lo pide
+`landing/AGENTS.md`). La portada tiene la pantalla Hoy funcionando en el navegador
+(`landing/src/demo/`, estado solo en memoria) — usa una COPIA de
+`src/domain/voiceParser.ts` (`landing/src/demo/voiceParser.ts`): si se cambia
+el parser en la app, copiar el cambio allá. La lista de espera guarda en **Resend** (contactos) vía
+`RESEND_API_KEY` — sin esa variable, en producción responde 503 a propósito. Desplegada en Vercel
+(proyecto `meld`, `usemeld.vercel.app`), conectada a `JhonnyXT/meld-app`
+(GitHub) con `Root Directory: landing` — cada push a `main` construye y
+despliega solo. Detalle completo (dominio, variables de entorno, gotchas
+de la conexión Git↔Vercel) en `landing/README.md`.
 
 ## Roadmap Pro
 

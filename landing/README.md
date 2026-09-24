@@ -74,31 +74,31 @@ npm run build && npm start
   pantallas es centrado con snap para que las flechas siempre tengan algo
   que mover.
 - **Desplegado**: proyecto **`meld`** en Vercel (org
-  `jonathanblandon1017-5123s-projects`), enlazado con `vercel link` — ver
-  `.vercel/project.json` (no se commitea). `RESEND_API_KEY` y
-  `NEXT_PUBLIC_SITE_URL` ya cargadas en Production y Preview. **URL pública:
-  `https://usemeld.vercel.app`** — `meld.vercel.app`/`meld-app.vercel.app`/
+  `jonathanblandon1017-5123s-projects`), conectado al repo de GitHub
+  **`JhonnyXT/meld-app`** (rama `main`) — cada `git push` a `main` dispara un
+  build y despliegue automático a producción. **`Root Directory` del proyecto
+  está seteado a `landing`** (el repo tiene la app de Expo en la raíz y esta
+  carpeta adentro; sin ese ajuste Vercel buscaría `package.json` en el lugar
+  equivocado) — se configuró vía la API de Vercel (`PATCH /v9/projects/{id}`
+  con `{"rootDirectory": "landing"}`), no hay flag para esto en el CLI.
+  `RESEND_API_KEY` y `NEXT_PUBLIC_SITE_URL` cargadas en Production y Preview.
+  **URL pública: `https://usemeld.vercel.app`** — es un Domain real y
+  verificado del proyecto (no un alias suelto), así que sigue solo cada
+  deploy nuevo a producción, sea por push a `main` o por
+  `vercel deploy --prod` local. `meld.vercel.app`/`meld-app.vercel.app`/
   `meldapp.vercel.app` ya pertenecen a otra cuenta (no se pueden reclamar).
   Protección SSO del proyecto DESACTIVADA (`vercel project protection
-  disable meld --sso`) — sin esto, cualquier alias que no sea el "dominio
-  primario" del proyecto (ver debajo) pedía loguearse con Vercel para verla,
+  disable meld --sso`) — sin esto, cualquier alias que no fuera el "dominio
+  primario" original del proyecto pedía loguearse con Vercel para verla,
   algo que no tiene sentido en una landing pública.
 
-  **Gotcha real de este deploy — sin Git, cada `vercel deploy --prod` crea
-  una URL de deployment nueva.** El proyecto tiene DOS "dominios primarios"
-  que Vercel mueve solos a la última producción en cada deploy:
-  `meld-landing-ashy.vercel.app` (el que Vercel asignó solo en el primer
-  deploy, de cuando el proyecto todavía se llamaba `meld-landing` — quedó
-  pegado) y `meld-<org>.vercel.app`. **`usemeld.vercel.app` NO es uno de
-  esos** — se creó a mano con `vercel alias set <deployment> usemeld.vercel.app`,
-  así que apunta a un deployment fijo y NO seguirá los próximos
-  `--prod` solo. Tras cada deploy a producción, hay que re-apuntarlo:
-  ```bash
-  cd landing
-  vercel deploy --prod                      # anotar la URL de deployment que imprime
-  vercel alias set <esa-url> usemeld.vercel.app
-  ```
-  (Los otros dos alias primarios se actualizan solos, no hace falta tocarlos.)
+  **Conectar el repo a un proyecto de Vercel ya creado a mano (no vía
+  Import) puede fallar la primera vez** con
+  `Failed to connect <repo> to project` si la integración GitHub↔Vercel de
+  la cuenta está limitada a "repositorios seleccionados" y el repo es nuevo
+  — hay que agregarlo a mano en github.com/settings/installations → Vercel
+  → Configure → Repository access, y recién ahí `vercel git connect
+  <url-del-repo>` conecta bien.
 - **Pendiente**: dominio propio (ver "Dominio y verificación de Resend"
   abajo), completar los marcadores legales en `src/legal/docs.ts`, enlace de
   Soporte real (`Footer.tsx`) y una imagen Open Graph propia (hoy usa el
