@@ -17,9 +17,17 @@ npm run build && npm start
 - **Secciones**: `src/components/sections/*`, en el orden de `src/app/[lang]/page.tsx`.
   La barra flotante (`DockBar`) usa los `id` de cada sección.
 - **Lista de espera**: `POST /api/waitlist` → `src/lib/waitlist.ts` → crea un
-  contacto en **Resend** (`POST https://api.resend.com/contacts`). Variables:
-  `RESEND_API_KEY` (obligatoria) y `RESEND_SEGMENT_ID` (opcional), ver
-  `.env.example`. Sin la key: en dev solo loguea; en producción responde 503
+  contacto en **Resend**. Comparte cuenta/audiencia con
+  `my-wallet-app/landing`, separado por **segmento** (`Meld — Waitlist`,
+  agrupa a quien se anota aquí) y **topic** (`Meld — Lanzamiento`,
+  suscripción propia): dar de baja hace `opt_out` de ese topic únicamente
+  (`PATCH /contacts/{email}/topics`), nunca el `unsubscribed` global del
+  contacto — eso sacaría a la persona también de la lista de MyWallet si
+  comparte el mismo email. IDs por defecto ya en el código (creados a mano
+  en el dashboard, 2026-09-24); `RESEND_SEGMENT_ID`/`RESEND_TOPIC_ID` en
+  `.env.example` solo hacen falta si se recrean. `RESEND_API_KEY` es
+  obligatoria (puede ser la misma key que usa MyWallet, con permiso de
+  contactos). Sin la key: en dev solo loguea; en producción responde 503
   (nunca finge que guardó). Tiene un campo trampa `website` contra bots.
 - **Portada interactiva = la pantalla Hoy de la app funcionando en el
   navegador** (`src/demo/`): agregar los 5 tipos con Quick Add (tarea,
@@ -53,14 +61,17 @@ npm run build && npm start
   ser el link "darte de baja" de un futuro email, no un formulario del
   sitio — a propósito, no queremos invitar a que cualquiera dé de baja a
   cualquiera) → `unsubscribeEmail` en `src/lib/waitlist.ts`
-  (`PATCH /contacts/{email}` en Resend) → redirige a
-  `/[lang]/unsubscribed` con la confirmación. Probado de punta a punta
-  contra Resend real (crear contacto de prueba → dar de baja → verificar
-  `unsubscribed:true` → borrar el contacto de prueba). **Todavía no hay
-  ningún email real que use este link** — es la infraestructura, lista para
-  cuando se arme el email de lanzamiento (Resend Broadcasts); ahí hay que
-  incluir `https://<dominio>/api/unsubscribe?email={{email}}&lang=es` (o
-  `en`) en el pie del email.
+  (`PATCH /contacts/{email}/topics`, `opt_out` solo del topic
+  `Meld — Lanzamiento` — ver arriba, no toca el `unsubscribed` global) →
+  redirige a `/[lang]/unsubscribed` con la confirmación. Probado de punta a
+  punta contra Resend real cuando aún era baja global (crear contacto de
+  prueba → dar de baja → verificar `unsubscribed:true` → borrar el contacto
+  de prueba); pendiente reprobar con el `opt_out` de topic actual.
+  **Todavía no hay ningún email real que use este link** — es la
+  infraestructura, lista para cuando se arme el email de lanzamiento
+  (Resend Broadcasts); ahí hay que incluir
+  `https://<dominio>/api/unsubscribe?email={{email}}&lang=es` (o `en`) en
+  el pie del email.
 - **Privacidad y Términos**: `/[lang]/privacy` y `/[lang]/terms`, textos en
   `src/legal/docs.ts` (es + en). Describen la app TAL COMO ES HOY (Free 100%
   local, sin analíticas, dictado vía el reconocedor del sistema, Pro sin
