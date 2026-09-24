@@ -20,6 +20,8 @@ import {
 import { useNavigateMenuStore } from '@/store/navigateMenuStore';
 import { useCategoriesSheetStore } from '@/store/categoriesSheetStore';
 import { getNotificationPermissionStatus, requestNotificationPermission } from '@/services/notifications';
+import { trialDaysLeft } from '@/domain/trial';
+import { isDev, isTest } from '@/constants/appVariant';
 
 const THEME_LABEL_KEY: Record<ThemePreference, TranslationKey> = {
   system: 'themeSystem',
@@ -58,6 +60,14 @@ export function SettingsScreen() {
   const cycleCompletedItemStyle = useSettingsStore((s) => s.cycleCompletedItemStyle);
   const coolHabitsEnabled = useSettingsStore((s) => s.coolHabitsEnabled);
   const setCoolHabitsEnabled = useSettingsStore((s) => s.setCoolHabitsEnabled);
+  const plan = useSettingsStore((s) => s.plan);
+  const trialStartedAt = useSettingsStore((s) => s.trialStartedAt);
+  const onTrial = plan === 'pro' && trialStartedAt !== null;
+  const planSubtitle = onTrial
+    ? t('settingsPlanTrial', { days: trialDaysLeft(trialStartedAt) })
+    : plan === 'pro'
+      ? t('settingsPlanPro')
+      : t('settingsPlanFree');
 
   // Solo para saber si el diálogo nativo todavía puede aparecer al tocar
   // "activar" — no gobierna el valor del toggle (ver `notificationsEnabled`,
@@ -111,6 +121,35 @@ export function SettingsScreen() {
         contentContainerStyle={[styles.content, { paddingHorizontal: 16 }]}
         showsVerticalScrollIndicator={false}
       >
+        <SettingsSection title={t('settingsSectionPlan')}>
+          <SettingRow
+            icon="sparkles"
+            title={plan === 'pro' ? 'Meld Pro' : 'Meld Free'}
+            subtitle={planSubtitle}
+            showBorder={isDev || isTest}
+          />
+          {(isDev || isTest) && (
+            <SettingRow
+              icon="schedule"
+              title={
+                onTrial
+                  ? t('settingsSimTrialEnd')
+                  : plan === 'pro'
+                    ? t('settingsSimBackToFree')
+                    : t('settingsSimStartTrial')
+              }
+              subtitle={onTrial ? t('settingsSimTrialEndSubtitle') : t('settingsSimSubtitle')}
+              onPress={() => {
+                const st = useSettingsStore.getState();
+                if (onTrial) st.simulateTrialExpired();
+                else if (plan === 'pro') st.setPlan('free');
+                else st.startProTrial();
+              }}
+              right={<Icon name="chevron-right" size={18} color={palette.textDim} />}
+            />
+          )}
+        </SettingsSection>
+
         <SettingsSection title={t('settingsSectionGeneral')}>
           <SettingRow
             icon="notifications"

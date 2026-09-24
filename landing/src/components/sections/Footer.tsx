@@ -12,7 +12,7 @@ export function Footer({ t, locale }: { t: Dictionary['footer']; locale: Locale 
       <nav aria-label="Footer" className="flex flex-wrap justify-center gap-[18px] text-sm sm:gap-[22px]">
         <Link href={`/${locale}/privacy`} className="text-dim hover:text-ink">{t.privacy}</Link>
         <Link href={`/${locale}/terms`} className="text-dim hover:text-ink">{t.terms}</Link>
-        <a href="#" className="text-dim hover:text-ink">{t.support}</a>
+        <a href="mailto:jonathanblandon1017@gmail.com" className="text-dim hover:text-ink">{t.support}</a>
       </nav>
       <span className="text-xs text-faint">{t.rights}</span>
     </footer>

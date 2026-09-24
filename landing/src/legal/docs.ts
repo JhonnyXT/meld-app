@@ -12,7 +12,7 @@ import type { Locale } from '@/i18n/config';
 export type LegalSection = { h: string; p?: string[]; list?: string[] };
 export type LegalDoc = { title: string; updated: string; intro: string[]; sections: LegalSection[] };
 
-const CONTACT = '[TU EMAIL DE CONTACTO]';
+const CONTACT = 'jonathanblandon1017@gmail.com';
 const OWNER = '[NOMBRE O RAZÓN SOCIAL]';
 const JURISDICTION = '[PAÍS / JURISDICCIÓN]';
 

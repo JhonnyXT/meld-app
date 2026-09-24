@@ -11,9 +11,9 @@ import type { Moment } from '@/domain/dayItem';
  * almacenamiento propio todavía).
  */
 export async function pickMomentPhotoForToday(): Promise<Moment | null> {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!permission.granted) return null;
-
+  // Sin pedir permiso: en Android abre el Photo Picker del sistema (el usuario
+  // elige una foto y solo esa se comparte) — Google Play no permite pedir
+  // acceso a toda la galería para esto.
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     quality: 0.8,

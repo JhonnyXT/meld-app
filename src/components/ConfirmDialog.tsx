@@ -12,6 +12,8 @@ interface ConfirmDialogProps {
   cancelLabel: string;
   onConfirm: () => void;
   onCancel: () => void;
+  /** `danger` (default) para acciones destructivas; `accent` para avisos. */
+  tone?: 'danger' | 'accent';
 }
 
 /** Modal de confirmación propio del sistema de diseño de Meld — reemplaza el
@@ -25,8 +27,10 @@ export function ConfirmDialog({
   cancelLabel,
   onConfirm,
   onCancel,
+  tone = 'danger',
 }: ConfirmDialogProps) {
   const { palette, font } = useTheme();
+  const toneColor = tone === 'accent' ? palette.accent : palette.danger;
   const scale = useRef(new Animated.Value(0.9)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -51,8 +55,8 @@ export function ConfirmDialog({
             { backgroundColor: palette.surface, borderColor: palette.border, transform: [{ scale }] },
           ]}
         >
-          <View style={[styles.iconCircle, { backgroundColor: `${palette.danger}26` }]}>
-            <Icon name={icon} size={26} color={palette.danger} />
+          <View style={[styles.iconCircle, { backgroundColor: `${toneColor}26` }]}>
+            <Icon name={icon} size={26} color={toneColor} />
           </View>
           <Text style={[styles.title, { fontFamily: font.bold, color: palette.text }]}>{title}</Text>
           <Text style={[styles.message, { fontFamily: font.regular, color: palette.textDim }]}>{message}</Text>
@@ -60,7 +64,7 @@ export function ConfirmDialog({
             <Pressable onPress={onCancel} style={[styles.btn, { backgroundColor: palette.surfaceLow }]}>
               <Text style={{ fontFamily: font.semibold, fontSize: 15, color: palette.text }}>{cancelLabel}</Text>
             </Pressable>
-            <Pressable onPress={onConfirm} style={[styles.btn, { backgroundColor: palette.danger }]}>
+            <Pressable onPress={onConfirm} style={[styles.btn, { backgroundColor: toneColor }]}>
               <Text style={{ fontFamily: font.semibold, fontSize: 15, color: '#fff' }}>{confirmLabel}</Text>
             </Pressable>
           </View>

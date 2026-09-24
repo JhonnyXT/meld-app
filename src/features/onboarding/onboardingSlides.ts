@@ -81,8 +81,8 @@ export const SLIDES: OnboardingSlide[] = [
     mock: require('../../../assets/onboarding/mock-moments.png'),
     ratio: 893 / 1340,
     framing: 'portrait',
-    // Sobre el botón "+" de agregar foto (fila "Hoy").
-    accent: { icon: 'photo-camera', x: 0.34, y: 0.29 },
+    // Sobre el botón "+" de agregar foto (primera semana).
+    accent: { icon: 'photo-camera', x: 0.524, y: 0.365 },
   },
   {
     key: 'calendar',

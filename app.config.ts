@@ -86,7 +86,16 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
     // exactas (AlarmManagerCompat.setAndAllowWhileIdle en vez de
     // setExactAndAllowWhileIdle) y Doze mode puede demorar un recordatorio
     // con hora puntual varios minutos — ver CLAUDE.md → "Doze mode".
-    permissions: ['RECORD_AUDIO', 'CAMERA', 'READ_MEDIA_IMAGES', 'POST_NOTIFICATIONS', 'SCHEDULE_EXACT_ALARM'],
+    permissions: ['RECORD_AUDIO', 'POST_NOTIFICATIONS', 'SCHEDULE_EXACT_ALARM'],
+    // Google Play restringe el acceso amplio a fotos: Momentos usa el Photo
+    // Picker del sistema, que no necesita permiso. Se bloquean para que
+    // ninguna librería los vuelva a agregar al manifest. La cámara no se usa
+    // (`cameraPermission: false` en expo-image-picker la bloquea también).
+    blockedPermissions: [
+      'android.permission.READ_MEDIA_IMAGES',
+      'android.permission.READ_MEDIA_VIDEO',
+      'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
+    ],
   },
   web: {
     favicon: './assets/favicon.png',
@@ -100,12 +109,7 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
       'expo-image-picker',
       {
         photosPermission: 'Meld accede a tus fotos para adjuntarlas a un día o guardarlas como moment.',
-      },
-    ],
-    [
-      'expo-camera',
-      {
-        cameraPermission: 'Meld usa la cámara para capturar fotos y adjuntarlas a un día.',
+        cameraPermission: false,
       },
     ],
     [

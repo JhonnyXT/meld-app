@@ -192,6 +192,9 @@ que lo pida.
                               'scheduled'`) para poder ver el rollover de
                               tareas atrasadas (ver "Interacciones no obvias")
                               apenas se abre la app con datos nuevos.
+                              **Ampliado 2026-09-24** con 8 ítems de Bandeja
+                              (`inboxRows`: notas, tareas con prioridad/link,
+                              nota de voz) para sacar capturas de Bandeja.
   /constants
     appVariant.ts             → variant de build (dev/test/prod) leído en runtime
                               vía `expo-constants` — ver "Build variants" arriba
@@ -2038,14 +2041,20 @@ pide). Ambas requirieron `expo prebuild --clean` + rebuild.
   superior con `marginTop:30` (se bajó a pedido, estaba pegado a la barra de
   estado). `StatusBar style="light"` (fondo oscuro desde 2026-08-29).
 
-**Mockups** (`assets/onboarding/mock-{today,habits,moments,calendar}.png`):
-exports de **shots.so** que el usuario generó a partir de screenshots reales
-(con el seed ampliado, ver `seed.ts`). Los 4 se recortan al bbox del canal
-alfa con PIL — al reemplazar uno, recortarlo así antes de commitear (el export
-crudo de shots.so trae mucho relleno transparente y `slide.ratio` está pensado
-para el contenido ya recortado). `mock-moments.png` se regeneró el 2026-08-29
-con el layout por-día (fila "Hoy" con `[+]` + tira de fotos), mismo recorte
-893×1340. `today`/`moments`/`calendar` usan el preset "dispositivo
+**Mockups** (`assets/onboarding/mock-{today,habits,moments,calendar}.png`,
+más `mock-inbox.png`, que solo usa la landing): exports de **shots.so** que el
+usuario generó a partir de screenshots reales (con el seed ampliado, ver
+`seed.ts`). **`today`/`moments`/`calendar` (y `inbox`) van en un lienzo de
+893×1340 con el teléfono en la MISMA posición** (bbox opaco en
+(173,62)-(714,1179)) — así se ven del mismo tamaño en el onboarding y en la
+landing. Bug real (2026-09-24): `mock-today.png` se había reemplazado por un
+export crudo de 1920×1440 con mucho lienzo transparente, y en el onboarding
+(que asume `slide.ratio` 893/1340) se veía chiquito. Al reemplazar uno,
+normalizarlo así con PIL: ubicar el bbox de alfa > 200 y pegarlo en un lienzo
+893×1340 con ese bbox en (173,62). `mock-moments.png` es, a elección explícita
+del usuario (2026-09-24), la versión con grupos por semana ("Semana 35",
+subtítulo "Una foto al día, guardada en su día"), no la por-día; el acento de
+cámara apunta a su botón "+". `today`/`moments`/`calendar` usan el preset "dispositivo
 completo vertical" (ratio ≈ 893/1340 = 0.666); `habits` usa un recorte más
 ancho (ratio ≈ 1462/1440 = 1.015) → por eso es el único `framing:'wide'`.
 shots.so free solo exporta **1x/PNG** — alcanza de sobra para mostrarse a
@@ -2066,17 +2075,34 @@ Planes (que trae sus 2 botones propios).
 "Yours to try" de ThisDay que pasó el usuario): ícono real de la app
 (`assets/logo.png` directo, sin tarjeta blanca) + título/subtítulo + lista
 vertical de **4 features Pro** (ícono coral `favorite`/`cloud`/`sparkles`/`zap`
-+ título bold + descripción dim, claves `onbPlanProF{1..4}` / `…Desc`) + botón
-primario coral "Probar Pro 14 días" + botón secundario relleno "Seguir con
-Free" + letra chica (`onbPlansFinePrint`) + footer "Restaurar compra ·
-Términos · Privacidad" (`onbPlansRestore`/`onbPlansLegal`, HOY sin acción —
-placeholders pre-RevenueCat). Se ELIMINÓ el layout viejo de dos tarjetas
-Free/Pro. Los dos botones llaman
-`useSettingsStore.getState().setPlan('pro'|'free')` y avanzan a Notificaciones.
-**`settingsStore.plan: 'free'|'pro'` + `setPlan`** (persistidos, default
-`'free'`). HOY es un flag 100% local — **sin RevenueCat ni gating real de
-features** (ver "## Roadmap Pro"). El switch "Simular plan Pro" en Ajustes
-(dev/test) sigue SIN existir.
++ título bold + descripción dim, claves `onbPlanProF{1..4}` / `…Desc`) + UN solo
+botón coral **"Empezar gratis"** (`setPlan('free')` → Notificaciones) + letra
+chica "Las funciones Pro llegan pronto" + footer "Términos · Privacidad" (abren
+`usemeld.vercel.app/{lang}/terms|privacy`, `src/constants/links.ts`). **Igual en
+dev/test/prod** (2026-09-24, a pedido explícito: ver en el celular lo mismo que
+verá el usuario de la tienda). Se sacaron "Probar Pro 14 días", "Seguir con
+Free", "Sin tarjeta ahora" y "Restaurar compra" — vuelven cuando haya cobro
+real (ver `docs/play-store-checklist.md`). Se ELIMINÓ el layout viejo de dos
+tarjetas Free/Pro. **`settingsStore.plan:
+'free'|'pro'`** (persistido, default `'free'`) — flag 100% local, **sin
+RevenueCat ni gating real de features** (ver "## Roadmap Pro").
+
+**Prueba de Pro SIMULADA (2026-09-24, a pedido explícito — sin cobro real)**:
+`settingsStore.trialStartedAt` (ISO) + `domain/trial.ts` (`TRIAL_DAYS = 14`,
+`trialDaysLeft`). `expireTrialIfDue()` corre al montar `RootStack` y cada vez
+que la app vuelve a primer plano (`components/TrialEndedDialog.tsx`, montado
+en `app/_layout.tsx`): si venció, pasa a `plan: 'free'` y levanta
+`trialEndedNotice`, que muestra un `ConfirmDialog` (`tone="accent"`, variante
+nueva) "Tu prueba de Pro terminó" con "Seguir con Free" / "Suscribirme"
+(`subscribePro()` = Pro "pagado" simulado, `trialStartedAt: null`). Ajustes
+tiene una sección **Plan** (Free / Pro / "Prueba gratis · quedan N días") y,
+solo en dev/test, una fila que según el estado empieza la prueba (el ÚNICO
+lugar donde se arranca — el onboarding ya no la ofrece), la vence ya
+(`simulateTrialExpired()` — deja `trialStartedAt` 15 días atrás; el aviso sale
+al cerrar y reabrir la app) o vuelve a Free. Cuando exista RevenueCat, la
+fuente de verdad pasa a ser la suscripción de la tienda y esto se reemplaza.
+**Ojo al integrar la tienda**: una prueba de App Store/Google Play pide
+método de pago, así que un texto tipo "Sin tarjeta ahora" no sería cierto.
 
 **Notificaciones** (`slides/NotificationsStep.tsx`, fuera del carrusel/dots):
 campana con anillos pulsantes + copy + "Activar recordatorios" →
@@ -2116,6 +2142,16 @@ el parser en la app, copiar el cambio allá. La lista de espera guarda en **Rese
 (GitHub) con `Root Directory: landing` — cada push a `main` construye y
 despliega solo. Detalle completo (dominio, variables de entorno, gotchas
 de la conexión Git↔Vercel) en `landing/README.md`.
+
+## Publicar en Google Play
+
+Checklist completo en `docs/play-store-checklist.md` (anotado 2026-09-24):
+bloqueantes técnicos (ya resueltos el 2026-09-24: `prod` genera AAB,
+permisos de cámara/galería bloqueados en `app.config.ts` → `blockedPermissions`
+y `expo-image-picker` `cameraPermission: false` — Momentos usa el Photo Picker
+sin permiso —, Pro en "Próximamente" en `prod`), ficha y formularios de Play Console, prueba cerrada
+obligatoria con testers, y lo que falta para cobrar Pro de verdad. Leerlo
+antes de cualquier tarea de publicación.
 
 ## Roadmap Pro
 
@@ -2168,8 +2204,8 @@ por `plan` — decisión explícita del usuario ("disponible para todos").
   slide de Planes del onboarding ya escribe `settingsStore.plan:
   'free'|'pro'` (persistido, ver "## Onboarding"), pero es un flag 100%
   local — NO hay RevenueCat instalado, NI paywall real, NI gating de
-  ninguna feature por `plan` todavía. Falta también el switch "Simular plan
-  Pro" en Ajustes (dev/test) para probar el gating cuando exista. Antes de
+  ninguna feature por `plan` todavía. La prueba de 14 días está SIMULADA
+  (ver "## Onboarding" → "Prueba de Pro SIMULADA"). Antes de
   empezar cualquiera de estos, releer el artifact del spec — esta sección
   de `CLAUDE.md` no reemplaza esa fuente, solo evita perder de vista lo que
   ya tiene código real esperando (Auto-registro, arriba).
@@ -2292,6 +2328,13 @@ por `plan` — decisión explícita del usuario ("disponible para todos").
   warnings `Reanimated: ... RetryableMountingLayerException: Unable to find
   SurfaceMountingManager` que aparecen en el log durante el arranque son
   ruido no-fatal de esta ventana de carga, no la causa del problema.
+
+- **La app queda trabada en el splash nativo (ícono fijo, no avanza)** con el
+  variant `dev`: casi siempre es que se perdió el `adb reverse tcp:8081
+  tcp:8082` (se borra cada vez que se reinicia el servidor de adb) y la app no
+  puede bajar el bundle de Metro. Confirmar con `adb reverse --list` (vacío) o
+  logcat (`failed to connect to localhost/127.0.0.1 (port 8081)`), volver a
+  crearlo y relanzar la app — no es un bug del código.
 
 ## Verificación en dispositivo — no abusar de los ciclos yo solo
 

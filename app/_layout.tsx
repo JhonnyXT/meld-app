@@ -28,6 +28,7 @@ import { ItemDetailSheet } from '@/components/itemDetail/ItemDetailSheet';
 import { TimeDragOverlay } from '@/components/TimeDragOverlay';
 import { RemindersSheet } from '@/components/reminders/RemindersSheet';
 import { CategoriesManagerSheet } from '@/components/settings/CategoriesManagerSheet';
+import { TrialEndedDialog } from '@/components/TrialEndedDialog';
 import { OnboardingScreen } from '@/features/onboarding/OnboardingScreen';
 import { useSettingsStore } from '@/store/settingsStore';
 
@@ -78,6 +79,7 @@ function RootStack() {
       <TimeDragOverlay />
       <RemindersSheet />
       <CategoriesManagerSheet />
+      <TrialEndedDialog />
     </>
   );
 }

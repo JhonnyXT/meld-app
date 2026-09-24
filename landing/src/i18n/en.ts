@@ -158,7 +158,7 @@ export const en: Dictionary = {
     goTo: 'Go to screen',
     items: [
       { a: 'Your whole day.', b: 'One app.', alt: "Meld's Today screen" },
-      { a: 'Habits that', b: 'actually stick', alt: 'Habits in Meld with weekly progress' },
+      { a: 'Capture fast,', b: 'sort it later', alt: "Meld's Inbox screen" },
       { a: 'The whole month,', b: 'at a glance', alt: "Meld's calendar month view" },
       { a: 'A photo', b: 'for every day', alt: "Meld's Moments screen" },
     ],

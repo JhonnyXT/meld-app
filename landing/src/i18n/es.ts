@@ -175,7 +175,7 @@ export const es = {
     goTo: 'Ir a la pantalla',
     items: [
       { a: 'Todo tu día.', b: 'Una sola app.', alt: 'Pantalla Hoy de Meld' },
-      { a: 'Hábitos que', b: 'se sostienen', alt: 'Hábitos en Meld con progreso semanal' },
+      { a: 'Captura rápido,', b: 'clasifica después', alt: 'Bandeja de entrada de Meld' },
       { a: 'El mes entero,', b: 'de un vistazo', alt: 'Vista de mes del calendario de Meld' },
       { a: 'Una foto', b: 'para cada día', alt: 'Pantalla Momentos de Meld' },
     ],

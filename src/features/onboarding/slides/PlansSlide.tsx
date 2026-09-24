@@ -1,17 +1,17 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import type { IconName } from '@/domain/iconNames';
 import { useTranslation, type TranslationKey } from '@/i18n';
-import type { PlanTier } from '@/store/settingsStore';
 import { ONB } from '../onboardingTheme';
+import { privacyUrl, termsUrl } from '@/constants/links';
 
 const LOGO = require('../../../../assets/logo.png');
 
 interface PlansSlideProps {
   active: boolean;
-  onChoose: (plan: PlanTier) => void;
+  onStartFree: () => void;
 }
 
 const FEATURES: { icon: IconName; titleKey: TranslationKey; descKey: TranslationKey }[] = [
@@ -21,8 +21,8 @@ const FEATURES: { icon: IconName; titleKey: TranslationKey; descKey: Translation
   { icon: 'zap', titleKey: 'onbPlanProF4', descKey: 'onbPlanProF4Desc' },
 ];
 
-export function PlansSlide({ active, onChoose }: PlansSlideProps) {
-  const { t } = useTranslation();
+export function PlansSlide({ active, onStartFree }: PlansSlideProps) {
+  const { t, lang } = useTranslation();
   const insets = useSafeAreaInsets();
   const Row = active ? Animated.View : View;
   const enter = (delay: number) =>
@@ -62,18 +62,22 @@ export function PlansSlide({ active, onChoose }: PlansSlideProps) {
         ))}
       </View>
 
-      <Row {...enter(580)}>
-        <Pressable style={styles.primary} onPress={() => onChoose('pro')}>
-          <Text style={styles.primaryText}>{t('onbPlansTryPro')}</Text>
+      <Row {...enter(580)} style={styles.cta}>
+        {/* Sin cobro real todavía: Pro se anuncia como "Próximamente" en las
+            tres versiones. La prueba simulada de 14 días se arranca desde
+            Ajustes → Plan (solo dev/test). Ver docs/play-store-checklist.md. */}
+        <Pressable style={styles.primary} onPress={onStartFree}>
+          <Text style={styles.primaryText}>{t('onbPlansStartFree')}</Text>
         </Pressable>
-        <Pressable style={styles.secondary} onPress={() => onChoose('free')}>
-          <Text style={styles.secondaryText}>{t('onbPlansContinueFree')}</Text>
-        </Pressable>
-        <Text style={styles.finePrint}>{t('onbPlansFinePrint')}</Text>
+        <Text style={styles.finePrint}>{t('onbPlansProSoon')}</Text>
         <View style={styles.footerRow}>
-          <Text style={styles.footerLink}>{t('onbPlansRestore')}</Text>
+          <Pressable hitSlop={8} onPress={() => Linking.openURL(termsUrl(lang))}>
+            <Text style={styles.footerLink}>{t('onbPlansTerms')}</Text>
+          </Pressable>
           <Text style={styles.footerDot}>·</Text>
-          <Text style={styles.footerLink}>{t('onbPlansLegal')}</Text>
+          <Pressable hitSlop={8} onPress={() => Linking.openURL(privacyUrl(lang))}>
+            <Text style={styles.footerLink}>{t('onbPlansPrivacy')}</Text>
+          </Pressable>
         </View>
       </Row>
     </ScrollView>
@@ -118,6 +122,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: ONB.textMedium,
   },
+  cta: { alignSelf: 'stretch' },
   primary: {
     height: 56,
     borderRadius: 18,
@@ -127,17 +132,6 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   primaryText: { fontFamily: ONB.font.semibold, fontSize: 17, color: '#FFFFFF' },
-  secondary: {
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: ONB.card,
-    borderWidth: 1,
-    borderColor: ONB.cardBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-  },
-  secondaryText: { fontFamily: ONB.font.semibold, fontSize: 17, color: ONB.textDark },
   finePrint: {
     fontFamily: ONB.font.medium,
     fontSize: 12,

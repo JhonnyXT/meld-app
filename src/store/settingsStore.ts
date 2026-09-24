@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { type AccentId, defaultAccent } from '@/theme/tokens';
 import type { Language } from '@/i18n/translations';
+import { expiredTrialStart, trialDaysLeft } from '@/domain/trial';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type ListSpacing = 'compact' | 'comfortable';
@@ -31,6 +32,11 @@ interface SettingsState {
    * Planes del onboarding — todavía no hay RevenueCat ni gating real de
    * features (ver CLAUDE.md → "## Roadmap Pro"). */
   plan: PlanTier;
+  /** ISO de cuándo empezó la prueba de Pro (simulada, ver `domain/trial.ts`).
+   * `null` con `plan: 'pro'` = Pro "pagado" (también simulado). */
+  trialStartedAt: string | null;
+  /** La prueba venció y todavía no se mostró el aviso (`TrialEndedDialog`). */
+  trialEndedNotice: boolean;
   setThemePreference: (value: ThemePreference) => void;
   setLanguage: (value: Language) => void;
   cycleLanguage: () => void;
@@ -44,6 +50,14 @@ interface SettingsState {
   setHabitsInTodayEnabled: (value: boolean) => void;
   setOnboardingCompleted: (value: boolean) => void;
   setPlan: (value: PlanTier) => void;
+  startProTrial: () => void;
+  /** Si la prueba venció: vuelve a Free y deja el aviso pendiente. Se llama al
+   * abrir la app y cada vez que vuelve a primer plano. */
+  expireTrialIfDue: () => void;
+  subscribePro: () => void;
+  dismissTrialEndedNotice: () => void;
+  /** Solo dev/test: deja la prueba vencida para ver el aviso al reabrir. */
+  simulateTrialExpired: () => void;
   cycleThemePreference: () => void;
 }
 
@@ -64,6 +78,8 @@ export const useSettingsStore = create<SettingsState>()(
       habitsInTodayEnabled: true,
       onboardingCompleted: false,
       plan: 'free',
+      trialStartedAt: null,
+      trialEndedNotice: false,
       setThemePreference: (themePreference) => set({ themePreference }),
       setAccent: (accent) => set({ accent }),
       setLanguage: (language) => set({ language }),
@@ -84,6 +100,16 @@ export const useSettingsStore = create<SettingsState>()(
       setHabitsInTodayEnabled: (habitsInTodayEnabled) => set({ habitsInTodayEnabled }),
       setOnboardingCompleted: (onboardingCompleted) => set({ onboardingCompleted }),
       setPlan: (plan) => set({ plan }),
+      startProTrial: () =>
+        set({ plan: 'pro', trialStartedAt: new Date().toISOString(), trialEndedNotice: false }),
+      expireTrialIfDue: () => {
+        const { plan, trialStartedAt } = get();
+        if (plan !== 'pro' || !trialStartedAt || trialDaysLeft(trialStartedAt) > 0) return;
+        set({ plan: 'free', trialStartedAt: null, trialEndedNotice: true });
+      },
+      subscribePro: () => set({ plan: 'pro', trialStartedAt: null, trialEndedNotice: false }),
+      dismissTrialEndedNotice: () => set({ trialEndedNotice: false }),
+      simulateTrialExpired: () => set({ plan: 'pro', trialStartedAt: expiredTrialStart() }),
       cycleThemePreference: () => {
         const next = THEME_CYCLE[(THEME_CYCLE.indexOf(get().themePreference) + 1) % THEME_CYCLE.length];
         set({ themePreference: next });

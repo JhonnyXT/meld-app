@@ -132,6 +132,25 @@ Pasos para cuando haya un dominio:
 4. Actualizar `NEXT_PUBLIC_SITE_URL` en Vercel al dominio propio y volver a
    desplegar (`vercel env rm/add` + `vercel deploy --prod`).
 
+## Gotcha: reemplazar una imagen de `public/img/`
+
+El optimizador de `next/image` guarda cada variante por **URL** (no por
+contenido) durante horas, y el navegador también. Si se pisa un archivo con el
+mismo nombre, se sigue viendo el viejo aunque el disco esté bien — hasta con
+hard refresh. Al cambiar una imagen, **usar un nombre nuevo** y actualizar la
+ruta (p. ej. `Screens.tsx` → `SRC`). Las 4 capturas de "Míralo en tu teléfono"
+son Hoy, Bandeja, Calendario y Momentos (`public/img/screen-*.png`, salen de
+`assets/onboarding/mock-*.png` de la app) y están normalizadas al mismo lienzo
+(893×1340, teléfono en la misma posición) para que se vean del mismo tamaño;
+una captura nueva debe recortarse igual (ver CLAUDE.md raíz → "Mockups").
+
+Para revisar el sitio sin la extensión de Chrome: Chrome headless del sistema
+(`/usr/bin/google-chrome --headless --remote-debugging-port=… --remote-allow-origins=*`,
+con un `--user-data-dir` temporal) + Chrome DevTools Protocol desde Python
+(`websocket-client`): navegar, medir con `getBoundingClientRect` y sacar
+`Page.captureScreenshot`. Así se confirmó que el bug de tamaño era real y no
+caché del navegador.
+
 ## Gotcha: animaciones con `@keyframes`
 
 Tailwind v4 **elimina del CSS final** los `@keyframes` declarados dentro de

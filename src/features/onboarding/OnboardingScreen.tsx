@@ -22,7 +22,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from '@/i18n';
 import { requestNotificationPermission } from '@/services/notifications';
-import { useSettingsStore, type PlanTier } from '@/store/settingsStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import { Icon } from '@/components/Icon';
 import { ONB } from './onboardingTheme';
 import { SLIDES } from './onboardingSlides';
@@ -69,8 +69,8 @@ export function OnboardingScreen({ onDone }: OnboardingScreenProps) {
     setPhase('notif');
   };
 
-  const choosePlan = (plan: PlanTier) => {
-    useSettingsStore.getState().setPlan(plan);
+  const startFree = () => {
+    useSettingsStore.getState().setPlan('free');
     toNotif();
   };
 
@@ -119,7 +119,7 @@ export function OnboardingScreen({ onDone }: OnboardingScreenProps) {
             ) : (
               <SafeAreaView edges={['top']} style={styles.slideInner}>
                 <View style={styles.plansTopSpacer} />
-                <PlansSlide active={page === i} onChoose={choosePlan} />
+                <PlansSlide active={page === i} onStartFree={startFree} />
               </SafeAreaView>
             )}
           </SlideFrame>

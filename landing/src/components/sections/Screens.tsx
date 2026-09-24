@@ -6,7 +6,7 @@ import { useRef, useState, type KeyboardEvent } from 'react';
 import type { Dictionary } from '@/i18n/config';
 import { SectionHead } from './shared';
 
-const SRC = ['/img/mock-today.png', '/img/mock-habits.png', '/img/mock-calendar.png', '/img/mock-moments.png'];
+const SRC = ['/img/screen-today.png', '/img/screen-inbox.png', '/img/screen-calendar.png', '/img/screen-moments-v2.png'];
 
 /** Carrusel centrado: la tarjeta activa queda en el medio y las demás se ven
  * a los lados, más chicas y apagadas. El relleno lateral de media pantalla
