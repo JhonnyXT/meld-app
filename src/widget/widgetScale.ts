@@ -2,7 +2,7 @@
  * decide el launcher del usuario (su propia grilla de celdas — confirmado
  * con logcat real en un Samsung: un widget "chico" (`targetCellWidth/
  * Height: 2`) terminó en 226dp de alto, bastante más que las ~172dp del
- * mock de referencia en `designs/trove-splash.pen`). Sin escalar el
+ * diseño de referencia). Sin escalar el
  * contenido a ese tamaño real, todo (íconos, tipografía, el círculo del
  * FAB, la fracción grande) queda chico y disperso en una caja más grande de
  * lo esperado — se ve "poco prolijo" en vez de una fila más cómoda y

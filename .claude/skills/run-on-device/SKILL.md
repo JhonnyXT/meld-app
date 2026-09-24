@@ -34,39 +34,25 @@ export JAVA_HOME="$HOME/.local/jdk-17"
 ADB="$ANDROID_HOME/platform-tools/adb"
 ```
 
-## Paso 1 — ¿hace falta recompilar el APK nativo?
+## Paso 1 — compilar e instalar (solo si cambió código nativo)
 
-Solo si cambiaron dependencias con código nativo (cualquier paquete `expo-*` nuevo,
-`react-native-gesture-handler`, `react-native-reanimated`, `react-native-worklets`,
-o cambios en `app.config.ts` → `plugins`/`ios`/`android`). Si solo cambió JS/TSX, saltar
-al Paso 3 — Metro ya sirve el bundle nuevo con solo recargar la app.
+Hace falta solo si cambiaron dependencias con código nativo (cualquier paquete
+`expo-*` nuevo, `react-native-gesture-handler`, `react-native-reanimated`,
+`react-native-worklets`, o `app.config.ts` → `plugins`/`ios`/`android`). Si solo
+cambió JS/TSX, saltar al Paso 2 — Metro sirve el bundle nuevo al recargar.
 
 ```bash
 cd /home/usuario/Documentos/me/code/anchor-app
-APP_VARIANT=dev npx expo prebuild --platform android --clean
-
 export ANDROID_HOME="$HOME/Android/Sdk"
 export JAVA_HOME="$HOME/.local/jdk-17"
-echo "sdk.dir=$ANDROID_HOME" > android/local.properties
-cd android
-./gradlew assembleDebug 2>&1 | tail -100
-```
-
-Build exitoso ≈ 6-9 min en frío. El APK queda en
-`android/app/build/outputs/apk/debug/app-debug.apk`.
-
-## Paso 2 — instalar el APK
-
-Todo en la MISMA invocación de Bash (ver nota de adb más abajo):
-
-```bash
-export ANDROID_HOME="$HOME/Android/Sdk"
-ADB="$ANDROID_HOME/platform-tools/adb"
-nohup "$ADB" nodaemon server -a > /tmp/adb-server.log 2>&1 &
+nohup "$ANDROID_HOME/platform-tools/adb" nodaemon server -a > /tmp/adb-server.log 2>&1 &
 sleep 2
-"$ADB" devices -l
-"$ADB" install -r /home/usuario/Documentos/me/code/anchor-app/android/app/build/outputs/apk/debug/app-debug.apk
+npm run build:dev
 ```
+
+`scripts/build-android.sh` decide solo si hace falta `prebuild --clean` (cambio
+de variant) o incremental (conserva cachés de Gradle), y si hay dispositivo
+conectado instala el APK. Build en frío ≈ 6-9 min.
 
 > **Nota adb**: el sandbox mata el daemon de `adb` entre invocaciones de shell
 > separadas del tool Bash. Si `adb devices`/`install` falla con
@@ -75,7 +61,7 @@ sleep 2
 > dentro de la misma llamada de Bash que los comandos cliente que siguen, y
 > reutilizar esa llamada para todo lo que use adb después.
 
-## Paso 3 — puerto y Metro
+## Paso 2 — puerto y Metro
 
 Si vas a lanzar un `expo start` nuevo, primero revisar si ya hay uno corriendo de
 una sesión anterior (no asumas que no):
@@ -111,7 +97,7 @@ puerto nativo 8081, en realidad hable con el Metro de Meld en el 8082 de esta
 máquina — sin esto la app carga el bundle equivocado (el de `my-wallet-app`) o
 nada.
 
-## Paso 4 — abrir/recargar la app
+## Paso 3 — abrir/recargar la app
 
 ```bash
 export ANDROID_HOME="$HOME/Android/Sdk"
@@ -140,9 +126,11 @@ capturar pantalla antes de diagnosticar.
   codificado) a veces desestabiliza el foco del input en este Gboard — si hace
   falta un espacio real, escribir el texto en dos `input text` separados o evitar
   espacios en pruebas rápidas.
-- Siempre `"$ADB" exec-out screencap -p > archivo.png` y leer la imagen antes de
-  reportar éxito — no asumir que un tap funcionó solo porque el comando no dio
-  error.
+- Tras un tap, confirmar con `"$ADB" exec-out screencap -p > archivo.png` antes
+  de dar el resultado por bueno — un comando sin error no prueba que el tap
+  funcionó. Mantener esta verificación propia corta (un par de capturas): para
+  exploración más larga, pasarle al usuario pasos concretos para que pruebe él
+  (ver "Verificación en dispositivo" en `CLAUDE.md`).
 
 ## Reset de datos para volver a ver el seed
 

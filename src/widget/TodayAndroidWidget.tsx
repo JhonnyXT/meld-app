@@ -9,9 +9,7 @@ import { widgetContentScale } from './widgetScale';
 // llamada directa desde `requestWidgetUpdate`), sin `ThemeProvider` ni
 // acceso al `accent` elegido en Settings. Coincide con los tokens dark base
 // (`darkBase`/coral) para que combine visualmente con el resto de la app.
-// Diseñado primero como mock en `designs/trove-splash.pen`
-// ("Widget - Hoy") antes de llevarlo a código, ver CLAUDE.md → "Widget de
-// pantalla de inicio".
+// Ver CLAUDE.md → "Widgets de pantalla de inicio".
 const BG = '#1C1C1E';
 const TEXT = '#FFFFFF';
 const TEXT_DIM = '#8E8E93';

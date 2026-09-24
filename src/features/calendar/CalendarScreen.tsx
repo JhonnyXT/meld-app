@@ -52,8 +52,7 @@ export function CalendarScreen() {
     router.push({ pathname: '/', params: { date: dateKey } });
   };
   // Mes que se está navegando en la vista Mes — separado de `today` a
-  // propósito (agregado 2026-08-26, fiel al chevron/botón de calendario del
-  // mock de Pen "Calendar Screen"): antes el grid de Mes SIEMPRE mostraba el
+  // propósito (agregado 2026-08-26): antes el grid de Mes SIEMPRE mostraba el
   // mes actual, sin poder navegar a otro. El día del mes no importa, solo
   // año/mes. La vista Año sigue anclada a `today.getFullYear()` — no está en
   // el alcance de este cambio.

@@ -13,7 +13,7 @@ interface MonthDayCellProps {
   onPress?: (dateKey: string) => void;
 }
 
-/** Celda de la grilla de Mes — fiel al mock de Pen "Calendar Screen":
+/** Celda de la grilla de Mes:
  * puntos de color arriba del número (uno por ítem que NO sea Moment ese día,
  * coloreado con el color fijo de su TIPO — `typeColors`, no la categoría —
  * tope `MAX_DOTS`) y, debajo, la miniatura de

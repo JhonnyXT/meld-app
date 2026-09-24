@@ -18,10 +18,8 @@ let appGroup = "group.app.meld.mobile.widget"
 // si se compila para esos variants (mismo TODO que `appGroup`).
 let widgetDeepLinkScheme = "meld"
 
-// Paleta y layout calcados de los mocks "Widget - ..." en
-// `designs/trove-splash.pen` (mismo diseño que el lado Android,
-// `src/widget/*AndroidWidget.tsx`) — ver CLAUDE.md → "Widget de pantalla de
-// inicio".
+// Paleta y layout iguales al lado Android (`src/widget/*AndroidWidget.tsx`)
+// — ver CLAUDE.md → "Widgets de pantalla de inicio".
 let widgetBg = Color(red: 0.11, green: 0.11, blue: 0.12) // #1C1C1E
 let dimColor = Color(red: 0.557, green: 0.557, blue: 0.576) // #8E8E93
 let accentColor = Color(red: 1, green: 0.294, blue: 0.4) // #FF4B66

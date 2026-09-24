@@ -22,9 +22,7 @@ interface ProgressAndroidWidgetProps {
  * header del widget "Hoy" — ver la misma simplificación conocida ahí: no
  * inyecta ocurrencias recurrentes de hábitos). `widgetContentScale` agranda
  * la fracción según el tamaño real que le dio el launcher del usuario
- * (mismo bug/fix que `QuickAddAndroidWidget.tsx`). Tocar abre la app.
- * Diseñado primero en `designs/trove-splash.pen` → "Widget - Progreso del
- * día". */
+ * (mismo bug/fix que `QuickAddAndroidWidget.tsx`). Tocar abre la app. */
 export function ProgressAndroidWidget({
   doneCount,
   totalCount,

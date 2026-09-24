@@ -26,8 +26,7 @@ interface EmptyStateProps {
  * (invita a usar "+" o guardar en la Bandeja). Inspirado en el patrón de
  * `habit-tracker` (`core/ui/empty-state.tsx`), simplificado al sistema visual
  * de Meld (tokens de `theme/tokens.ts`, `Icon` de Lucide). `ctaLabel`/
- * `onPressCta` (opcionales) agregan el botón "+ Add a task" del diseño Pen
- * "Empty State / No Tasks Today" — hoy solo lo usa Today, Inbox sigue sin
+ * `onPressCta` (opcionales) agregan el botón "+ Add a task" — hoy solo lo usa Today, Inbox sigue sin
  * botón (su propio campo de captura rápida ya cumple ese rol). */
 export function EmptyState({ icon, title, message, ctaLabel, onPressCta }: EmptyStateProps) {
   const { palette, font } = useTheme();

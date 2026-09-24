@@ -24,8 +24,7 @@ interface QuickAddAndroidWidgetProps {
  * real reportado por el usuario. Tocar el círculo coral arma una deep link
  * con `Linking.createURL` (resuelve al scheme real del variant, nunca
  * hardcodeado) que `app/_layout.tsx` escucha para abrir Quick Add directo,
- * sin pasar por Today. Diseñado primero en `designs/trove-splash.pen` →
- * "Widget - Agregar rápido". */
+ * sin pasar por Today. */
 export function QuickAddAndroidWidget({ label, width, height }: QuickAddAndroidWidgetProps) {
   const scale = widgetContentScale(width, height);
   const fabSize = Math.round(52 * scale);
@@ -49,8 +48,7 @@ export function QuickAddAndroidWidget({ label, width, height }: QuickAddAndroidW
       {/* `FlexWidget` apila en columna por default (como `View` de RN) — sin
           `flexDirection: 'row'` acá, `justifyContent`/`alignItems` actúan
           sobre el eje vertical, no el horizontal, y el círculo terminaba
-          pegado a la izquierda en vez de centrado (bug real visto en el
-          mock de Pen, mismo error ahí). */}
+          pegado a la izquierda en vez de centrado. */}
       <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', justifyContent: 'center' }}>
         <FlexWidget
           style={{

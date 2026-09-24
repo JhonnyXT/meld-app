@@ -29,8 +29,7 @@ interface HabitsAndroidWidgetProps {
  * cada fila es interactivo de verdad: márcala hecha hoy ahí mismo, sin
  * abrir la app (`clickAction="TOGGLE_HABIT"`, ver `widgetActions.ts` y
  * `registerWidgetTask.ts` → `WIDGET_CLICK`) — mismo pedido explícito que
- * `TodayAndroidWidget.tsx`. Diseñado primero en `designs/trove-splash.pen`
- * → "Widget - Hábitos". */
+ * `TodayAndroidWidget.tsx`. */
 export function HabitsAndroidWidget({ data, emptyLabel, habitsLabel, width, height }: HabitsAndroidWidgetProps) {
   const scale = widgetContentScale(width, height);
   const headerFontSize = Math.round(17 * scale);
