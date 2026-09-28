@@ -12,7 +12,6 @@ export const en: Dictionary = {
     closeMenu: 'Close section menu',
     prev: 'Previous section',
     next: 'Next section',
-    joined: 'On the list',
     join: 'Join',
     sections: {
       top: 'Home',
@@ -37,15 +36,7 @@ export const en: Dictionary = {
   },
   waitlist: {
     label: 'Let me know when Meld is available',
-    placeholder: 'you@email.com',
     submit: 'Join the waitlist',
-    sending: 'Sending…',
-    success: "You're in!",
-    successDetail: "We'll email {email} on launch day. Nothing else.",
-    onList: "You're on the list",
-    change: 'Change',
-    invalid: 'Check your email, something looks off.',
-    error: "We couldn't save your email. Please try again in a moment.",
   },
   phone: {
     work: 'Work',

@@ -44,50 +44,7 @@
 /* Animaciones usadas desde estilos en línea (style={{ animation: … }}). Van
  * FUERA de @theme a propósito: Tailwind v4 elimina del CSS final los
  * @keyframes de @theme que ninguna clase suya usa, y estas desaparecían en
- * silencio (el check de la lista de espera, las barras de voz, la barra de
- * Deshacer). */
-@keyframes waitlist-pop {
-  from {
-    transform: scale(0.3);
-    opacity: 0;
-  }
-}
-@keyframes waitlist-circle {
-  from {
-    stroke-dashoffset: 189;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-@keyframes waitlist-draw {
-  from {
-    stroke-dashoffset: 40;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-@keyframes waitlist-ring {
-  from {
-    transform: scale(0.7);
-    opacity: 0.9;
-  }
-  to {
-    transform: scale(1.9);
-    opacity: 0;
-  }
-}
-@keyframes waitlist-spark {
-  from {
-    transform: translate(0, 0) scale(1);
-    opacity: 1;
-  }
-  to {
-    transform: translate(var(--dx), var(--dy)) scale(0.4);
-    opacity: 0;
-  }
-}
+ * silencio (las barras de voz, la barra de Deshacer). */
 @keyframes modal-pop {
   from {
     transform: scale(0.9);

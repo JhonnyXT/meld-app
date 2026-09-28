@@ -16,19 +16,14 @@ npm run build && npm start
   solo existen `/es` y `/en` (páginas estáticas).
 - **Secciones**: `src/components/sections/*`, en el orden de `src/app/[lang]/page.tsx`.
   La barra flotante (`DockBar`) usa los `id` de cada sección.
-- **Lista de espera**: `POST /api/waitlist` → `src/lib/waitlist.ts` → crea un
-  contacto en **Resend**. Comparte cuenta/audiencia con
-  `my-wallet-app/landing`, separado por **segmento** (`Meld — Waitlist`,
-  agrupa a quien se anota aquí) y **topic** (`Meld — Lanzamiento`,
-  suscripción propia): dar de baja hace `opt_out` de ese topic únicamente
-  (`PATCH /contacts/{email}/topics`), nunca el `unsubscribed` global del
-  contacto — eso sacaría a la persona también de la lista de MyWallet si
-  comparte el mismo email. IDs por defecto ya en el código (creados a mano
-  en el dashboard, 2026-09-24); `RESEND_SEGMENT_ID`/`RESEND_TOPIC_ID` en
-  `.env.example` solo hacen falta si se recrean. `RESEND_API_KEY` es
-  obligatoria (puede ser la misma key que usa MyWallet, con permiso de
-  contactos). Sin la key: en dev solo loguea; en producción responde 503
-  (nunca finge que guardó). Tiene un campo trampa `website` contra bots.
+- **Lista de espera**: vive en **joblan** (`joblan/joblan-web`). Los botones
+  (`src/components/WaitlistCta.tsx`) llevan a
+  `joblanstudio.vercel.app/<idioma>?app=meld#avisame`, que llega con la app ya
+  elegida y guarda en el mismo segmento (`Meld — Waitlist`) y topic
+  (`Meld — Lanzamiento`) de Resend de siempre. Aquí solo queda la baja:
+  `/api/unsubscribe` → `unsubscribeEmail` en `src/lib/waitlist.ts` (`opt_out`
+  del topic, nunca la baja global, que sacaría a la persona también de
+  MyWallet). `NEXT_PUBLIC_JOBLAN_URL` cambia la URL de joblan si hace falta.
 - **Portada interactiva = la pantalla Hoy de la app funcionando en el
   navegador** (`src/demo/`): agregar los 5 tipos con Quick Add (tarea,
   evento, nota de voz grabada de verdad con `MediaRecorder`, nota, hábito),

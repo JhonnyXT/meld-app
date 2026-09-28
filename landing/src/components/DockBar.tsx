@@ -1,11 +1,10 @@
 'use client';
 
-import { Check, ChevronLeft, ChevronRight, Menu, Plus, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Menu, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useWaitlistJoined } from './WaitlistForm';
 
 type Section = { id: string; label: string };
-type Labels = { openMenu: string; closeMenu: string; prev: string; next: string; join: string; joined: string };
+type Labels = { openMenu: string; closeMenu: string; prev: string; next: string; join: string };
 
 /** Barra flotante fija abajo, calcada de la DayBar de la app: ☰ abre la
  * lista de secciones, la cápsula del centro dice en qué sección estás (‹ ›
@@ -13,7 +12,6 @@ type Labels = { openMenu: string; closeMenu: string; prev: string; next: string;
 export function DockBar({ sections, labels }: { sections: Section[]; labels: Labels }) {
   const [current, setCurrent] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
-  const joined = useWaitlistJoined();
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -111,12 +109,10 @@ export function DockBar({ sections, labels }: { sections: Section[]; labels: Lab
           </div>
           <a
             href="#unirme"
-            className={`flex h-[46px] items-center gap-1.5 rounded-full px-4 text-sm font-bold sm:h-12 sm:gap-2 sm:px-5 sm:text-[15px] ${
-              joined ? 'bg-surface-2 text-ink hover:bg-line' : 'bg-coral-btn text-white hover:bg-coral-btn-hover'
-            }`}
+            className="flex h-[46px] items-center gap-1.5 rounded-full bg-coral-btn px-4 text-sm font-bold text-white hover:bg-coral-btn-hover sm:h-12 sm:gap-2 sm:px-5 sm:text-[15px]"
           >
-            {joined ? <Check size={16} strokeWidth={2.5} className="text-coral" aria-hidden /> : <Plus size={16} strokeWidth={2.5} aria-hidden />}
-            {joined ? labels.joined : labels.join}
+            <Plus size={16} strokeWidth={2.5} aria-hidden />
+            {labels.join}
           </a>
         </div>
       </div>

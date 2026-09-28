@@ -14,7 +14,6 @@ export const es = {
     closeMenu: 'Cerrar menú de secciones',
     prev: 'Sección anterior',
     next: 'Sección siguiente',
-    joined: 'En la lista',
     join: 'Unirme',
     sections: {
       top: 'Inicio',
@@ -39,15 +38,7 @@ export const es = {
   },
   waitlist: {
     label: 'Avísame cuando Meld esté disponible',
-    placeholder: 'tu@email.com',
     submit: 'Unirme a la lista',
-    sending: 'Enviando…',
-    success: '¡Estás dentro!',
-    successDetail: 'Te escribiremos a {email} el día del lanzamiento. Nada más.',
-    onList: 'Estás en la lista',
-    change: 'Cambiar',
-    invalid: 'Revisa tu email, parece que falta algo.',
-    error: 'No pudimos guardar tu email. Inténtalo de nuevo en un momento.',
   },
   phone: {
     work: 'Trabajo',

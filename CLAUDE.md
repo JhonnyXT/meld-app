@@ -895,8 +895,8 @@ en vez de `middleware.ts`, `params` como Promise) — leer
 `landing/node_modules/next/dist/docs/` antes de tocar código. La portada tiene la
 pantalla Hoy funcionando en el navegador (`landing/src/demo/`) con una COPIA de
 `src/domain/voiceParser.ts`: si cambia el parser de la app, copiar el cambio. La
-lista de espera usa Resend (`RESEND_API_KEY`; sin ella, producción responde 503 a
-propósito). Deploy en Vercel (proyecto `meld`, `usemeld.vercel.app`) conectado a
+lista de espera vive en joblan (`joblanstudio.vercel.app/?app=meld#avisame`); aquí solo
+queda la baja (`/api/unsubscribe`, Resend). Deploy en Vercel (proyecto `meld`, `usemeld.vercel.app`) conectado a
 `JhonnyXT/meld-app` con `Root Directory: landing` — cada push a `main` despliega.
 Detalle en `landing/README.md`.
 
