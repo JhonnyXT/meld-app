@@ -24,6 +24,9 @@ npm run build && npm start
   `/api/unsubscribe` → `unsubscribeEmail` en `src/lib/waitlist.ts` (`opt_out`
   del topic, nunca la baja global, que sacaría a la persona también de
   MyWallet). `NEXT_PUBLIC_JOBLAN_URL` cambia la URL de joblan si hace falta.
+  La política (§5) cuenta qué pide ese formulario de joblan: email y nombre en
+  Resend; ciudad, plataforma y nota solo en los logs de Vercel de joblan. Si
+  joblan cambia qué guarda, actualizar esa sección (y la de MyWallet).
 - **Portada interactiva = la pantalla Hoy de la app funcionando en el
   navegador** (`src/demo/`): agregar los 5 tipos con Quick Add (tarea,
   evento, nota de voz grabada de verdad con `MediaRecorder`, nota, hábito),

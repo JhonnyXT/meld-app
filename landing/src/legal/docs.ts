@@ -18,7 +18,7 @@ const JURISDICTION = '[PAÍS / JURISDICCIÓN]';
 
 const privacyEs: LegalDoc = {
   title: 'Política de privacidad',
-  updated: 'Última actualización: 23 de septiembre de 2026',
+  updated: 'Última actualización: 6 de octubre de 2026',
   intro: [
     `Esta política explica qué datos maneja Meld (la app para iPhone y Android) y este sitio web, operados por ${OWNER} ("nosotros"). La versión corta: en el plan Free, todo lo que guardas en Meld se queda en tu teléfono y nosotros no lo vemos.`,
   ],
@@ -55,10 +55,11 @@ const privacyEs: LegalDoc = {
     {
       h: '5. Este sitio web y la lista de espera',
       p: [
-        'Si te unes a la lista de espera, guardamos solo tu email para avisarte cuando Meld esté disponible. No lo usamos para nada más y puedes pedir que lo borremos en cualquier momento escribiendo a ' +
+        'El formulario de la lista de espera está en joblanstudio.vercel.app, la web de quien desarrolla Meld. Ahí guardamos tu email y el nombre que escribas para avisarte cuando Meld esté disponible, con un proveedor de envío de correos que actúa en nuestro nombre: Resend (resend.com). La ciudad, la plataforma y la nota opcional solo quedan en los registros del servidor (Vercel), para saber qué te interesa.',
+        'No usamos esos datos para nada más y puedes pedir que los borremos en cualquier momento escribiendo a ' +
           CONTACT +
           ' o usando el enlace para darte de baja que incluiremos en cada email.',
-        'El email se guarda con un proveedor de envío de correos que actúa en nuestro nombre: Resend (resend.com). El sitio no usa cookies de rastreo ni analíticas; las fuentes tipográficas se sirven desde nuestro propio dominio.',
+        'Ni este sitio ni ese formulario usan cookies de rastreo ni analíticas; las fuentes tipográficas de este sitio se sirven desde nuestro propio dominio.',
       ],
     },
     {
@@ -74,7 +75,7 @@ const privacyEs: LegalDoc = {
     {
       h: '8. Tus derechos',
       p: [
-        'Como el contenido de la app vive solo en tu dispositivo, tú tienes control total sobre él: puedes editarlo o borrarlo en cualquier momento. Para cualquier consulta sobre los datos de la lista de espera (acceso, corrección o eliminación), escríbenos a ' +
+        'Como el contenido de la app vive solo en tu dispositivo, tú tienes control total sobre él: puedes editarlo o borrarlo en cualquier momento. Para cualquier consulta sobre los datos de la lista de espera (email, nombre, ciudad, plataforma o nota: acceso, corrección o eliminación), escríbenos a ' +
           CONTACT +
           '.',
       ],
@@ -91,7 +92,7 @@ const privacyEs: LegalDoc = {
 
 const privacyEn: LegalDoc = {
   title: 'Privacy Policy',
-  updated: 'Last updated: September 23, 2026',
+  updated: 'Last updated: October 6, 2026',
   intro: [
     `This policy explains what data Meld (the iPhone and Android app) and this website, operated by ${OWNER} ("we"), handle. The short version: on the Free plan, everything you save in Meld stays on your phone and we never see it.`,
   ],
@@ -124,10 +125,11 @@ const privacyEn: LegalDoc = {
     {
       h: '5. This website and the waitlist',
       p: [
-        'If you join the waitlist, we store only your email to let you know when Meld is available. We use it for nothing else, and you can ask us to delete it at any time by writing to ' +
+        'The waitlist form lives on joblanstudio.vercel.app, the website of Meld’s developer. There we store your email and the name you enter to let you know when Meld is available, with an email provider acting on our behalf: Resend (resend.com). City, platform and the optional note only stay in the server logs (Vercel), to know what you are interested in.',
+        'We use that data for nothing else, and you can ask us to delete it at any time by writing to ' +
           CONTACT +
           ' or by using the unsubscribe link included in every email.',
-        'Your email is stored with an email provider acting on our behalf: Resend (resend.com). The site uses no tracking cookies or analytics; fonts are served from our own domain.',
+        'Neither this site nor that form uses tracking cookies or analytics; this site’s fonts are served from our own domain.',
       ],
     },
     {
@@ -143,7 +145,7 @@ const privacyEn: LegalDoc = {
     {
       h: '8. Your rights',
       p: [
-        'Because the app’s content lives only on your device, you are fully in control of it: you can edit or delete it at any time. For any request about your waitlist data (access, correction or deletion), write to ' +
+        'Because the app’s content lives only on your device, you are fully in control of it: you can edit or delete it at any time. For any request about your waitlist data (email, name, city, platform or note: access, correction or deletion), write to ' +
           CONTACT +
           '.',
       ],
