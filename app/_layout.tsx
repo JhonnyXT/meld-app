@@ -20,6 +20,7 @@ import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 import { AnimatedSplash } from '@/components/AnimatedSplash';
 import { initDb } from '@/data/local/db';
 import { refreshAppBadge } from '@/services/appBadge';
+import { registerNotificationResponseHandling } from '@/services/notifications';
 import { useCategoriesStore } from '@/store/categoriesStore';
 import { QuickAddSheet } from '@/components/quickAdd/QuickAddSheet';
 import { AddMenu } from '@/components/AddMenu';
@@ -60,6 +61,12 @@ function RootStack() {
     const sub = Linking.addEventListener('url', ({ url }) => handleDeepLink(url));
     return () => sub.remove();
   }, [handleDeepLink]);
+
+  // Tocar una notificación (o su botón "Marcar hecho") — ver
+  // `services/notifications.ts` → `registerNotificationResponseHandling`,
+  // mismo patrón que el deep link de arriba (evento en caliente + chequeo
+  // en frío al arrancar).
+  useEffect(() => registerNotificationResponseHandling(), []);
 
   return (
     <>

@@ -3,7 +3,9 @@ import * as Notifications from 'expo-notifications';
 import type { DayItem } from '@/domain/dayItem';
 import { ANY_TIME_HHMM } from '@/domain/time';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useItemDetailStore } from '@/store/itemDetailStore';
 import { translate } from '@/i18n';
+import { completeItemFromNotification } from './notificationActions';
 
 const ANDROID_CHANNEL_ID = 'reminders';
 let channelReady: Promise<void> | null = null;
@@ -18,6 +20,36 @@ function ensureAndroidChannel(): Promise<void> {
     }).then(() => undefined);
   }
   return channelReady;
+}
+
+// Categoría con la acción "Marcar hecho" directo desde la bandeja de
+// notificaciones (como el "Marcar como leído" de WhatsApp) — solo se asigna
+// a recordatorios de Task/Habit (los únicos tipos con un "hecho" real, ver
+// `completeItemFromNotification`). **`opensAppToForeground: true` a
+// propósito, no silencioso del todo**: la documentación de
+// `expo-notifications` dice explícito que con `false`, si la app está
+// MATADA (no solo en segundo plano — Android, sobre todo Samsung, mata
+// procesos agresivamente), el listener de la acción NUNCA se dispara, el
+// toque se pierde en silencio. Para un recordatorio que puede sonar días
+// después de la última vez que se abrió la app (semanal/mensual), ese es el
+// caso común, no la excepción — mejor que abra la app un instante y SIEMPRE
+// funcione, a que sea 100% silenciosa pero falle la mitad de las veces sin
+// avisar. Ver `registerNotificationResponseHandling`.
+const COMPLETABLE_CATEGORY = 'completable';
+const MARK_DONE_ACTION = 'mark-done';
+let categoriesReady: Promise<void> | null = null;
+
+function ensureCategories(): Promise<void> {
+  if (!categoriesReady) {
+    categoriesReady = Notifications.setNotificationCategoryAsync(COMPLETABLE_CATEGORY, [
+      {
+        identifier: MARK_DONE_ACTION,
+        buttonTitle: translate(useSettingsStore.getState().language, 'notificationMarkDone'),
+        options: { opensAppToForeground: true },
+      },
+    ]).then(() => undefined);
+  }
+  return categoriesReady;
 }
 
 Notifications.setNotificationHandler({
@@ -139,7 +171,20 @@ export async function syncReminderNotification(item: DayItem): Promise<void> {
   if (!granted) return;
   await ensureAndroidChannel();
 
-  const content = { title: item.title, body: translate(useSettingsStore.getState().language, 'notificationBody') };
+  // Task y Habit son los únicos tipos con un "hecho" real (Event/Note/
+  // VoiceMemo nunca se marcan completados en ningún lado de la app) — solo
+  // ellos llevan la categoría con el botón "Marcar hecho" de la bandeja.
+  // `data.itemId` va SIEMPRE (en los 6 tipos): es lo que usa
+  // `registerNotificationResponseHandling` para abrir el detalle del ítem
+  // al tocar la notificación en sí (no el botón de acción).
+  const isCompletable = item.type === 'task' || item.type === 'habit';
+  if (isCompletable) await ensureCategories();
+  const content = {
+    title: item.title,
+    body: translate(useSettingsStore.getState().language, 'notificationBody'),
+    data: { itemId: item.id },
+    ...(isCompletable ? { categoryIdentifier: COMPLETABLE_CATEGORY } : {}),
+  };
 
   // Task que repite (`repeatRule`): el disparador nativo se repite SOLO
   // (diario/semanal/mensual, anclado al día/hora originales) — el SO se
@@ -219,4 +264,41 @@ export async function syncReminderNotification(item: DayItem): Promise<void> {
     content,
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: anchor, channelId: ANDROID_CHANNEL_ID },
   });
+}
+
+/**
+ * Qué pasa al tocar una notificación programada por `syncReminderNotification`
+ * — se llama UNA vez desde `app/_layout.tsx` (mismo patrón que
+ * `handleDeepLink` ahí: evento en caliente + chequeo en frío al arrancar).
+ * - Botón de acción "Marcar hecho" (`MARK_DONE_ACTION`): completa el ítem
+ *   directo vía `completeItemFromNotification`, sin abrir ningún modal —
+ *   la app igual se abre un instante (`opensAppToForeground: true`, ver la
+ *   nota arriba de por qué), pero no navega a ningún lado.
+ * - Tocar la notificación misma (el cuerpo, no un botón —
+ *   `Notifications.DEFAULT_ACTION_IDENTIFIER`): abre el detalle del ítem
+ *   (`useItemDetailStore.open`), igual que tocar su fila en Today.
+ *
+ * `getLastNotificationResponseAsync()` cubre el arranque en frío (la app
+ * estaba cerrada y se abrió tocando la notificación) — sin esto, un toque
+ * que ocurrió antes de que el listener se suscribiera se perdería, mismo
+ * problema que `Linking.getInitialURL()` resuelve para deep links.
+ */
+export function registerNotificationResponseHandling(): () => void {
+  const handle = (response: Notifications.NotificationResponse) => {
+    const data = response.notification.request.content.data as { itemId?: string } | undefined;
+    const itemId = data?.itemId;
+    if (!itemId) return;
+
+    if (response.actionIdentifier === MARK_DONE_ACTION) {
+      completeItemFromNotification(itemId);
+      return;
+    }
+    useItemDetailStore.getState().open(itemId);
+  };
+
+  Notifications.getLastNotificationResponseAsync().then((response) => {
+    if (response) handle(response);
+  });
+  const sub = Notifications.addNotificationResponseReceivedListener(handle);
+  return () => sub.remove();
 }

@@ -333,6 +333,7 @@ export const es = {
 
   // Notificaciones
   notificationBody: 'Meld · recordatorio',
+  notificationMarkDone: 'Marcar hecho',
 
   // SearchOverlay
   close: 'Cerrar',
@@ -703,6 +704,7 @@ export const en: Record<keyof typeof es, string> = {
   settingsCoolHabitsSubtitle: 'Same style as health habits, applied to every habit',
 
   notificationBody: 'Meld · reminder',
+  notificationMarkDone: 'Mark done',
 
   close: 'Close',
   searchPlaceholder: 'Search tasks, events, notes…',

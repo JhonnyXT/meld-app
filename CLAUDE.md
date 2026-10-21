@@ -268,6 +268,32 @@ React. El idioma vive en `settingsStore.language` (persistido).
     `WEEKLY` solo cubre un día — `cancelReminderNotification` cancela las 6
     variantes posibles de un ítem (base + 5 weekday) sin necesidad de
     recordar cuál se usó la vez anterior.
+  - **Acciones desde la bandeja de notificaciones** (pedido explícito del
+    usuario — "que funcione así como WhatsApp"): toda notificación lleva
+    `data: { itemId }`; las de Task/Habit (los únicos tipos con un "hecho"
+    real) además llevan `categoryIdentifier: 'completable'`
+    (`ensureCategories()`, categoría con un solo botón "Marcar hecho" vía
+    `setNotificationCategoryAsync`). `registerNotificationResponseHandling()`
+    (llamado una vez desde `app/_layout.tsx`, mismo patrón que
+    `handleDeepLink`: evento en caliente + `getLastNotificationResponseAsync()`
+    en frío) reacciona a la respuesta: el botón llama
+    `services/notificationActions.ts` → `completeItemFromNotification`
+    (IDEMPOTENTE — marca hecho, no alterna; usa `toggleTaskCompletion`/
+    `toggleHabitCompletion` para ítems que repiten, `status: 'done'` directo
+    para los que no); tocar la notificación misma (el cuerpo, no el botón —
+    `actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER`) abre el
+    detalle del ítem (`useItemDetailStore.open`), para los 6 tipos.
+    **`opensAppToForeground: true` a propósito, no 100% silenciosa como
+    WhatsApp**: la documentación de `expo-notifications` dice explícito que
+    con `false`, si la app está MATADA (no solo en segundo plano — Android, y
+    Samsung en particular, mata procesos agresivamente), el listener de la
+    acción nunca se dispara, el toque se pierde en silencio sin ningún aviso.
+    Para un recordatorio que puede sonar días después de la última vez que
+    se abrió la app (semanal/mensual), ese es el caso común, no la
+    excepción — mejor que la app se abra un instante y SIEMPRE funcione, a
+    que sea silenciosa pero falle la mitad de las veces. No reintroducir
+    `opensAppToForeground: false` para "que no abra la app" sin volver a
+    leer esto.
 - **Preferencia local vs. permiso del SO** (mismo patrón que `my-wallet-app`):
   - El permiso del SO se pide solo en el paso final del onboarding
     (`NotificationsStep`). Si el usuario lo salta, no se vuelve a pedir hasta que
