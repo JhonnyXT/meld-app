@@ -64,6 +64,17 @@ export function initDb() {
   );
 
   sqlite.execSync(`
+    CREATE TABLE IF NOT EXISTS task_completions (
+      id TEXT PRIMARY KEY NOT NULL,
+      task_id TEXT NOT NULL,
+      date TEXT NOT NULL
+    );
+  `);
+  sqlite.execSync(
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_task_completions_task_date ON task_completions(task_id, date);',
+  );
+
+  sqlite.execSync(`
     CREATE TABLE IF NOT EXISTS categories (
       id TEXT PRIMARY KEY NOT NULL,
       label TEXT NOT NULL,

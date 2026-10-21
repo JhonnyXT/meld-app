@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import * as FileSystem from 'expo-file-system';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
-import type { DayItem, Habit } from '@/domain/dayItem';
+import type { DayItem, Habit, Task } from '@/domain/dayItem';
 import { toDateKey, fromDateKey, addDays } from '@/domain/date';
 import { getWeekRange } from '@/domain/week';
 import { isHabitScheduledOn, computeWeekProgress, computeStreak } from '@/domain/habit';
+import { isTaskScheduledOn } from '@/domain/task';
 import { cancelReminderNotification, syncReminderNotification } from '@/services/notifications';
 import { useUndoStore } from '@/store/undoStore';
 import { useSettingsStore } from '@/store/settingsStore';
@@ -55,6 +56,32 @@ async function loadHabitOccurrences(dateKey: string): Promise<{ habits: Habit[];
   return { habits, completedMap };
 }
 
+/** Trae las ocurrencias recurrentes de tasks (`repeatRule` no null) que
+ * corresponden a `dateKey` (ver `domain/task.ts` → `isTaskScheduledOn`),
+ * mismo patrón que `loadHabitOccurrences` pero sin progress/streak (no
+ * aplica a Task). Devuelve también si cada una ya se marcó hecha ese día,
+ * para `taskCompletedMap`. */
+async function loadTaskOccurrences(dateKey: string): Promise<{ tasks: Task[]; completedMap: Record<string, boolean> }> {
+  const referenceDate = fromDateKey(dateKey);
+  const allTasks = (await dayItemRepository.listActiveRepeatingTasks()) as Task[];
+  const scheduled = allTasks.filter((t) => t.date && t.repeatRule && isTaskScheduledOn(t.repeatRule, fromDateKey(t.date), referenceDate));
+
+  const results = await Promise.all(
+    scheduled.map(async (task) => {
+      const dates = await dayItemRepository.listTaskCompletionDates(task.id, dateKey, dateKey);
+      return { task, completed: dates.length > 0 };
+    }),
+  );
+
+  const tasks: Task[] = [];
+  const completedMap: Record<string, boolean> = {};
+  for (const r of results) {
+    tasks.push(r.task);
+    completedMap[r.task.id] = r.completed;
+  }
+  return { tasks, completedMap };
+}
+
 /** Recalcula `progress`/`currentStreak` de un hábito tras alternar su
  * completado en `dateKey` y actualiza `items` con la copia recalculada.
  * Compartido entre `toggleHabitComplete` y su acción de Deshacer. */
@@ -83,6 +110,10 @@ interface DayItemsState {
   /** habitId -> ¿ya se marcó hecho en `selectedDateKey`? Solo cubre hábitos
    * (ver `loadHabitOccurrences`). */
   habitCompletedMap: Record<string, boolean>;
+  /** taskId -> ¿ya se marcó hecha en `selectedDateKey`? Solo cubre tasks que
+   * repiten (`repeatRule` no null, ver `loadTaskOccurrences`) — una task sin
+   * repetición sigue leyendo `status` directo, no aparece acá. */
+  taskCompletedMap: Record<string, boolean>;
   loading: boolean;
   setSelectedDate: (date: Date) => Promise<void>;
   reload: () => Promise<void>;
@@ -96,6 +127,7 @@ export const useDayItemsStore = create<DayItemsState>((set, get) => ({
   selectedDateKey: toDateKey(new Date()),
   items: [],
   habitCompletedMap: {},
+  taskCompletedMap: {},
   // Arranca en `true` para que "Hoy" pinte la maquetación de carga
   // (`components/ListSkeleton`) desde el primer frame, en vez del estado
   // vacío, hasta que el primer `reload()` traiga los ítems reales.
@@ -113,13 +145,15 @@ export const useDayItemsStore = create<DayItemsState>((set, get) => ({
     const isRealToday = dateKey === toDateKey(new Date());
     const habitsEnabled = useSettingsStore.getState().habitsInTodayEnabled;
 
-    // Las 3 consultas son independientes entre sí — dispararlas en paralelo
+    // Las 4 consultas son independientes entre sí — dispararlas en paralelo
     // (en vez de encadenarlas con `await` una detrás de otra) es lo que
     // realmente se sentía lento al cambiar de día (swipe, flechas, "Volver a
-    // hoy"): pedido explícito del usuario, 2026-09-16.
-    const [dateItems, habitData, overdueTasks] = await Promise.all([
+    // hoy"): pedido explícito del usuario, 2026-09-16. Cualquier consulta
+    // nueva va acá adentro, nunca suelta antes/después del `Promise.all`.
+    const [dateItems, habitData, taskData, overdueTasks] = await Promise.all([
       dayItemRepository.listByDate(dateKey),
       habitsEnabled ? loadHabitOccurrences(dateKey) : Promise.resolve(null),
+      loadTaskOccurrences(dateKey),
       // "Rollover" de tareas no cumplidas — solo cuando `dateKey` es el día
       // real de hoy (no al navegar a un día pasado/futuro): las tareas
       // pendientes de días anteriores se suman a la lista SIN tocar su
@@ -139,6 +173,16 @@ export const useDayItemsStore = create<DayItemsState>((set, get) => ({
       items = Array.from(byId.values());
     }
 
+    const taskCompletedMap = taskData.completedMap;
+    if (taskData.tasks.length > 0) {
+      // Mismo merge por id que los hábitos — una task que repite puede ya
+      // estar en `items` si su propia `date` (fecha ancla) coincide con
+      // `dateKey`.
+      const byId = new Map(items.map((i) => [i.id, i] as const));
+      for (const task of taskData.tasks) byId.set(task.id, task);
+      items = Array.from(byId.values());
+    }
+
     // Van primero en el orden — lo atrasado se resuelve antes que lo nuevo
     // del día.
     if (overdueTasks.length > 0) {
@@ -147,7 +191,7 @@ export const useDayItemsStore = create<DayItemsState>((set, get) => ({
       items = [...newOverdue, ...items];
     }
 
-    set({ items, habitCompletedMap, loading: false });
+    set({ items, habitCompletedMap, taskCompletedMap, loading: false });
     // "Fire and forget" — no bloquea el reload de la pantalla ni depende de
     // que `selectedDateKey` sea hoy (el widget recalcula su propio "hoy"
     // desde cero, ver `getTodayWidgetData`). Un solo punto de enganche cubre
@@ -185,7 +229,28 @@ export const useDayItemsStore = create<DayItemsState>((set, get) => ({
 
   toggleComplete: async (id: string) => {
     const item = get().items.find((i) => i.id === id);
-    if (!item) return;
+    if (!item || item.type !== 'task') return;
+
+    // Task que repite (`repeatRule`): completar es POR DÍA, igual que un
+    // hábito — nunca toca `status` de la fila (que para estas queda fijo en
+    // 'scheduled' para siempre; la fuente real es `task_completions`, ver
+    // `loadTaskOccurrences`). Sin esto, marcarla hecha la dejaría "hecha"
+    // permanentemente y nunca volvería a aparecer el período siguiente.
+    if (item.repeatRule) {
+      const dateKey = get().selectedDateKey;
+      const completed = await dayItemRepository.toggleTaskCompletion(id, dateKey);
+      set({ taskCompletedMap: { ...get().taskCompletedMap, [id]: completed } });
+      refreshWidgets();
+      if (completed) {
+        useUndoStore.getState().show(translate(useSettingsStore.getState().language, 'taskCompleted'), 'check', async () => {
+          await dayItemRepository.toggleTaskCompletion(id, dateKey);
+          set({ taskCompletedMap: { ...get().taskCompletedMap, [id]: false } });
+          refreshWidgets();
+        });
+      }
+      return;
+    }
+
     const nextStatus = item.status === 'done' ? 'scheduled' : 'done';
     const updated: DayItem = { ...item, status: nextStatus, updatedAt: new Date().toISOString() };
     await dayItemRepository.upsert(updated);
@@ -222,7 +287,16 @@ export const useDayItemsStore = create<DayItemsState>((set, get) => ({
         item.type === 'habit' &&
         useSettingsStore.getState().habitsInTodayEnabled &&
         isHabitScheduledOn(item.targetFrequency, fromDateKey(get().selectedDateKey));
-      if (item.date === get().selectedDateKey || isRecurringHabitToday) set({ items: [...get().items, item] });
+      // Mismo caso para una task que repite — puede estar visible ese día
+      // sin que su `date` ancla coincida.
+      const isRecurringTaskToday =
+        item.type === 'task' &&
+        !!item.repeatRule &&
+        !!item.date &&
+        isTaskScheduledOn(item.repeatRule, fromDateKey(item.date), fromDateKey(get().selectedDateKey));
+      if (item.date === get().selectedDateKey || isRecurringHabitToday || isRecurringTaskToday) {
+        set({ items: [...get().items, item] });
+      }
       refreshWidgets();
     });
   },

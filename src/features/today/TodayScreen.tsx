@@ -62,6 +62,7 @@ export function TodayScreen() {
   const items = useDayItemsStore((s) => s.items);
   const loading = useDayItemsStore((s) => s.loading);
   const habitCompletedMap = useDayItemsStore((s) => s.habitCompletedMap);
+  const taskCompletedMap = useDayItemsStore((s) => s.taskCompletedMap);
   const setStoreDate = useDayItemsStore((s) => s.setSelectedDate);
   const reload = useDayItemsStore((s) => s.reload);
   const toggleComplete = useDayItemsStore((s) => s.toggleComplete);
@@ -119,9 +120,11 @@ export function TodayScreen() {
   // Los Momentos viven en su propia pantalla — no cuentan en "X de Y hechos"
   // ni aparecen en la lista de Today (ver `visibleRows` abajo).
   const countableItems = items.filter((i) => i.type !== 'moment');
-  const doneCount = countableItems.filter((i) =>
-    i.type === 'habit' ? habitCompletedMap[i.id] : i.status === 'done',
-  ).length;
+  const doneCount = countableItems.filter((i) => {
+    if (i.type === 'habit') return habitCompletedMap[i.id];
+    if (i.type === 'task' && i.repeatRule) return taskCompletedMap[i.id];
+    return i.status === 'done';
+  }).length;
   const isFiltering = searchActive && searchResults !== null;
   // Maquetación gris de carga: solo mientras el store está cargando y todavía
   // no hay nada que pintar (primera entrada). Al cambiar de día desde una
@@ -140,7 +143,7 @@ export function TodayScreen() {
         items.filter(
           (i) =>
             i.type !== 'moment' &&
-            !(i.type === 'task' && i.status === 'done') &&
+            !(i.type === 'task' && (i.repeatRule ? taskCompletedMap[i.id] : i.status === 'done')) &&
             !(i.type === 'habit' && habitCompletedMap[i.id]),
         ),
         coolHabitsEnabled,
@@ -176,6 +179,7 @@ export function TodayScreen() {
         onToggleComplete={toggleComplete}
         habitCompletedToday={habitCompletedMap[item.id] ?? false}
         onToggleHabitComplete={toggleHabitComplete}
+        taskCompletedToday={taskCompletedMap[item.id] ?? false}
       />
     </Animated.View>
   );

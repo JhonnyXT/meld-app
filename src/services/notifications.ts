@@ -84,9 +84,34 @@ export async function primeNotificationPermissionOnLaunch(): Promise<void> {
   }
 }
 
-/** Cancela cualquier notificación programada previamente para este ítem. */
-export async function cancelReminderNotification(itemId: string): Promise<void> {
+// Para el recordatorio de un hábito "Weekdays" (sin día fijo único) se
+// programan 5 notificaciones nativas `WEEKLY` sueltas, una por día de
+// semana (lunes-viernes) — cada una necesita su propio `identifier` aparte
+// del id del ítem (expo-notifications: 1=domingo...7=sábado, por eso
+// lunes=2...viernes=6). `cancelAllVariants` cancela TODAS las variantes
+// posibles de un ítem sin tener que recordar cuál se usó la vez anterior —
+// cancelar un identifier que nunca se programó es un no-op silencioso.
+const WEEKDAY_IDS = [2, 3, 4, 5, 6];
+
+function weekdayIdentifier(itemId: string, weekday: number): string {
+  return `${itemId}:wd:${weekday}`;
+}
+
+/** JS `Date.getDay()` es 0=domingo...6=sábado; expo-notifications usa
+ * 1=domingo...7=sábado. */
+function toExpoWeekday(jsDay: number): number {
+  return jsDay + 1;
+}
+
+async function cancelAllVariants(itemId: string): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(itemId).catch(() => {});
+  await Promise.all(WEEKDAY_IDS.map((wd) => Notifications.cancelScheduledNotificationAsync(weekdayIdentifier(itemId, wd)).catch(() => {})));
+}
+
+/** Cancela cualquier notificación programada previamente para este ítem
+ * (incluidas las 5 variantes de un hábito "Weekdays", ver arriba). */
+export async function cancelReminderNotification(itemId: string): Promise<void> {
+  await cancelAllVariants(itemId);
 }
 
 /**
@@ -106,16 +131,92 @@ export async function syncReminderNotification(item: DayItem): Promise<void> {
   // no se programa nada aunque el permiso del sistema siga concedido.
   if (!useSettingsStore.getState().notificationsEnabled) return;
 
-  const date = localDateFromReminderAt(item.reminderAt);
-  if (date.getTime() <= Date.now()) return;
+  const anchor = localDateFromReminderAt(item.reminderAt);
+  const hour = anchor.getHours();
+  const minute = anchor.getMinutes();
 
   const granted = await ensurePermission();
   if (!granted) return;
   await ensureAndroidChannel();
 
+  const content = { title: item.title, body: translate(useSettingsStore.getState().language, 'notificationBody') };
+
+  // Task que repite (`repeatRule`): el disparador nativo se repite SOLO
+  // (diario/semanal/mensual, anclado al día/hora originales) — el SO se
+  // encarga, no hace falta reprogramar día a día desde la app. Limitación
+  // conocida y aceptada: el disparador no sabe si esa ocurrencia puntual ya
+  // se completó, sigue sonando igual (no existe forma de "cancelar solo
+  // hoy" un disparador nativo repetitivo sin cancelar toda la serie).
+  if (item.type === 'task' && item.repeatRule) {
+    if (item.repeatRule === 'Daily') {
+      await Notifications.scheduleNotificationAsync({
+        identifier: item.id,
+        content,
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute, channelId: ANDROID_CHANNEL_ID },
+      });
+    } else if (item.repeatRule === 'Weekly') {
+      await Notifications.scheduleNotificationAsync({
+        identifier: item.id,
+        content,
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          weekday: toExpoWeekday(anchor.getDay()),
+          hour,
+          minute,
+          channelId: ANDROID_CHANNEL_ID,
+        },
+      });
+    } else if (item.repeatRule === 'Monthly') {
+      await Notifications.scheduleNotificationAsync({
+        identifier: item.id,
+        content,
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.MONTHLY,
+          day: anchor.getDate(),
+          hour,
+          minute,
+          channelId: ANDROID_CHANNEL_ID,
+        },
+      });
+    }
+    return;
+  }
+
+  // Hábito: recordatorio recurrente según su frecuencia — antes se
+  // programaba una sola vez (el día de creación) y nunca más volvía a
+  // sonar. "Weekdays" tiene día fijo (lunes-viernes), así que se arman 5
+  // disparadores `WEEKLY` sueltos. "Every day" es `DAILY`. "3x a week"/
+  // "Weekly" NO tienen día fijo (el usuario elige en cuáles cumplir el
+  // objetivo semanal) — decisión de producto: avisan TODOS los días a la
+  // hora preferida, un empujón suave; no hay forma de saber de antemano qué
+  // días va a elegir.
+  if (item.type === 'habit') {
+    if (item.targetFrequency === 'Weekdays') {
+      await Promise.all(
+        WEEKDAY_IDS.map((weekday) =>
+          Notifications.scheduleNotificationAsync({
+            identifier: weekdayIdentifier(item.id, weekday),
+            content,
+            trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday, hour, minute, channelId: ANDROID_CHANNEL_ID },
+          }),
+        ),
+      );
+    } else {
+      await Notifications.scheduleNotificationAsync({
+        identifier: item.id,
+        content,
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute, channelId: ANDROID_CHANNEL_ID },
+      });
+    }
+    return;
+  }
+
+  // Resto de tipos (Event/Note/VoiceMemo) y Task sin repetir: recordatorio
+  // puntual de una sola vez, como siempre.
+  if (anchor.getTime() <= Date.now()) return;
   await Notifications.scheduleNotificationAsync({
     identifier: item.id,
-    content: { title: item.title, body: translate(useSettingsStore.getState().language, 'notificationBody') },
-    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date, channelId: ANDROID_CHANNEL_ID },
+    content,
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: anchor, channelId: ANDROID_CHANNEL_ID },
   });
 }

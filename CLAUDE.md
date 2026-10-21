@@ -247,6 +247,27 @@ React. El idioma vive en `settingsStore.language` (persistido).
   `syncReminderNotification`; "Any Time" no programa nada. Se llama desde los tres
   lugares donde se fija una hora: `timeDragStore.confirm()`,
   `QuickAddSheet.handleSave` e `ItemDetailSheet.handleSave`.
+  - **Disparadores nativos recurrentes** (bug real corregido — antes TODO
+    recordatorio, repita o no la tarea/hábito, usaba un disparador `DATE` de
+    una sola vez y nunca volvía a sonar): `syncReminderNotification` ahora
+    arma el trigger según el ítem — `DAILY`/`WEEKLY`/`MONTHLY` de
+    `expo-notifications` para una Task con `repeatRule`, anclados al
+    día-de-semana/día-de-mes original; `DAILY`/5×`WEEKLY` (lunes-viernes)
+    para un Habit según `targetFrequency` ("3x a week"/"Weekly" no tienen día
+    fijo — el usuario elige en qué días cumplir el objetivo semanal, así que
+    avisan TODOS los días a la hora preferida, un empujón suave). El resto
+    (Event/Note/VoiceMemo, y Task sin repetir) sigue con el disparador `DATE`
+    puntual de siempre. El SO repite el disparador solo, sin que la app
+    tenga que hacer nada en segundo plano. **Limitación conocida y
+    aceptada**: un disparador nativo repetitivo no sabe si esa ocurrencia
+    puntual ya se marcó hecha — sigue sonando igual (no hay forma de
+    "cancelar solo hoy" sin cancelar toda la serie; una versión más fina
+    exigiría notificaciones programadas desde un background task, fuera de
+    alcance). Un hábito "Weekdays" necesita 5 `identifier` sueltos
+    (`${id}:wd:${2..6}`, expo numera 1=domingo) porque cada disparador
+    `WEEKLY` solo cubre un día — `cancelReminderNotification` cancela las 6
+    variantes posibles de un ítem (base + 5 weekday) sin necesidad de
+    recordar cuál se usó la vez anterior.
 - **Preferencia local vs. permiso del SO** (mismo patrón que `my-wallet-app`):
   - El permiso del SO se pide solo en el paso final del onboarding
     (`NotificationsStep`). Si el usuario lo salta, no se vuelve a pedir hasta que
@@ -305,6 +326,51 @@ React. El idioma vive en `settingsStore.language` (persistido).
   = todos los hábitos programados ese día hechos, `'red'` = al menos uno no,
   `'none'` = ninguno programado. Si el filtro de Calendario es un hábito,
   agrega solo ese; si no, entre todos.
+
+### Tareas que repiten (recurrencia real)
+
+Antes, "Repetir" (Diario/Semanal/Mensual) en una Task solo se guardaba en
+`repeatRule` y mostraba el ícono 🔁 en la fila — bug real reportado por el
+usuario: nada volvía a traer la tarea pendiente el período siguiente, ni
+reprogramaba el recordatorio. Corregido con el mismo patrón que ya usan los
+hábitos (`habit_completions`/`isHabitScheduledOn`):
+
+- **`task_completions`** (un registro por día que una task QUE REPITE se
+  marcó hecha, índice único `taskId`+`date`) es la fuente de verdad del
+  completado para esas tasks. Una task SIN `repeatRule` no la toca — sigue
+  usando `status` directo en `day_items`, exactamente como siempre.
+- **`domain/task.ts`** → `isTaskScheduledOn(repeatRule, anchorDate, date)`:
+  a diferencia de los hábitos (que recurren "todos los días desde siempre"),
+  una task recurrente está anclada a su propia `date` — 'Daily' todos los
+  días desde esa fecha; 'Weekly' el mismo día-de-semana; 'Monthly' el mismo
+  día-de-mes (si el mes no tiene ese día, simplemente no recurre ese mes, no
+  se corre al último día disponible). Nunca recurre antes de `anchorDate`.
+- **`dayItemRepository`**: `listActiveRepeatingTasks()` (ignora qué tan
+  lejos quedó `date`, mismo criterio que `listActiveHabits`),
+  `toggleTaskCompletion`/`listTaskCompletionDates` (mismo patrón que las
+  funciones homónimas de hábito). `listOverdueTasks` (rollover) EXCLUYE
+  tasks con `repeatRule` — que su `date` ancla quede en el pasado es normal
+  para estas, la recurrencia ya las trae de vuelta; incluirlas ahí además
+  duplicaría la fila.
+- **`dayItemsStore`**: `reload()` suma `loadTaskOccurrences(dateKey)` al
+  `Promise.all` existente (mismo criterio de rendimiento que los hábitos —
+  cualquier consulta nueva va adentro, nunca suelta) y mergea por id como ya
+  hace con hábitos. `taskCompletedMap: Record<taskId, boolean>` paralelo a
+  `habitCompletedMap`. `toggleComplete(id)` bifurca: si la task tiene
+  `repeatRule`, alterna `task_completions` para `selectedDateKey` (nunca
+  toca `status`) con su propio Undo; si no, el flujo de siempre
+  (`status` directo). Completar cualquiera de las dos la oculta de Today
+  igual que antes.
+- **UI**: el checkbox de una task que repite lee `taskCompletedToday`
+  (`mapDayItemToRow.ts` → `leadingFor`/`toRowViewModel`), no `item.status`.
+  El badge de atraso (`overdue`) NO aplica a tasks con `repeatRule` — su
+  `date` ancla en el pasado no es un atraso real, lo es solo para una task
+  normal (ver `trailingBadgesFor`). El badge 🔁 (`recurrence`) sigue igual.
+- **Mismo alcance que los hábitos** (ver "Simplificaciones conocidas"): la
+  recurrencia solo está cableada en Today, no en Calendar Mes/Semana —
+  ahí una task que repite se sigue viendo solo en su `date` ancla, como
+  cualquier otra. Extenderlo implicaría que `useWeekAgenda`/
+  `listByDateRange` también inyecten ocurrencias.
 
 ### Auto-registro (picker de métricas de salud)
 
@@ -931,9 +997,14 @@ releerlo antes de empezar cualquiera de estas.
 ## Simplificaciones conocidas (no son bugs)
 
 - Los hábitos NO recurren en Calendar Mes ni en la agenda Semana (ahí se ven solo
-  en su fecha de creación), y el tap-to-complete solo está en Today. Extenderlo
+  en su fecha de creación), y el tap-to-complete solo está en Today. Mismo
+  alcance para las tasks que repiten (ver "Tareas que repiten"). Extenderlo
   implicaría que `useWeekAgenda`/`listByDateRange` inyecten ocurrencias como
   `dayItemsStore.reload`.
+- Un recordatorio recurrente (Task con `repeatRule`, o Habit) no sabe si esa
+  ocurrencia puntual ya se completó — sigue sonando igual sin importar que
+  ya la hayas marcado hecha. Es una limitación real de los disparadores
+  nativos repetitivos (ver "Notificaciones locales reales"), no un bug.
 - `Event` no soporta multi-día (solo `startTime`/`endTime` del mismo día).
 - **`FlashList` solo en `InboxScreen`**. Today, agenda Semana y Moments son listas
   acotadas y siguen con `ScrollView`: el reciclado de `FlashList` no es compatible

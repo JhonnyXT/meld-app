@@ -58,10 +58,13 @@ function isCoolHabit(item: DayItem, coolHabitsEnabled: boolean): boolean {
   return item.type === 'habit' && (item.colorStyle === 'cool' || coolHabitsEnabled);
 }
 
-function leadingFor(item: DayItem, habitCompletedToday: boolean, coolHabitsEnabled: boolean): Leading {
+function leadingFor(item: DayItem, habitCompletedToday: boolean, coolHabitsEnabled: boolean, taskCompletedToday: boolean): Leading {
   switch (item.type) {
     case 'task':
-      return { kind: 'checkbox', checked: item.status === 'done' };
+      // Una task que repite (`repeatRule`) nunca toca `status` al marcarse
+      // hecha (completar es por día, ver `dayItemsStore.toggleComplete`) —
+      // el checkbox tiene que leer `taskCompletedToday`, no `status`.
+      return { kind: 'checkbox', checked: item.repeatRule ? taskCompletedToday : item.status === 'done' };
     case 'event':
       return { kind: 'icon', name: 'calendar-today' as IconName };
     case 'voiceMemo':
@@ -94,8 +97,11 @@ function trailingBadgesFor(item: DayItem, coolHabitsEnabled: boolean): TrailingB
   const badges: TrailingBadge[] = [];
 
   // Rollover de tareas (ver `dayItemsStore.reload`) — máxima precedencia,
-  // saber que algo quedó atrasado es lo primero que hay que ver.
-  if (item.type === 'task' && item.status !== 'done' && item.date && item.date < toDateKey(new Date())) {
+  // saber que algo quedó atrasado es lo primero que hay que ver. No aplica a
+  // tasks que repiten (`repeatRule`): para esas, que su `date` ancla quede
+  // en el pasado es normal (la recurrencia las trae de vuelta solas), no es
+  // un atraso real.
+  if (item.type === 'task' && !item.repeatRule && item.status !== 'done' && item.date && item.date < toDateKey(new Date())) {
     badges.push({ kind: 'overdue' });
   }
 
@@ -134,15 +140,20 @@ function trailingBadgesFor(item: DayItem, coolHabitsEnabled: boolean): TrailingB
  * `dayItemsStore.selectedDateKey`). Se ignora para el resto de tipos.
  * `coolHabitsEnabled` viene de `settingsStore` (toggle "Cool Habits") — ver
  * `isCoolHabit`. */
-export function toRowViewModel(item: DayItem, habitCompletedToday = false, coolHabitsEnabled = false): DayItemRowViewModel {
+export function toRowViewModel(
+  item: DayItem,
+  habitCompletedToday = false,
+  coolHabitsEnabled = false,
+  taskCompletedToday = false,
+): DayItemRowViewModel {
   return {
     id: item.id,
     timeMarker: timeMarkerFor(item),
-    leading: leadingFor(item, habitCompletedToday, coolHabitsEnabled),
+    leading: leadingFor(item, habitCompletedToday, coolHabitsEnabled, taskCompletedToday),
     title: item.title,
     trailing: trailingBadgesFor(item, coolHabitsEnabled),
     hasLink: (item.type === 'task' || item.type === 'event') && !!item.link,
-    completed: item.status === 'done',
+    completed: item.type === 'task' && item.repeatRule ? taskCompletedToday : item.status === 'done',
   };
 }
 

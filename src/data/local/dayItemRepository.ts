@@ -1,6 +1,6 @@
 import { eq, and, ne, lt, isNull, isNotNull, gte, lte, like, asc } from 'drizzle-orm';
 import { db } from './db';
-import { dayItems, habitCompletions } from './schema';
+import { dayItems, habitCompletions, taskCompletions } from './schema';
 import type { DayItem } from '@/domain/dayItem';
 
 type Row = typeof dayItems.$inferSelect;
@@ -91,12 +91,22 @@ export const dayItemRepository = {
    * (ver `dayItemsStore.reload`), mismo patrón no-destructivo que ya usan
    * las ocurrencias recurrentes de hábitos — la tarea sigue viéndose en su
    * día original en Calendario, solo Today la "adelanta" hasta que se
-   * completa. */
+   * completa. **Excluye tasks que repiten** (`repeatRule` no null): para
+   * esas, que su `date` ancla quede en el pasado es normal (la recurrencia
+   * real la trae de vuelta vía `listActiveRepeatingTasks`/
+   * `isTaskScheduledOn`) — incluirlas acá además duplicaría la fila. */
   async listOverdueTasks(beforeDateKey: string): Promise<DayItem[]> {
     const rows = await db
       .select()
       .from(dayItems)
-      .where(and(eq(dayItems.type, 'task'), eq(dayItems.status, 'scheduled'), lt(dayItems.date, beforeDateKey)));
+      .where(
+        and(
+          eq(dayItems.type, 'task'),
+          eq(dayItems.status, 'scheduled'),
+          lt(dayItems.date, beforeDateKey),
+          isNull(dayItems.repeatRule),
+        ),
+      );
     return rows.map(toDomain);
   },
 
@@ -167,6 +177,7 @@ export const dayItemRepository = {
   async remove(id: string): Promise<void> {
     await db.delete(dayItems).where(eq(dayItems.id, id));
     await db.delete(habitCompletions).where(eq(habitCompletions.habitId, id));
+    await db.delete(taskCompletions).where(eq(taskCompletions.taskId, id));
   },
 
   /** Todos los hábitos existentes (definición recurrente) — a diferencia de
@@ -227,6 +238,47 @@ export const dayItemRepository = {
       .from(habitCompletions)
       .where(and(gte(habitCompletions.date, fromDate), lte(habitCompletions.date, toDate)));
     return rows.map((r) => ({ habitId: r.habitId, date: r.date }));
+  },
+
+  /** Todas las tasks que repiten (`repeatRule` no null) — a diferencia de
+   * `listByDate`, ignora qué tan lejos quedó su `date` (que en una task que
+   * repite es su fecha ancla, no "el único día que vive"). Usado para
+   * inyectar ocurrencias recurrentes en Today (ver `dayItemsStore.reload`),
+   * mismo patrón que `listActiveHabits`. Excluye `status: 'inbox'` por la
+   * misma razón que los hábitos. */
+  async listActiveRepeatingTasks(): Promise<DayItem[]> {
+    const rows = await db
+      .select()
+      .from(dayItems)
+      .where(and(eq(dayItems.type, 'task'), isNotNull(dayItems.repeatRule), ne(dayItems.status, 'inbox')));
+    return rows.map(toDomain);
+  },
+
+  /** Alterna (inserta/borra) el registro de "hecho" de una task que repite
+   * para `date` — mismo patrón que `toggleHabitCompletion`. Una task sin
+   * `repeatRule` nunca pasa por acá, sigue usando `status` directo. */
+  async toggleTaskCompletion(taskId: string, date: string): Promise<boolean> {
+    const existing = await db
+      .select()
+      .from(taskCompletions)
+      .where(and(eq(taskCompletions.taskId, taskId), eq(taskCompletions.date, date)))
+      .limit(1);
+    if (existing.length > 0) {
+      await db.delete(taskCompletions).where(eq(taskCompletions.id, existing[0].id));
+      return false;
+    }
+    await db.insert(taskCompletions).values({ id: `${taskId}-${date}`, taskId, date });
+    return true;
+  },
+
+  /** Fechas ("YYYY-MM-DD") en que una task que repite se marcó hecha, dentro
+   * del rango inclusive `fromDate`-`toDate`. */
+  async listTaskCompletionDates(taskId: string, fromDate: string, toDate: string): Promise<string[]> {
+    const rows = await db
+      .select()
+      .from(taskCompletions)
+      .where(and(eq(taskCompletions.taskId, taskId), gte(taskCompletions.date, fromDate), lte(taskCompletions.date, toDate)));
+    return rows.map((r) => r.date);
   },
 
   /** `category`/`status` de todos los ítems que tienen categoría asignada —

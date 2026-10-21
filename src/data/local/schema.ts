@@ -61,6 +61,16 @@ export const habitCompletions = sqliteTable('habit_completions', {
   date: text('date').notNull(),
 });
 
+/** Un registro por día que una task QUE REPITE (`repeatRule` no null) se
+ * marcó hecha — mismo patrón que `habitCompletions`, ver `domain/task.ts`.
+ * Una task sin `repeatRule` sigue usando directo la columna `status` de
+ * `day_items` como siempre (esta tabla no aplica, no se toca). */
+export const taskCompletions = sqliteTable('task_completions', {
+  id: text('id').primaryKey(),
+  taskId: text('task_id').notNull(),
+  date: text('date').notNull(),
+});
+
 /** Catálogo de categorías configurable por el usuario (Ajustes > Categorías,
  * ver `domain/category.ts`) — reemplaza la lista fija que vivía en
  * `domain/quickAdd.ts`. `category`/`categoryColor` en `day_items` siguen

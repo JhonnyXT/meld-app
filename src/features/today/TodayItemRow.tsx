@@ -24,6 +24,10 @@ interface TodayItemRowProps {
    * de Today) el ícono de hábito queda visual pero no tocable. */
   habitCompletedToday?: boolean;
   onToggleHabitComplete?: (id: string) => void;
+  /** Solo aplica a tasks QUE REPITEN (`repeatRule` no null) — si ya se marcó
+   * hecha el día que se está viendo (`dayItemsStore.taskCompletedMap`). Una
+   * task sin repetición sigue leyendo `item.status` directo, ignora esto. */
+  taskCompletedToday?: boolean;
 }
 
 export function TodayItemRow({
@@ -33,6 +37,7 @@ export function TodayItemRow({
   onClearVoiceMemoAudio,
   habitCompletedToday,
   onToggleHabitComplete,
+  taskCompletedToday,
 }: TodayItemRowProps) {
   const { t } = useTranslation();
   const hasAudio = item.type === 'voiceMemo' && !!item.audioFileUri;
@@ -41,7 +46,7 @@ export function TodayItemRow({
   const isDraggingThis = useTimeDragStore((s) => s.active && s.itemId === item.id);
   const draggingMinutes = useTimeDragStore((s) => s.currentMinutes);
   const coolHabitsEnabled = useSettingsStore((s) => s.coolHabitsEnabled);
-  const row = toRowViewModel(item, habitCompletedToday, coolHabitsEnabled);
+  const row = toRowViewModel(item, habitCompletedToday, coolHabitsEnabled, taskCompletedToday);
 
   if (isDraggingThis) {
     row.timeMarker = { kind: 'dragging', ...minutesTo12h(draggingMinutes) };
