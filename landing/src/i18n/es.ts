@@ -224,6 +224,7 @@ export const es = {
     terms: 'Términos',
     support: 'Soporte',
     rights: '© 2026 Meld',
+    madeBy: 'Hecho por',
   },
 };
 

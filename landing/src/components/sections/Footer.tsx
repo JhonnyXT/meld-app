@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Dictionary, Locale } from '@/i18n/config';
+import { MadeByJoblan } from '../MadeByJoblan';
 
 // TODO(dueño del proyecto): el enlace de Soporte sigue vacío hasta tener un
 // email/página de contacto real.
@@ -15,6 +16,7 @@ export function Footer({ t, locale }: { t: Dictionary['footer']; locale: Locale 
         <a href="mailto:jonathanblandon1017@gmail.com" className="text-dim hover:text-ink">{t.support}</a>
       </nav>
       <span className="text-xs text-faint">{t.rights}</span>
+      <MadeByJoblan label={t.madeBy} locale={locale} />
     </footer>
   );
 }

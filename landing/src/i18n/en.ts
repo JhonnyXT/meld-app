@@ -207,5 +207,6 @@ export const en: Dictionary = {
     terms: 'Terms',
     support: 'Support',
     rights: '© 2026 Meld',
+    madeBy: 'Made by',
   },
 };
