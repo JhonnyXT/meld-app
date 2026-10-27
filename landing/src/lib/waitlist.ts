@@ -1,5 +1,5 @@
 // Baja de la lista de espera de Meld (topic `Meld — Lanzamiento` en Resend). Las altas viven en
-// joblan (joblanstudio.vercel.app/?app=…#avisame), que escribe en el mismo segmento y topic de
+// joblan (joblanstudio.com/?app=…#avisame), que escribe en el mismo segmento y topic de
 // siempre, en la cuenta que comparte con `my-wallet-app/landing`.
 //
 // Variables de entorno: RESEND_API_KEY (obligatoria) y RESEND_TOPIC_ID (opcional, default abajo).

@@ -17,11 +17,11 @@ function JbMark({ className = '' }: { className?: string }) {
   );
 }
 
-/** Crédito al final de la página: enlaza al inicio de joblanstudio.vercel.app en el mismo idioma. */
+/** Crédito al final de la página: enlaza al inicio de joblanstudio.com en el mismo idioma. */
 export function MadeByJoblan({ label, locale }: { label: string; locale: Locale }) {
   return (
     <a
-      href={`https://joblanstudio.vercel.app/${locale}`}
+      href={`https://joblanstudio.com/${locale}`}
       target="_blank"
       rel="noopener"
       className="flex items-center gap-1.5 text-xs text-faint transition-colors hover:text-dim"

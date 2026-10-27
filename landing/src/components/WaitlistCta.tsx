@@ -2,7 +2,7 @@ import { ArrowUpRight } from 'lucide-react';
 import type { Dictionary, Locale } from '@/i18n/config';
 
 // La lista de espera vive en joblan (misma cuenta y segmento de Resend que antes usaba esta landing).
-const JOBLAN_URL = process.env.NEXT_PUBLIC_JOBLAN_URL || 'https://joblanstudio.vercel.app';
+const JOBLAN_URL = process.env.NEXT_PUBLIC_JOBLAN_URL || 'https://joblanstudio.com';
 
 export function waitlistHref(locale: Locale) {
   return `${JOBLAN_URL}/${locale}?app=meld#avisame`;

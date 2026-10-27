@@ -18,7 +18,7 @@ npm run build && npm start
   La barra flotante (`DockBar`) usa los `id` de cada sección.
 - **Lista de espera**: vive en **joblan** (`joblan/joblan-web`). Los botones
   (`src/components/WaitlistCta.tsx`) llevan a
-  `joblanstudio.vercel.app/<idioma>?app=meld#avisame`, que llega con la app ya
+  `joblanstudio.com/<idioma>?app=meld#avisame`, que llega con la app ya
   elegida y guarda en el mismo segmento (`Meld — Waitlist`) y topic
   (`Meld — Lanzamiento`) de Resend de siempre. Aquí solo queda la baja:
   `/api/unsubscribe` → `unsubscribeEmail` en `src/lib/waitlist.ts` (`opt_out`

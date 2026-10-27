@@ -273,27 +273,39 @@ React. El idioma vive en `settingsStore.language` (persistido).
     `data: { itemId }`; las de Task/Habit (los únicos tipos con un "hecho"
     real) además llevan `categoryIdentifier: 'completable'`
     (`ensureCategories()`, categoría con un solo botón "Marcar hecho" vía
-    `setNotificationCategoryAsync`). `registerNotificationResponseHandling()`
-    (llamado una vez desde `app/_layout.tsx`, mismo patrón que
-    `handleDeepLink`: evento en caliente + `getLastNotificationResponseAsync()`
-    en frío) reacciona a la respuesta: el botón llama
-    `services/notificationActions.ts` → `completeItemFromNotification`
-    (IDEMPOTENTE — marca hecho, no alterna; usa `toggleTaskCompletion`/
-    `toggleHabitCompletion` para ítems que repiten, `status: 'done'` directo
-    para los que no); tocar la notificación misma (el cuerpo, no el botón —
-    `actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER`) abre el
-    detalle del ítem (`useItemDetailStore.open`), para los 6 tipos.
-    **`opensAppToForeground: true` a propósito, no 100% silenciosa como
-    WhatsApp**: la documentación de `expo-notifications` dice explícito que
-    con `false`, si la app está MATADA (no solo en segundo plano — Android, y
-    Samsung en particular, mata procesos agresivamente), el listener de la
-    acción nunca se dispara, el toque se pierde en silencio sin ningún aviso.
-    Para un recordatorio que puede sonar días después de la última vez que
-    se abrió la app (semanal/mensual), ese es el caso común, no la
-    excepción — mejor que la app se abra un instante y SIEMPRE funcione, a
-    que sea silenciosa pero falle la mitad de las veces. No reintroducir
-    `opensAppToForeground: false` para "que no abra la app" sin volver a
-    leer esto.
+    `setNotificationCategoryAsync`, `opensAppToForeground: false`).
+    - **"Marcar hecho" NO abre la app.** Dos caminos, los dos llaman
+      `services/notificationActions.ts` → `completeItemFromNotification`
+      (IDEMPOTENTE — marca hecho, no alterna; `toggleTaskCompletion`/
+      `toggleHabitCompletion` para ítems que repiten, `status: 'done'` para
+      los que no) y después `dismissNotificationAsync`:
+      1. App cerrada o en segundo plano (Android): `expo-notifications` corre
+         la tarea de `expo-task-manager` `meld-notification-actions`
+         (`services/notificationBackgroundTask.ts`, importado desde
+         `index.js` antes que nada, igual que el headless del widget). Con la
+         app MATADA es el único camino: el listener JS no existe. Por eso
+         `expo-task-manager` es dependencia directa.
+      2. App viva: el listener de `registerNotificationResponseHandling()`
+         (llamado desde `app/_layout.tsx`), que además hace `reload()` de
+         Today. Con la app viva en segundo plano corren los dos; es
+         inofensivo por la idempotencia.
+      - **En la tarea, el `itemId` llega en `content.dataString`** (JSON, al
+        nivel de `title`/`body`), no en `content.data` — leer solo `data`
+        hacía que la tarea terminara sin marcar nada (bug real visto en
+        dispositivo). `itemIdFromContent` acepta las dos formas.
+      - En `dev` la tarea tarda ~20 s con la app matada (el proceso headless
+        baja el bundle de Metro); en `test`/`prod` es casi inmediata.
+    - **Tocar la notificación (el cuerpo) abre la app en el detalle del
+      ítem** (`actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER`
+      → `useItemDetailStore.open`), para los 6 tipos. En frío se lee con
+      `getLastNotificationResponse()` (síncrona; la versión `Async` está
+      deprecada) + `clearLastNotificationResponse()` para no reabrirlo.
+    - **Probar sin esperar una hora real**: Ajustes → "Probar recordatorio"
+      (solo `dev`/`test`) crea una "Tarea de prueba" para hoy y la notifica
+      a los 10 s (`scheduleTestReminder`). Para simular "app matada" usar
+      `adb shell am kill app.meld.mobile` con la app en segundo plano —
+      **nunca `am force-stop`**: cancela las alarmas de la app y la
+      notificación no llega.
 - **Preferencia local vs. permiso del SO** (mismo patrón que `my-wallet-app`):
   - El permiso del SO se pide solo en el paso final del onboarding
     (`NotificationsStep`). Si el usuario lo salta, no se vuelve a pedir hasta que
@@ -488,13 +500,21 @@ Convenciones de UI — reusar, no reinventar:
     "Mañana"**, el calendario ya lo cubre.
   - `DurationFieldRow` — abre `durationPicker/DurationPickerModal` (horas 0-4 +
     minutos en pasos de 15), trabaja en minutos totales.
-- **Quick Add/ItemDetailSheet son UNA sola card (`configBox`) con un ÚNICO
-  `fieldGroup` (`gap:0`)** que contiene los campos del tipo + Categoría +
-  Prioridad, separados solo por líneas divisorias. Un segundo `fieldGroup` mete un
-  salto de 24px (`configBox` tiene `gap:24`). La línea antes de Categoría es el
-  borde inferior del último `FieldRow` del bloque (dejar `showBorder` en `true`);
-  la línea entre Categoría y Prioridad es `showBorder` de `CategoryChips`, y vive
-  en un solo lugar (header colapsado o pie de los chips), nunca en los dos.
+- **Quick Add/ItemDetailSheet agrupan los campos en cards por sección**
+  (`quickAdd/FieldSection.tsx`, fondo `surfaceLow` + borde, `marginBottom:12`):
+  Grabación (solo nota de voz) › Cuándo (Día + campos del tipo) › Enlace (task/
+  event) › Organizar (Categoría + Prioridad). Dentro de cada card las filas se
+  separan solo por su divisor; **la última fila de cada sección va con
+  `showBorder={false}`** (todas las filas aceptan esa prop). La línea entre
+  Categoría y Prioridad es `showBorder` de `CategoryChips`, y vive en un solo
+  lugar (header colapsado o pie de los chips), nunca en los dos.
+- **Botonera fija al pie** (`quickAdd/SheetActions.tsx`): Cancelar (secundario)
+  + Agregar/Actualizar (`accent`), fuera del `ScrollView` (`flexShrink:1`) para
+  que siempre se vea aunque el formulario sea largo.
+- **El botón de confirmar (Agregar/Actualizar) se deshabilita sin título**
+  (`saveDisabled` en `QuickAddSheet`/`ItemDetailSheet` ahora también chequea
+  `!title.trim()`, no solo la grabación de nota de voz) — antes se podía
+  guardar un ítem vacío con solo tocar el botón.
 - **Categoría y Prioridad son acordeones colapsados por default** (estado
   `expanded` local): el header muestra el valor actual + chevron y los chips solo
   se renderizan expandidos. **Todo acordeón de selección se colapsa al elegir un
@@ -603,12 +623,23 @@ corta a Today. ~1.9s. Reglas (cada una evita un bug visto en dispositivo):
 No hay tab bar nativa. `(tabs)/_layout.tsx` es un `Stack` sin header — reintroducir
 `Tabs` de Expo Router duplica la navegación.
 
-**El menú se expande INLINE dentro de `FloatingBar`**: tocar "☰"
-(`navigateMenuStore`) oculta el pill central y el FAB y los reemplaza por una fila
-con los 5 destinos (`NAV_DESTINATIONS` en `FloatingBar.tsx`); el botón pasa a "×".
-Transición con `accordionMotion.ts`. Mientras está abierto se suprime la fila
-extra. Orden fijo pedido por el usuario: **Hoy, Bandeja, Calendario, Momentos,
-Ajustes** — no reordenar.
+**Menú lateral (drawer) que empuja la pantalla**
+(`components/navDrawer/NavDrawer.tsx` → `NavDrawerLayout`, envuelve al `Stack`
+raíz en `app/_layout.tsx`): tocar "☰" de `FloatingBar` (`navigateMenuStore.open`)
+desliza la pantalla actual a la derecha, la achica (`CONTENT_SCALE` 0.92) y le
+redondea las esquinas; debajo, a la izquierda, aparece el menú: fecha larga
+(`formatLongDate`), mini calendario del mes actual (tocar un día → Today en ese
+día, ver "Ir a un día puntual") y los destinos **Hoy, Calendario, Momentos |
+Bandeja (con conteo de `inboxStore`), Categorías (abre `CategoriesManagerSheet`)
+| Ajustes**. Se cierra tocando o arrastrando a la izquierda la pantalla empujada
+(overlay con `Gesture.Exclusive(pan, tap)`) o con "atrás" de Android. Las hojas
+globales (Quick Add, detalle, etc.) quedan fuera del drawer, por encima.
+- La grilla del mini calendario se arma como filas explícitas de 7: con
+  `flexWrap` + anchos en % el redondeo mandaba la 7ma celda a la fila siguiente
+  y corría todos los días.
+- "Hábitos" de la referencia no figura: no hay pantalla de hábitos (viven en Hoy).
+- `FloatingBar` ya no tiene la fila de navegación inline; `onMenuPress` se pasa
+  tal cual (Inbox lo sigue usando para "cancelar selección").
 
 **Header de Today** (`TopAppBar.tsx`): buscar + agrupar (`filter-list`, pinta en
 `accent` si está activo) + "más" (`more-horiz`, abre `RemindersSheet`). Bandeja se
@@ -987,7 +1018,7 @@ en vez de `middleware.ts`, `params` como Promise) — leer
 `landing/node_modules/next/dist/docs/` antes de tocar código. La portada tiene la
 pantalla Hoy funcionando en el navegador (`landing/src/demo/`) con una COPIA de
 `src/domain/voiceParser.ts`: si cambia el parser de la app, copiar el cambio. La
-lista de espera vive en joblan (`joblanstudio.vercel.app/?app=meld#avisame`); aquí solo
+lista de espera vive en joblan (`joblanstudio.com/?app=meld#avisame`); aquí solo
 queda la baja (`/api/unsubscribe`, Resend). Deploy en Vercel (proyecto `meld`, `usemeld.vercel.app`) conectado a
 `JhonnyXT/meld-app` con `Root Directory: landing` — cada push a `main` despliega.
 Detalle en `landing/README.md`.
@@ -1054,6 +1085,25 @@ releerlo antes de empezar cualquiera de estas.
   Confirmar con `adb logcat -d | grep "ReactNativeJS: Running"` y esperar ~15-20s
   más antes de diagnosticar. `RetryableMountingLayerException` en ese arranque es
   ruido.
+- **"Se cierra la app" al escribir mucho texto (variant `dev`, reportado por el
+  usuario 2026-10-21) no es un bug de Meld**: es el atajo de desarrollo de React
+  Native "doble R recarga la app" (`DoubleTapReloadRecognizer`, pensado para
+  teclado físico/Bluetooth). El teclado de Samsung del Moto E7 Plus a veces manda
+  cada tecla como evento de teclado físico en vez de solo "commitear" el texto
+  (igual que `adb shell input text`, con el que se reprodujo tecleando apenas
+  "rr"); cualquier palabra en español con dos "r" cercanas (romper, correr,
+  agregar, borrar…) dispara una recarga completa de React Native — pantalla negra
+  un instante + el formulario pierde lo tipeado. Logcat lo confirma:
+  `BridgelessReact: ReactHost{0}.getOrCreateReloadTask(): Starting React Native
+  reload` sin ninguna excepción fatal de por medio. **Solo existe en `dev`** (el
+  atajo depende de `getUseDeveloperSupport()`, que es `false` en `test`/`prod` —
+  no afecta a usuarios reales ni a los builds de Play Store). No vale la pena
+  parchar `MainActivity.kt` nativo para esto (se pierde en `expo prebuild
+  --clean` y solo mejora la experiencia de probar en `dev`, a pedido explícito
+  del usuario se dejó así).
+- **Instalar dependencias con `npm install --force`**, no
+  `--legacy-peer-deps`: hay un conflicto de peers en el árbol y
+  `--legacy-peer-deps` poda paquetes peer que sí se usan (rompe el build).
 - Reanimated 4.x necesita `react-native-worklets` explícito, y `babel-preset-expo`
   en el `node_modules` raíz.
 - **Un `GestureDetector` dentro de un `<Modal>` no recibe toques en Android** (el
