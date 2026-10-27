@@ -12,7 +12,7 @@ import type { Locale } from '@/i18n/config';
 export type LegalSection = { h: string; p?: string[]; list?: string[] };
 export type LegalDoc = { title: string; updated: string; intro: string[]; sections: LegalSection[] };
 
-const CONTACT = 'jonathanblandon1017@gmail.com';
+const CONTACT = 'hello@joblanstudio.com';
 const OWNER = '[NOMBRE O RAZÓN SOCIAL]';
 const JURISDICTION = '[PAÍS / JURISDICCIÓN]';
 
@@ -55,7 +55,7 @@ const privacyEs: LegalDoc = {
     {
       h: '5. Este sitio web y la lista de espera',
       p: [
-        'El formulario de la lista de espera está en joblanstudio.com, la web de quien desarrolla Meld. Ahí guardamos tu email y el nombre que escribas para avisarte cuando Meld esté disponible, con un proveedor de envío de correos que actúa en nuestro nombre: Resend (resend.com). La ciudad, la plataforma y la nota opcional solo quedan en los registros del servidor (Vercel), para saber qué te interesa.',
+        'El formulario de la lista de espera está en joblanstudio.com, la web de quien desarrolla Meld, que tiene su propia política de privacidad (joblanstudio.com/es/privacidad). Ahí guardamos tu email y el nombre que escribas para avisarte cuando Meld esté disponible, con un proveedor de envío de correos que actúa en nuestro nombre: Resend (resend.com). La ciudad, la plataforma y la nota opcional solo quedan en los registros del servidor (Vercel), para saber qué te interesa.',
         'No usamos esos datos para nada más y puedes pedir que los borremos en cualquier momento escribiendo a ' +
           CONTACT +
           ' o usando el enlace para darte de baja que incluiremos en cada email.',
@@ -125,7 +125,7 @@ const privacyEn: LegalDoc = {
     {
       h: '5. This website and the waitlist',
       p: [
-        'The waitlist form lives on joblanstudio.com, the website of Meld’s developer. There we store your email and the name you enter to let you know when Meld is available, with an email provider acting on our behalf: Resend (resend.com). City, platform and the optional note only stay in the server logs (Vercel), to know what you are interested in.',
+        'The waitlist form lives on joblanstudio.com, the website of Meld’s developer, which has its own privacy policy (joblanstudio.com/en/privacy). There we store your email and the name you enter to let you know when Meld is available, with an email provider acting on our behalf: Resend (resend.com). City, platform and the optional note only stay in the server logs (Vercel), to know what you are interested in.',
         'We use that data for nothing else, and you can ask us to delete it at any time by writing to ' +
           CONTACT +
           ' or by using the unsubscribe link included in every email.',
