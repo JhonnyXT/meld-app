@@ -66,7 +66,7 @@ cambian seguido: confirmarlas en Play Console antes de actuar.
 - [ ] Capturas de teléfono (mínimo 2): se pueden reusar las de la landing
       (`landing/public/img/screen-*.png`) o sacar nuevas con el seed de `dev`.
 - [ ] **URL de política de privacidad**: `https://usemeld.vercel.app/es/privacy`.
-      Email de contacto ya puesto (jonathanblandon1017@gmail.com, también en
+      Email de contacto ya puesto (hello@joblanstudio.com, también en
       el link "Soporte" de la landing). Faltan `[NOMBRE O RAZÓN SOCIAL]` y
       `[PAÍS / JURISDICCIÓN]` en `landing/src/legal/docs.ts`.
 - [ ] **Seguridad de los datos (Data safety)**: la app no manda datos a ningún
@@ -76,7 +76,7 @@ cambian seguido: confirmarlas en Play Console antes de actuar.
 - [ ] Cuestionario de clasificación de contenido, público objetivo (no
       infantil), declaración de anuncios (no tiene) y acceso a la app (no
       requiere login).
-- [ ] Email de soporte en la ficha: jonathanblandon1017@gmail.com.
+- [ ] Email de soporte en la ficha: hello@joblanstudio.com.
 
 ## 3. Prueba cerrada obligatoria (testers)
 
