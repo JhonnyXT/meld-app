@@ -170,8 +170,11 @@ Nada visible cambia; deja todo listo para que dos teléfonos no choquen.
 
 **Hecho cuando:** la app funciona igual que hoy, cada registro nuevo tiene id único y fecha de
 edición, borrar/desmarcar deja tombstone en vez de eliminar, y un dispositivo con datos previos
-migra sin perder nada (⚠️ pendiente de confirmar en el Moto E7 Plus — no estaba conectado al
-terminar este pase).
+migra sin perder nada — ✅ confirmado en el S24 Ultra con los 42 ítems reales del usuario (0
+borrados, 0 perdidos). En el primer intento la migración se rompía con "no such column:
+category_id" (bug real: el índice de `category_id` se creaba antes de agregar la columna en un
+dispositivo con datos previos — corregido reordenando `db.ts`). Probado también: completar/
+desmarcar un hábito (reutiliza su id determinístico) y crear/editar una tarea.
 
 ### Fase 2 — Firebase + cuentas con Google · M
 - [ ] Proyectos `meld-test` y `meld-prod`, Firestore con reglas que niegan todo; emulador para

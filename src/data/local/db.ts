@@ -56,15 +56,21 @@ export function initDb() {
   `);
   sqlite.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_date ON day_items(date);');
   sqlite.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_status ON day_items(status);');
-  sqlite.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_category_id ON day_items(category_id);');
 
   addColumnIfMissing('day_items', 'health_metric_target REAL');
   // Sync (SYNC_ROADMAP.md, Fase 1) — dispositivos con datos previos a estas
   // 3 columnas. `sync_state` necesita un DEFAULT porque la columna queda
   // NOT NULL (SQLite exige uno para agregar NOT NULL a una tabla con filas).
+  // Tienen que ir ANTES del índice de `category_id`: en un dispositivo con
+  // datos previos, el `CREATE TABLE IF NOT EXISTS` de arriba es un no-op (la
+  // tabla ya existe sin esta columna), así que crear el índice antes de
+  // agregarla rompe con "no such column: category_id" (bug real, visto en
+  // dispositivo — `execSync` no está en try/catch como `addColumnIfMissing`,
+  // así que tiraba abajo `initDb()` entero sin tocar nada más).
   addColumnIfMissing('day_items', 'category_id TEXT');
   addColumnIfMissing('day_items', 'deleted_at TEXT');
   addColumnIfMissing('day_items', "sync_state TEXT NOT NULL DEFAULT 'pending'");
+  sqlite.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_category_id ON day_items(category_id);');
 
   sqlite.execSync(`
     CREATE TABLE IF NOT EXISTS habit_completions (
