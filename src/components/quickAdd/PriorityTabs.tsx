@@ -69,6 +69,6 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  track: { flexDirection: 'row', borderRadius: 16, padding: 4, gap: 4, borderWidth: 1 },
+  track: { flexDirection: 'row', borderRadius: 16, padding: 4, gap: 4, borderWidth: 1, marginBottom: 14 },
   tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12 },
 });

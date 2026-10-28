@@ -5,7 +5,7 @@ import { ANY_TIME_HHMM } from '@/domain/time';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useItemDetailStore } from '@/store/itemDetailStore';
 import { translate } from '@/i18n';
-import { completeItemFromNotification } from './notificationActions';
+import { completeItemFromNotification, MARK_DONE_ACTION } from './notificationActions';
 
 const ANDROID_CHANNEL_ID = 'reminders';
 let channelReady: Promise<void> | null = null;
@@ -25,18 +25,12 @@ function ensureAndroidChannel(): Promise<void> {
 // Categoría con la acción "Marcar hecho" directo desde la bandeja de
 // notificaciones (como el "Marcar como leído" de WhatsApp) — solo se asigna
 // a recordatorios de Task/Habit (los únicos tipos con un "hecho" real, ver
-// `completeItemFromNotification`). **`opensAppToForeground: true` a
-// propósito, no silencioso del todo**: la documentación de
-// `expo-notifications` dice explícito que con `false`, si la app está
-// MATADA (no solo en segundo plano — Android, sobre todo Samsung, mata
-// procesos agresivamente), el listener de la acción NUNCA se dispara, el
-// toque se pierde en silencio. Para un recordatorio que puede sonar días
-// después de la última vez que se abrió la app (semanal/mensual), ese es el
-// caso común, no la excepción — mejor que abra la app un instante y SIEMPRE
-// funcione, a que sea 100% silenciosa pero falle la mitad de las veces sin
-// avisar. Ver `registerNotificationResponseHandling`.
+// `completeItemFromNotification`). `opensAppToForeground: false`: tocar el
+// botón NO abre la app. Con la app en segundo plano o cerrada, lo atiende la
+// tarea de `expo-task-manager` de `notificationBackgroundTask.ts` (Android
+// corre un proceso JS headless aunque la app esté matada); con la app en
+// primer plano, el listener de `registerNotificationResponseHandling`.
 const COMPLETABLE_CATEGORY = 'completable';
-const MARK_DONE_ACTION = 'mark-done';
 let categoriesReady: Promise<void> | null = null;
 
 function ensureCategories(): Promise<void> {
@@ -45,7 +39,7 @@ function ensureCategories(): Promise<void> {
       {
         identifier: MARK_DONE_ACTION,
         buttonTitle: translate(useSettingsStore.getState().language, 'notificationMarkDone'),
-        options: { opensAppToForeground: true },
+        options: { opensAppToForeground: false },
       },
     ]).then(() => undefined);
   }
@@ -283,22 +277,64 @@ export async function syncReminderNotification(item: DayItem): Promise<void> {
  * que ocurrió antes de que el listener se suscribiera se perdería, mismo
  * problema que `Linking.getInitialURL()` resuelve para deep links.
  */
-export function registerNotificationResponseHandling(): () => void {
+export function registerNotificationResponseHandling(onItemCompleted?: () => void): () => void {
+  // La categoría se guarda en el SO: re-registrarla al arrancar aplica los
+  // cambios de opciones a las notificaciones ya programadas.
+  ensureCategories().catch(() => {});
+
   const handle = (response: Notifications.NotificationResponse) => {
-    const data = response.notification.request.content.data as { itemId?: string } | undefined;
-    const itemId = data?.itemId;
+    const { identifier, content } = response.notification.request;
+    const itemId = (content.data as { itemId?: string } | undefined)?.itemId;
     if (!itemId) return;
 
     if (response.actionIdentifier === MARK_DONE_ACTION) {
-      completeItemFromNotification(itemId);
+      completeItemFromNotification(itemId)
+        .then(() => {
+          onItemCompleted?.();
+          return Notifications.dismissNotificationAsync(identifier);
+        })
+        .catch(() => {});
       return;
     }
-    useItemDetailStore.getState().open(itemId);
+    if (response.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
+      Notifications.dismissNotificationAsync(identifier).catch(() => {});
+      useItemDetailStore.getState().open(itemId);
+    }
   };
 
-  Notifications.getLastNotificationResponseAsync().then((response) => {
-    if (response) handle(response);
-  });
+  // En frío (la app se abrió tocando la notificación) la respuesta ya llegó
+  // antes de montar el listener: se lee una vez y se limpia, para que no se
+  // vuelva a abrir el detalle en el próximo montaje.
+  const last = Notifications.getLastNotificationResponse();
+  if (last) {
+    Notifications.clearLastNotificationResponse();
+    handle(last);
+  }
   const sub = Notifications.addNotificationResponseReceivedListener(handle);
   return () => sub.remove();
+}
+
+/** Solo dev/test (fila de Ajustes): crea una tarea de prueba y le programa
+ * un recordatorio en 10 s, con la misma categoría/acciones que uno real, para
+ * probar los toques de la notificación sin esperar una hora puntual. */
+export async function scheduleTestReminder(item: DayItem): Promise<boolean> {
+  const granted = await ensurePermission();
+  if (!granted) return false;
+  await ensureAndroidChannel();
+  await ensureCategories();
+  await Notifications.scheduleNotificationAsync({
+    identifier: item.id,
+    content: {
+      title: item.title,
+      body: translate(useSettingsStore.getState().language, 'notificationBody'),
+      data: { itemId: item.id },
+      categoryIdentifier: COMPLETABLE_CATEGORY,
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: 10,
+      channelId: ANDROID_CHANNEL_ID,
+    },
+  });
+  return true;
 }

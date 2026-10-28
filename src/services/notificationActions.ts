@@ -2,6 +2,11 @@ import { dayItemRepository } from '@/data/local/dayItemRepository';
 import { toDateKey } from '@/domain/date';
 import { refreshWidgets } from '@/widget/refreshWidgets';
 
+/** Identificador del botón "Marcar hecho" de la categoría `completable` —
+ * vive acá (y no en `notifications.ts`) para que la tarea en segundo plano
+ * (`notificationBackgroundTask.ts`) lo use sin cargar los stores de la UI. */
+export const MARK_DONE_ACTION = 'mark-done';
+
 /**
  * Acción "Marcar hecho" tocada directo desde la bandeja de notificaciones
  * (ver `services/notifications.ts` → `registerNotificationResponseHandling`
@@ -15,10 +20,10 @@ import { refreshWidgets } from '@/widget/refreshWidgets';
  *
  * Muta la DB directo, sin pasar por `dayItemsStore` — a propósito, para no
  * crear un require cycle (`notifications.ts` → acá → `dayItemsStore.ts` →
- * `notifications.ts`, Metro avisa de esto si se reintroduce). No hace
- * falta: `opensAppToForeground: true` (ver `notifications.ts`) trae la app
- * al frente, y `TodayScreen` ya recarga solo al tomar foco
- * (`useFocusEffect`) — la DB queda correcta y la pantalla la lee fresca.
+ * `notifications.ts`, Metro avisa de esto si se reintroduce), y porque
+ * también corre en la tarea en segundo plano con la app cerrada, donde no
+ * hay UI. Si la app está abierta, quien la llama recarga la lista después
+ * (ver `registerNotificationResponseHandling`).
  */
 export async function completeItemFromNotification(itemId: string): Promise<void> {
   const item = await dayItemRepository.getById(itemId);

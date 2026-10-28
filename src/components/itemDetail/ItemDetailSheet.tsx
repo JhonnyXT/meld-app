@@ -38,6 +38,8 @@ import { CategoryChips } from '@/components/quickAdd/CategoryChips';
 import { PriorityTabs } from '@/components/quickAdd/PriorityTabs';
 import { TypeTabs } from '@/components/quickAdd/TypeTabs';
 import { VoiceRecordRow } from '@/components/quickAdd/VoiceRecordRow';
+import { FieldSection } from '@/components/quickAdd/FieldSection';
+import { SheetActions } from '@/components/quickAdd/SheetActions';
 import {
   QUICK_ADD_META,
   type QuickAddType,
@@ -311,7 +313,9 @@ export function ItemDetailSheet() {
 
   const meta = QUICK_ADD_META[type];
   const typeLabel = t(meta.tabLabelKey);
-  const saveDisabled = type === 'voiceMemo' && !recordedUri;
+  // Mismo criterio que QuickAddSheet: sin título (o sin grabación en nota de
+  // voz nueva) no se puede guardar.
+  const saveDisabled = !title.trim() || (type === 'voiceMemo' && !recordedUri);
 
   return (
     <Modal visible={!!itemId} animationType="slide" transparent onRequestClose={close}>
@@ -341,7 +345,7 @@ export function ItemDetailSheet() {
 
           {item.type !== 'moment' ? <TypeTabs value={type} onChange={handleTypeChange} /> : null}
 
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.titleRow}>
               {type === 'task' ? (
                 <Pressable
@@ -365,6 +369,7 @@ export function ItemDetailSheet() {
                   placeholderTextColor={palette.textDim}
                   autoCorrect={false}
                   spellCheck={false}
+                  multiline
                   style={{ fontFamily: font.medium, fontSize: 16, color: palette.text, padding: 0, paddingRight: 36 }}
                 />
                 <Pressable
@@ -392,88 +397,90 @@ export function ItemDetailSheet() {
               </View>
             )}
 
-            <View style={[styles.configBox, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
-              <View>
-                <DateFieldRow
-                  icon="calendar-month"
-                  label={t('fieldDate')}
-                  dateKey={dateKey}
-                  onChange={setDateKey}
-                  allowInbox
-                  showBorder
-                />
-
-                {type === 'task' && (
-                  <>
-                    <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={taskReminderMinutes} onChange={setTaskReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime />
-                    <PresetFieldRow icon="repeat" label={t('fieldRepeat')} options={REPEAT_OPTIONS} value={taskRepeat} onChange={setTaskRepeat} lang={lang} />
-                    <LinkFieldRow value={link} onChange={setLink} />
-                  </>
+            {type === 'voiceMemo' && (
+              <FieldSection>
+                {item.type === 'voiceMemo' ? (
+                  <FieldRow icon="graphic-eq" label={t('fieldRecorded')} value={item.audioFileUri ? formatDuration(item.durationSeconds) : t('audioDeleted')} onPress={() => {}} showBorder={false} />
+                ) : (
+                  <VoiceRecordRow
+                    recorder={recorder}
+                    recordedUri={recordedUri}
+                    recordedSeconds={recordedSeconds}
+                    onRecorded={handleVoiceRecorded}
+                    onDelete={handleVoiceDelete}
+                    onPermissionDenied={handleVoicePermissionDenied}
+                    onError={handleVoiceError}
+                    showBorder={false}
+                  />
                 )}
+              </FieldSection>
+            )}
 
-                {type === 'event' && (
-                  <>
-                    <TimeFieldRow icon="schedule" label={t('fieldStarts')} minutes={eventStartMinutes} onChange={(m) => setEventStartMinutes(m ?? eventStartMinutes)} offLabel="" />
-                    <DurationFieldRow icon="schedule" label={t('fieldDuration')} minutes={eventDurationMinutes} onChange={setEventDurationMinutes} />
-                    <PresetFieldRow icon="notifications" label={t('fieldEarlyAlert')} options={EARLY_ALERT_OPTIONS} value={eventEarlyAlert} onChange={setEventEarlyAlert} lang={lang} />
-                    <LinkFieldRow value={link} onChange={setLink} />
-                  </>
-                )}
+            <FieldSection>
+              <DateFieldRow
+                icon="calendar-month"
+                label={t('fieldDate')}
+                dateKey={dateKey}
+                onChange={setDateKey}
+                allowInbox
+                showBorder
+              />
 
-                {type === 'voiceMemo' && (
-                  <>
-                    {item.type === 'voiceMemo' ? (
-                      <FieldRow icon="graphic-eq" label={t('fieldRecorded')} value={item.audioFileUri ? formatDuration(item.durationSeconds) : t('audioDeleted')} onPress={() => {}} />
-                    ) : (
-                      <VoiceRecordRow
-                        recorder={recorder}
-                        recordedUri={recordedUri}
-                        recordedSeconds={recordedSeconds}
-                        onRecorded={handleVoiceRecorded}
-                        onDelete={handleVoiceDelete}
-                        onPermissionDenied={handleVoicePermissionDenied}
-                        onError={handleVoiceError}
-                      />
-                    )}
-                    <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={voiceReminderMinutes} onChange={setVoiceReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime />
-                  </>
-                )}
+              {type === 'task' && (
+                <>
+                  <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={taskReminderMinutes} onChange={setTaskReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime />
+                  <PresetFieldRow icon="repeat" label={t('fieldRepeat')} options={REPEAT_OPTIONS} value={taskRepeat} onChange={setTaskRepeat} lang={lang} showBorder={false} />
+                </>
+              )}
 
-                {type === 'note' && (
-                  <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={noteReminderMinutes} onChange={setNoteReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime />
-                )}
+              {type === 'event' && (
+                <>
+                  <TimeFieldRow icon="schedule" label={t('fieldStarts')} minutes={eventStartMinutes} onChange={(m) => setEventStartMinutes(m ?? eventStartMinutes)} offLabel="" />
+                  <DurationFieldRow icon="schedule" label={t('fieldDuration')} minutes={eventDurationMinutes} onChange={setEventDurationMinutes} />
+                  <PresetFieldRow icon="notifications" label={t('fieldEarlyAlert')} options={EARLY_ALERT_OPTIONS} value={eventEarlyAlert} onChange={setEventEarlyAlert} lang={lang} showBorder={false} />
+                </>
+              )}
 
-                {type === 'habit' && (
-                  <>
-                    <PresetFieldRow icon="repeat" label={t('fieldSchedule')} options={HABIT_SCHEDULE_OPTIONS} value={habitSchedule} onChange={setHabitSchedule} lang={lang} />
-                    <PresetFieldRow icon="schedule" label={t('fieldPreferredTime')} options={HABIT_PREFERRED_TIME_OPTIONS} value={habitPreferredTime} onChange={setHabitPreferredTime} lang={lang} />
-                    <HealthAutoTrackFieldRow
-                      icon="favorite"
-                      label={t('fieldAutoTrack')}
-                      metricId={habitHealthMetric}
-                      target={habitHealthMetricTarget}
-                      onChange={(nextId, nextTarget) => {
-                        setHabitHealthMetric(nextId);
-                        setHabitHealthMetricTarget(nextTarget);
-                      }}
-                    />
-                  </>
-                )}
+              {type === 'voiceMemo' && (
+                <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={voiceReminderMinutes} onChange={setVoiceReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime showBorder={false} />
+              )}
 
-                <CategoryChips value={category?.label ?? null} onChange={(label, color) => setCategory({ label, color })} showBorder />
-                <PriorityTabs value={priority} onChange={setPriority} />
-              </View>
-            </View>
+              {type === 'note' && (
+                <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={noteReminderMinutes} onChange={setNoteReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime showBorder={false} />
+              )}
 
-            <Pressable
-              onPress={handleSave}
-              disabled={saveDisabled}
-              style={[styles.cta, { backgroundColor: palette.accent, opacity: saveDisabled ? 0.5 : 1 }]}
-            >
-              <Icon name="check" size={20} color="#fff" />
-              <Text style={{ fontFamily: font.bold, fontSize: 17, color: '#fff' }}>{t(meta.ctaUpdateKey)}</Text>
-            </Pressable>
+              {type === 'habit' && (
+                <>
+                  <PresetFieldRow icon="repeat" label={t('fieldSchedule')} options={HABIT_SCHEDULE_OPTIONS} value={habitSchedule} onChange={setHabitSchedule} lang={lang} />
+                  <PresetFieldRow icon="schedule" label={t('fieldPreferredTime')} options={HABIT_PREFERRED_TIME_OPTIONS} value={habitPreferredTime} onChange={setHabitPreferredTime} lang={lang} />
+                  <HealthAutoTrackFieldRow
+                    icon="favorite"
+                    label={t('fieldAutoTrack')}
+                    metricId={habitHealthMetric}
+                    target={habitHealthMetricTarget}
+                    onChange={(nextId, nextTarget) => {
+                      setHabitHealthMetric(nextId);
+                      setHabitHealthMetricTarget(nextTarget);
+                    }}
+                    showBorder={false}
+                  />
+                </>
+              )}
+            </FieldSection>
+
+            {(type === 'task' || type === 'event') && (
+              <FieldSection>
+              <LinkFieldRow value={link} onChange={setLink} showBorder={false} />
+              </FieldSection>
+            )}
+
+            <FieldSection>
+              <CategoryChips value={category?.label ?? null} onChange={(label, color) => setCategory({ label, color })} showBorder />
+              <PriorityTabs value={priority} onChange={setPriority} />
+            </FieldSection>
           </ScrollView>
+
+          <SheetActions onCancel={close} onConfirm={handleSave} confirmLabel={t(meta.ctaUpdateKey)} confirmDisabled={saveDisabled} />
         </Animated.View>
         </KeyboardAvoidingView>
       </GestureHandlerRootView>
@@ -482,6 +489,7 @@ export function ItemDetailSheet() {
 }
 
 const styles = StyleSheet.create({
+  scroll: { flexGrow: 0, flexShrink: 1 },
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheetWrap: { flex: 1, justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: 20, maxHeight: '90%' },
@@ -529,22 +537,9 @@ const styles = StyleSheet.create({
   },
   linkIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   noteBodyBox: {
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 12,
     borderWidth: 1,
   },
-  configBox: {
-    borderRadius: 24,
-    padding: 20,
-    gap: 24,
-    marginBottom: 24,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  cta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, borderRadius: 20, marginBottom: 8 },
 });

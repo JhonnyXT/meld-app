@@ -6,4 +6,7 @@
 // proceso solo para actualizar el widget, con la app cerrada). Se importa
 // ANTES de `expo-router/entry` a propósito.
 import './src/widget/registerWidgetTask';
+// Botón "Marcar hecho" de las notificaciones con la app cerrada (mismo
+// motivo: el proceso headless no monta componentes).
+import './src/services/notificationBackgroundTask';
 import 'expo-router/entry';

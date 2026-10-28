@@ -1,4 +1,4 @@
-import { WEEKDAY_SHORT, MONTH_SHORT, MONTH_FULL, type Language } from '@/i18n/translations';
+import { WEEKDAY_SHORT, WEEKDAY_FULL, MONTH_SHORT, MONTH_FULL, type Language } from '@/i18n/translations';
 
 export { MONTH_SHORT };
 
@@ -70,4 +70,14 @@ export function formatMonthYearLabel(date: Date, lang: Language = 'es'): string 
 /** "July 2026" — usado en el header de Calendar (vista Month). */
 export function formatFullMonthYear(date: Date, lang: Language = 'es'): string {
   return `${MONTH_FULL[lang][date.getMonth()]} ${date.getFullYear()}`;
+}
+
+/** "Friday, September 18" / "Viernes, 18 de septiembre" — título del menú
+ * lateral (`NavDrawer`). */
+export function formatLongDate(date: Date, lang: Language = 'es'): string {
+  const weekday = WEEKDAY_FULL[lang][date.getDay()];
+  const month = MONTH_FULL[lang][date.getMonth()];
+  return lang === 'es'
+    ? `${weekday}, ${date.getDate()} de ${month.toLowerCase()}`
+    : `${weekday}, ${month} ${date.getDate()}`;
 }

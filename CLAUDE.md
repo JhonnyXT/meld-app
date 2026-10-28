@@ -453,6 +453,9 @@ hábitos (`habit_completions`/`isHabitScheduledOn`):
   categoría (eso se hace filtrando en Calendario).
 - **`CategoryChips` lee del store** y muestra `cat.label` directo, sin `t()` (es un
   nombre que tipeó el usuario).
+  Con más de 3 categorías (`MAX_WRAPPED_CATEGORIES`) los chips van en una sola
+  fila con scroll horizontal (sangra hasta el borde de la card) en vez de
+  envolverse en varias filas.
 
 ## Sistema visual
 
@@ -752,7 +755,11 @@ todos (ver "Roadmap Pro").
   cuando `selectedDateKey` es hoy. La `date` original nunca se toca (Calendario
   las sigue mostrando en su día). Completarla usa el flujo normal.
 - **Cambiar de día**: chevrons o swipe sobre el pill de `DayBar` (`Gesture.Pan`,
-  ±16px). **Tocar el pill abre `DatePickerModal`** para saltar a cualquier día.
+  ±16px). **Tocar el pill despliega el calendario del mes DENTRO de la barra**
+  (`FloatingBar` → `expandedPanel`: la barra entera se vuelve una card que
+  crece hacia arriba; no es un modal). Abierto, el pill navega meses ("Oct
+  2026 · Mes"); tocar un día salta ahí y cierra; tocar el pill, fuera o
+  "atrás" también cierra. Mientras está abierto se ocultan `topRow`/Deshacer.
   Si el día no es hoy, `DayBar` pasa `topRow` a `FloatingBar` con "Volver a hoy"
   (`BackToTodayRow`, `onBackToToday`). Para este patrón en otra pantalla, pasar
   `topRow`; no crear otra pill flotante.

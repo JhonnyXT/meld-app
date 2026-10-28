@@ -1,17 +1,22 @@
 import React, { useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import Animated, { useSharedValue, useAnimatedProps, withTiming, Easing } from 'react-native-reanimated';
-import { useRouter, usePathname } from 'expo-router';
+import Animated, {
+  useSharedValue,
+  useAnimatedProps,
+  withTiming,
+  Easing,
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+} from 'react-native-reanimated';
 import { Icon, type IconName } from '@/components/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
-import { useTranslation, type TranslationKey } from '@/i18n';
+import { useTranslation } from '@/i18n';
 import { useTimeDragStore } from '@/store/timeDragStore';
 import { useUndoStore, UNDO_DURATION_MS } from '@/store/undoStore';
-import { useNavigateMenuStore } from '@/store/navigateMenuStore';
 import { minutesToLabel, formatDelta } from '@/domain/time';
-import { ACCORDION_LAYOUT, ACCORDION_ENTER, ACCORDION_EXIT } from '@/components/quickAdd/accordionMotion';
 import {
   FLOATING_BAR_MARGIN,
   FLOATING_BAR_HEIGHT,
@@ -21,17 +26,9 @@ import {
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-const NAV_DESTINATIONS: {
-  path: string;
-  labelKey: TranslationKey;
-  icon: 'view-day' | 'calendar-month' | 'inbox' | 'photo-library' | 'settings';
-}[] = [
-  { path: '/', labelKey: 'today', icon: 'view-day' },
-  { path: '/inbox', labelKey: 'inbox', icon: 'inbox' },
-  { path: '/calendar', labelKey: 'calendar', icon: 'calendar-month' },
-  { path: '/moments', labelKey: 'moments', icon: 'photo-library' },
-  { path: '/settings', labelKey: 'settings', icon: 'settings' },
-];
+const PANEL_LAYOUT = LinearTransition.duration(240).easing(Easing.out(Easing.cubic));
+const PANEL_ENTER = FadeIn.duration(200).delay(60);
+const PANEL_EXIT = FadeOut.duration(120);
 
 interface FloatingBarProps {
   center: React.ReactNode;
@@ -57,6 +54,12 @@ interface FloatingBarProps {
    * dos tienen prioridad si están activas). Hoy solo la usa `DayBar` para
    * "Volver a hoy" cuando el día mostrado no es el actual. */
   topRow?: React.ReactNode;
+  /** Panel que se despliega DENTRO de la barra, por encima de las 3 piezas:
+   * con él la barra entera se vuelve una sola card que crece hacia arriba
+   * (hoy: el calendario de mes de `DayBar`, pedido explícito del usuario
+   * 2026-10-27 con referencia visual — en vez de abrir un modal). Mientras
+   * está abierto se ocultan `topRow`/Deshacer/Confirmar hora. */
+  expandedPanel?: React.ReactNode;
 }
 
 /** Esqueleto compartido de la barra flotante inferior: 3 piezas separadas por un
@@ -81,30 +84,19 @@ export function FloatingBar({
   menuLabel,
   fabLabel,
   topRow,
+  expandedPanel,
 }: FloatingBarProps) {
   const { palette } = useTheme();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const dragging = useTimeDragStore((s) => s.active);
   const undoVisible = useUndoStore((s) => s.visible);
-  const navExpanded = useNavigateMenuStore((s) => s.visible);
-  const closeNav = useNavigateMenuStore((s) => s.close);
 
-  // Con el menú de navegación expandido, tocar el mismo botón (ya convertido
-  // en "×") lo cierra — sin pisar el `onMenuPress` que cada pantalla pasa
-  // para su propio uso (p. ej. Inbox lo redirige a "cancelar selección"
-  // cuando no hay menú de navegación de por medio).
-  const handleMenuPress = () => {
-    if (navExpanded) {
-      closeNav();
-    } else {
-      onMenuPress?.();
-    }
-  };
+  const expanded = expandedPanel != null;
 
   return (
     <View style={[styles.wrap, { bottom: Math.max(insets.bottom, FLOATING_BAR_MARGIN) }]} pointerEvents="box-none">
-      {!navExpanded && (dragging || undoVisible || topRow) ? (
+      {!expanded && (dragging || undoVisible || topRow) ? (
         // Card flotante SEPARADA por encima de toda la barra (con hueco), a
         // todo el ancho — no una card pegada al pill ni estirando la barra
         // (pedido explícito 2026-08-29). Fondo/sombra propios porque las 3
@@ -119,94 +111,60 @@ export function FloatingBar({
           {dragging ? <TimeConfirmRow /> : undoVisible ? <UndoRow /> : topRow}
         </View>
       ) : null}
-      <Animated.View style={styles.row} layout={ACCORDION_LAYOUT}>
+      <Animated.View
+        layout={PANEL_LAYOUT}
+        style={[
+          styles.panelShell,
+          expanded && [styles.card, styles.panelOpen, { backgroundColor: palette.surface }],
+        ]}
+      >
+      {expanded ? (
+        <Animated.View entering={PANEL_ENTER} exiting={PANEL_EXIT} style={styles.panel}>
+          {expandedPanel}
+        </Animated.View>
+      ) : null}
+      <View style={styles.row}>
         <View style={styles.sideSlot}>
           <Pressable
-            onPress={handleMenuPress}
-            style={[styles.circleBtn, { backgroundColor: palette.surface }]}
+            onPress={onMenuPress}
+            style={[
+              styles.circleBtn,
+              { backgroundColor: palette.surface },
+              // Dentro de la card abierta el menú queda como ícono plano
+              // (sin círculo ni sombra), igual que en la referencia.
+              expanded && styles.circleBtnFlat,
+            ]}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel={navExpanded ? t('a11yCloseSheet') : menuLabel ?? t('navigate')}
+            accessibilityLabel={menuLabel ?? t('navigate')}
           >
-            <Icon name={navExpanded ? 'close' : menuIcon} size={24} color={palette.text} />
+            <Icon name={menuIcon} size={24} color={palette.text} />
           </Pressable>
         </View>
 
-        <Animated.View style={styles.centerColumn} layout={ACCORDION_LAYOUT}>
-          {navExpanded ? (
-            <Animated.View key="nav" entering={ACCORDION_ENTER} exiting={ACCORDION_EXIT}>
-              <NavDestinationsRow />
-            </Animated.View>
-          ) : (
-            // El pill de `center` flota solo — `DayBar`/`Inbox` ya dibujan su
-            // propio pill con `pillSolid`, el resto de pantallas usa
-            // `palette.pillSolid` directo en su `.pill`.
-            <Animated.View key="center" entering={ACCORDION_ENTER} exiting={ACCORDION_EXIT}>
-              <View style={[styles.bar, { paddingHorizontal: 0 }, centerStyle]}>{center}</View>
-            </Animated.View>
-          )}
-        </Animated.View>
+        <View style={styles.centerColumn}>
+          {/* El pill de `center` flota solo — `DayBar`/`Inbox` ya dibujan su
+              propio pill con `pillSolid`, el resto de pantallas usa
+              `palette.pillSolid` directo en su `.pill`. */}
+          <View style={[styles.bar, { paddingHorizontal: 0 }, centerStyle]}>{center}</View>
+        </View>
 
-        {!navExpanded ? (
-          <Animated.View style={styles.sideSlot} entering={ACCORDION_ENTER} exiting={ACCORDION_EXIT} layout={ACCORDION_LAYOUT}>
-            <Pressable
-              onPress={onAddPress}
-              style={[
-                styles.circleBtn,
-                styles.fab,
-                { backgroundColor: fabColor ?? palette.accent, width: fabSize, height: fabSize, borderRadius: fabSize / 2 },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={fabLabel ?? t('a11yAddItem')}
-            >
-              <Icon name={fabIcon} size={fabSize >= 56 ? 28 : 24} color="#fff" />
-            </Pressable>
-          </Animated.View>
-        ) : null}
-      </Animated.View>
-    </View>
-  );
-}
-
-/** Fila inline de navegación — reemplaza al viejo `NavigateMenu` (modal con
- * backdrop oscurecido). Ocupa el mismo espacio que el pill central + FAB
- * (que se oculta, ver arriba), sin overlay ni tarjeta flotante aparte —
- * pedido explícito del usuario (2026-09-04): expandir en el lugar, no abrir
- * un popup separado. */
-function NavDestinationsRow() {
-  const { palette, font } = useTheme();
-  const { t } = useTranslation();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const go = (path: string) => {
-    useNavigateMenuStore.getState().close();
-    router.replace(path as never);
-  };
-
-  return (
-    <View style={[styles.navRow, { backgroundColor: palette.pillSolid }]}>
-      {NAV_DESTINATIONS.map((dest) => {
-        const active = pathname === dest.path;
-        return (
-          <Pressable key={dest.path} onPress={() => go(dest.path)} style={styles.navItem}>
-            <View style={[styles.navIconBox, active && { backgroundColor: palette.accent }]}>
-              <Icon name={dest.icon} size={19} color={active ? '#fff' : palette.textDim} />
-            </View>
-            <Text
-              numberOfLines={1}
-              style={{
-                fontFamily: font.medium,
-                fontSize: 10,
-                color: active ? palette.accent : palette.textDim,
-                marginTop: 4,
-              }}
-            >
-              {t(dest.labelKey)}
-            </Text>
+        <View style={styles.sideSlot}>
+          <Pressable
+            onPress={onAddPress}
+            style={[
+              styles.circleBtn,
+              styles.fab,
+              { backgroundColor: fabColor ?? palette.accent, width: fabSize, height: fabSize, borderRadius: fabSize / 2 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={fabLabel ?? t('a11yAddItem')}
+          >
+            <Icon name={fabIcon} size={fabSize >= 56 ? 28 : 24} color="#fff" />
           </Pressable>
-        );
-      })}
+        </View>
+      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -354,7 +312,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 10,
   },
+  circleBtnFlat: { backgroundColor: 'transparent', shadowOpacity: 0, elevation: 0 },
   centerColumn: { flex: 1 },
+  panelShell: { width: '100%', maxWidth: 420, alignItems: 'center' },
+  // La card abierta envuelve panel + barra: el padding lateral corre la barra
+  // hacia adentro, así que menú/pill/FAB quedan dentro del borde redondeado.
+  panelOpen: { borderRadius: 32, paddingHorizontal: 10, paddingTop: 18 },
+  panel: { width: '100%', paddingHorizontal: 8, paddingBottom: 6 },
   card: {
     shadowColor: '#000',
     shadowOpacity: 0.3,
@@ -386,16 +350,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginLeft: 8,
   },
-  navRow: {
-    height: FLOATING_BAR_HEIGHT,
-    borderRadius: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 10,
-  },
-  navItem: { alignItems: 'center', flex: 1 },
-  navIconBox: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   undoRing: { width: RING_SIZE, height: RING_SIZE, alignItems: 'center', justifyContent: 'center' },
   undoRingIcon: { position: 'absolute' },
   undoBtn: {

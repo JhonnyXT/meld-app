@@ -6,7 +6,6 @@ import Animated, { FadeIn, FadeOut, LinearTransition, runOnJS } from 'react-nati
 import { Screen } from '@/components/Screen';
 import { TopAppBar } from '@/components/TopAppBar';
 import { DayBar } from '@/components/DayBar';
-import { DatePickerModal } from '@/components/datePicker/DatePickerModal';
 import { Icon } from '@/components/Icon';
 import { EmptyState } from '@/components/EmptyState';
 import { TodayItemRow } from './TodayItemRow';
@@ -47,7 +46,6 @@ export function TodayScreen() {
   const { palette, font } = useTheme();
   const { t, lang } = useTranslation();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
-  const [datePickerVisible, setDatePickerVisible] = useState(false);
   const isToday = toDateKey(selectedDate) === toDateKey(new Date());
   // Ir a un día puntual desde otra pantalla (p. ej. tocar una celda del grid
   // de Mes o la `CalendarTodayCard` en Calendar) pasa `?date=YYYY-MM-DD` por
@@ -304,21 +302,13 @@ export function TodayScreen() {
         isToday={isToday}
         onPrevDay={() => setSelectedDate((d) => addDays(d, -1))}
         onNextDay={() => setSelectedDate((d) => addDays(d, 1))}
-        onDatePress={() => setDatePickerVisible(true)}
+        selectedDateKey={toDateKey(selectedDate)}
+        onSelectDate={(dateKey) => setSelectedDate(fromDateKey(dateKey))}
         onBackToToday={() => setSelectedDate(new Date())}
         onAddPress={() => useAddMenuStore.getState().open()}
         onMenuPress={() => useNavigateMenuStore.getState().open()}
       />
 
-      <DatePickerModal
-        visible={datePickerVisible}
-        selectedDateKey={toDateKey(selectedDate)}
-        onCancel={() => setDatePickerVisible(false)}
-        onSelect={(dateKey) => {
-          if (dateKey) setSelectedDate(fromDateKey(dateKey));
-          setDatePickerVisible(false);
-        }}
-      />
     </Screen>
   );
 }

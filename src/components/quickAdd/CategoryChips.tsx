@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Icon } from '@/components/Icon';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useTranslation } from '@/i18n';
 import { useCategoriesStore } from '@/store/categoriesStore';
 import { ACCORDION_LAYOUT, ACCORDION_ENTER, ACCORDION_EXIT } from './accordionMotion';
+
+/** Con más de esta cantidad de categorías los chips pasan a una sola fila con
+ * scroll horizontal en vez de envolverse en varias filas (pedido explícito del
+ * usuario) — así la sección no crece en alto con cada categoría nueva. */
+const MAX_WRAPPED_CATEGORIES = 3;
 
 interface CategoryChipsProps {
   value: string | null;
@@ -30,6 +35,32 @@ export function CategoryChips({ value, onChange, showBorder }: CategoryChipsProp
   const categoryList = useCategoriesStore((s) => s.categories);
   const loaded = useCategoriesStore((s) => s.loaded);
   const selected = categoryList.find((cat) => cat.label === value);
+  const scrollable = categoryList.length > MAX_WRAPPED_CATEGORIES;
+
+  const chips = categoryList.map((cat) => {
+    const active = cat.label === value;
+    return (
+      <Pressable
+        key={cat.id}
+        onPress={() => {
+          onChange(cat.label, cat.color);
+          setExpanded(false);
+        }}
+        style={[
+          styles.chip,
+          {
+            backgroundColor: active ? palette.accent : 'transparent',
+            borderColor: active ? palette.accent : palette.border,
+          },
+        ]}
+      >
+        <View style={[styles.dot, { backgroundColor: active ? '#fff' : cat.color }]} />
+        <Text style={{ fontFamily: font.medium, fontSize: 13, color: active ? '#fff' : palette.text }}>
+          {cat.label}
+        </Text>
+      </Pressable>
+    );
+  });
 
   useEffect(() => {
     if (!loaded) useCategoriesStore.getState().load();
@@ -58,37 +89,26 @@ export function CategoryChips({ value, onChange, showBorder }: CategoryChipsProp
           exiting={ACCORDION_EXIT}
           style={[styles.rowWrap, showBorder && { paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: palette.border }]}
         >
-          <View style={styles.row}>
-            {categoryList.length === 0 ? (
-              <Text style={{ fontFamily: font.regular, fontSize: 13, color: palette.textDim }}>
-                {t('categoriesEmptyMessage')}
-              </Text>
-            ) : null}
-            {categoryList.map((cat) => {
-              const active = cat.label === value;
-              return (
-                <Pressable
-                  key={cat.id}
-                  onPress={() => {
-                    onChange(cat.label, cat.color);
-                    setExpanded(false);
-                  }}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor: active ? palette.accent : 'transparent',
-                      borderColor: active ? palette.accent : palette.border,
-                    },
-                  ]}
-                >
-                  <View style={[styles.dot, { backgroundColor: active ? '#fff' : cat.color }]} />
-                  <Text style={{ fontFamily: font.medium, fontSize: 13, color: active ? '#fff' : palette.text }}>
-                    {cat.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {scrollable ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              style={styles.scroller}
+              contentContainerStyle={styles.scrollRow}
+            >
+              {chips}
+            </ScrollView>
+          ) : (
+            <View style={styles.row}>
+              {categoryList.length === 0 ? (
+                <Text style={{ fontFamily: font.regular, fontSize: 13, color: palette.textDim }}>
+                  {t('categoriesEmptyMessage')}
+                </Text>
+              ) : null}
+              {chips}
+            </View>
+          )}
         </Animated.View>
       )}
     </Animated.View>
@@ -101,6 +121,10 @@ const styles = StyleSheet.create({
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   rowWrap: { paddingTop: 2 },
   row: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  // Sangra hasta el borde de la card (`FieldSection` tiene paddingHorizontal
+  // 16) para que los chips no se corten secos en el padding al deslizar.
+  scroller: { marginHorizontal: -16 },
+  scrollRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

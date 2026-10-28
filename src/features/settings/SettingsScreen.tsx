@@ -19,7 +19,10 @@ import {
 } from '@/store/settingsStore';
 import { useNavigateMenuStore } from '@/store/navigateMenuStore';
 import { useCategoriesSheetStore } from '@/store/categoriesSheetStore';
-import { getNotificationPermissionStatus, requestNotificationPermission } from '@/services/notifications';
+import { getNotificationPermissionStatus, requestNotificationPermission, scheduleTestReminder } from '@/services/notifications';
+import { dayItemRepository } from '@/data/local/dayItemRepository';
+import { useDayItemsStore } from '@/store/dayItemsStore';
+import { toDateKey } from '@/domain/date';
 import { trialDaysLeft } from '@/domain/trial';
 import { isDev, isTest } from '@/constants/appVariant';
 
@@ -86,6 +89,30 @@ export function SettingsScreen() {
   // permiso de todas formas. Prender sí intenta el diálogo nativo primero, y
   // solo abre Ajustes del sistema si el permiso ya fue rechazado de forma
   // permanente (el único caso sin salida dentro de la app).
+  // Solo dev/test: tarea real de hoy + recordatorio en 10 s, para probar
+  // "Marcar hecho" y el toque de la notificación sin esperar una hora puntual.
+  const handleTestReminder = async () => {
+    const now = new Date();
+    const item = {
+      id: `task-test-${now.getTime()}`,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      date: toDateKey(now),
+      title: t('testReminderTaskTitle'),
+      category: null,
+      categoryColor: null,
+      reminderAt: null,
+      status: 'scheduled' as const,
+      type: 'task' as const,
+      priority: 'none' as const,
+      repeatRule: null,
+      link: null,
+    };
+    await dayItemRepository.upsert(item);
+    useDayItemsStore.getState().reload();
+    await scheduleTestReminder(item);
+  };
+
   const handleNotificationsToggle = async (next: boolean) => {
     if (!next) {
       setNotificationsEnabled(false);
@@ -164,6 +191,16 @@ export function SettingsScreen() {
             showBorder
             right={<Toggle value={notificationsEnabled} onValueChange={handleNotificationsToggle} />}
           />
+          {(isDev || isTest) && (
+            <SettingRow
+              icon="notifications"
+              title={t('settingsTestReminder')}
+              subtitle={t('settingsTestReminderSubtitle')}
+              showBorder
+              onPress={handleTestReminder}
+              right={<Icon name="chevron-right" size={18} color={palette.textDim} />}
+            />
+          )}
           <SettingRow
             icon="repeat"
             title={t('settingsHabitsInToday')}

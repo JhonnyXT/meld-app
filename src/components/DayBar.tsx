@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, Pressable, StyleSheet, BackHandler } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { Icon } from '@/components/Icon';
@@ -7,6 +7,11 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useTranslation } from '@/i18n';
 import { FloatingBar } from './FloatingBar';
 import { FLOATING_BAR_CONFIRM_ROW_HEIGHT } from './floatingBarGeometry';
+import { WeekdayHeaderRow } from '@/components/calendar/WeekdayHeaderRow';
+import { DayPickerCell } from '@/components/datePicker/DayPickerCell';
+import { buildMonthGrid } from '@/domain/calendarGrid';
+import { formatMonthYearLabel } from '@/domain/date';
+import { MONTH_FULL } from '@/i18n/translations';
 
 interface DayBarProps {
   dateLabel: string;
@@ -18,10 +23,10 @@ interface DayBarProps {
   onMenuPress?: () => void;
   onPrevDay?: () => void;
   onNextDay?: () => void;
-  /** Tocar el pill (fuera de las flechas) — abre el calendario de mes para
-   * saltar a cualquier día (pedido explícito del usuario, 2026-09-11; antes
-   * saltaba directo a hoy, ver `onBackToToday` para ese atajo). */
-  onDatePress?: () => void;
+  /** Día mostrado (`YYYY-MM-DD`) — lo marca el calendario desplegable. */
+  selectedDateKey: string;
+  /** Tocar un día en el calendario desplegable. */
+  onSelectDate: (dateKey: string) => void;
   /** "Volver a hoy" — fila que aparece arriba de la barra cuando el día
    * mostrado no es el actual. */
   onBackToToday?: () => void;
@@ -35,12 +40,38 @@ export function DayBar({
   onMenuPress,
   onPrevDay,
   onNextDay,
-  onDatePress,
+  selectedDateKey,
+  onSelectDate,
   onBackToToday,
   onAddPress,
 }: DayBarProps) {
   const { palette, font } = useTheme();
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
+  // Tocar el pill despliega el calendario del mes DENTRO de la barra (la
+  // barra entera crece hacia arriba como una card), en vez del
+  // `DatePickerModal` — pedido explícito del usuario 2026-10-27 con
+  // referencia visual. Mientras está abierto, el pill pasa a navegar meses.
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [cursor, setCursor] = useState(() => monthStart(selectedDateKey));
+
+  const openCalendar = () => {
+    setCursor(monthStart(selectedDateKey));
+    setCalendarOpen(true);
+  };
+  const closeCalendar = () => setCalendarOpen(false);
+  const shiftMonth = (delta: number) => setCursor((c) => new Date(c.getFullYear(), c.getMonth() + delta, 1));
+
+  useEffect(() => {
+    if (!calendarOpen) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setCalendarOpen(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [calendarOpen]);
+
+  const prev = calendarOpen ? () => shiftMonth(-1) : onPrevDay;
+  const next = calendarOpen ? () => shiftMonth(1) : onNextDay;
 
   // Deslizar el pill de fecha cambia de día (izquierda = día siguiente,
   // derecha = día anterior), además de los chevrons — mismo umbral chico que
@@ -53,28 +84,52 @@ export function DayBar({
     .failOffsetY([-12, 12])
     .onEnd((e) => {
       if (e.translationX < -16 || e.velocityX < -400) {
-        if (onNextDay) runOnJS(onNextDay)();
+        if (next) runOnJS(next)();
       } else if (e.translationX > 16 || e.velocityX > 400) {
-        if (onPrevDay) runOnJS(onPrevDay)();
+        if (prev) runOnJS(prev)();
       }
     });
 
   return (
+    <>
+    {calendarOpen ? (
+      // Tocar fuera de la card cierra el calendario.
+      <Pressable style={StyleSheet.absoluteFill} onPress={closeCalendar} accessibilityLabel={t('close')} />
+    ) : null}
     <FloatingBar
-      onMenuPress={onMenuPress}
-      onAddPress={onAddPress}
+      onMenuPress={() => {
+        closeCalendar();
+        onMenuPress?.();
+      }}
+      onAddPress={() => {
+        closeCalendar();
+        onAddPress?.();
+      }}
       centerStyle={{ marginHorizontal: 0 }}
       topRow={!isToday ? <BackToTodayRow onPress={onBackToToday} /> : undefined}
+      expandedPanel={
+        calendarOpen ? (
+          <DayBarCalendar
+            cursor={cursor}
+            selectedDateKey={selectedDateKey}
+            monthTitle={MONTH_FULL[lang][cursor.getMonth()]}
+            onSelect={(dateKey) => {
+              onSelectDate(dateKey);
+              closeCalendar();
+            }}
+          />
+        ) : undefined
+      }
       center={
         <GestureDetector gesture={swipeGesture}>
           <Pressable
-            onPress={onDatePress}
+            onPress={calendarOpen ? closeCalendar : openCalendar}
             style={[styles.pager, { backgroundColor: palette.pillSolid }]}
             accessibilityRole="button"
-            accessibilityLabel={dateLabel}
+            accessibilityLabel={calendarOpen ? formatMonthYearLabel(cursor, lang) : dateLabel}
           >
             <Pressable
-              onPress={onPrevDay}
+              onPress={prev}
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={t('a11yPreviousDay')}
@@ -82,11 +137,15 @@ export function DayBar({
               <Icon name="chevron-left" size={18} color={palette.textDim} />
             </Pressable>
             <View style={styles.pagerLabel}>
-              <Text style={{ fontFamily: font.semibold, fontSize: 14, color: palette.text }}>{dateLabel}</Text>
-              <Text style={{ fontFamily: font.regular, fontSize: 10, color: palette.textDim }}>{doneLabel}</Text>
+              <Text style={{ fontFamily: font.semibold, fontSize: 14, color: palette.text }}>
+                {calendarOpen ? formatMonthYearLabel(cursor, lang) : dateLabel}
+              </Text>
+              <Text style={{ fontFamily: font.regular, fontSize: 10, color: palette.textDim }}>
+                {calendarOpen ? t('viewMonth') : doneLabel}
+              </Text>
             </View>
             <Pressable
-              onPress={onNextDay}
+              onPress={next}
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={t('a11yNextDay')}
@@ -97,6 +156,59 @@ export function DayBar({
         </GestureDetector>
       }
     />
+    </>
+  );
+}
+
+function monthStart(dateKey: string): Date {
+  const d = new Date(`${dateKey}T00:00:00`);
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+/** Calendario del mes que se despliega dentro de la barra. Los días de los
+ * meses vecinos quedan en blanco (como en la referencia) y las semanas van
+ * como filas explícitas de 7 (con `flexWrap` el redondeo de los % puede
+ * mandar la 7ma celda a la fila siguiente — mismo motivo que el drawer). */
+function DayBarCalendar({
+  cursor,
+  selectedDateKey,
+  monthTitle,
+  onSelect,
+}: {
+  cursor: Date;
+  selectedDateKey: string;
+  monthTitle: string;
+  onSelect: (dateKey: string) => void;
+}) {
+  const { palette, font } = useTheme();
+  const weeks = useMemo(() => {
+    const grid = buildMonthGrid(cursor.getFullYear(), cursor.getMonth(), new Date());
+    return Array.from({ length: grid.length / 7 }, (_, w) => grid.slice(w * 7, w * 7 + 7));
+  }, [cursor]);
+
+  return (
+    <View>
+      <Text style={[styles.monthTitle, { fontFamily: font.bold, color: palette.accent }]}>
+        {monthTitle.toUpperCase()}
+      </Text>
+      <WeekdayHeaderRow />
+      {weeks.map((week) => (
+        <View key={week[0].dateKey} style={styles.weekRow}>
+          {week.map((cell) =>
+            cell.inCurrentMonth ? (
+              <DayPickerCell
+                key={cell.dateKey}
+                cell={cell}
+                selected={cell.dateKey === selectedDateKey}
+                onPress={() => onSelect(cell.dateKey)}
+              />
+            ) : (
+              <View key={cell.dateKey} style={styles.emptyCell} />
+            ),
+          )}
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -130,6 +242,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   pagerLabel: { alignItems: 'center' },
+  monthTitle: { fontSize: 13, letterSpacing: 1, marginBottom: 12, paddingHorizontal: 4 },
+  weekRow: { flexDirection: 'row' },
+  emptyCell: { width: `${100 / 7}%`, height: 40 },
   backToTodayRow: {
     height: FLOATING_BAR_CONFIRM_ROW_HEIGHT,
     flexDirection: 'row',

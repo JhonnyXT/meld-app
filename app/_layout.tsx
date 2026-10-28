@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AppState, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import { useQuickAddStore } from '@/store/quickAddStore';
+import { useDayItemsStore } from '@/store/dayItemsStore';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
@@ -30,6 +31,7 @@ import { TimeDragOverlay } from '@/components/TimeDragOverlay';
 import { RemindersSheet } from '@/components/reminders/RemindersSheet';
 import { CategoriesManagerSheet } from '@/components/settings/CategoriesManagerSheet';
 import { TrialEndedDialog } from '@/components/TrialEndedDialog';
+import { NavDrawerLayout } from '@/components/navDrawer/NavDrawer';
 import { OnboardingScreen } from '@/features/onboarding/OnboardingScreen';
 import { useSettingsStore } from '@/store/settingsStore';
 
@@ -66,19 +68,31 @@ function RootStack() {
   // `services/notifications.ts` → `registerNotificationResponseHandling`,
   // mismo patrón que el deep link de arriba (evento en caliente + chequeo
   // en frío al arrancar).
-  useEffect(() => registerNotificationResponseHandling(), []);
+  useEffect(() => registerNotificationResponseHandling(() => useDayItemsStore.getState().reload()), []);
+
+  // "Marcar hecho" desde la notificación con la app en segundo plano lo
+  // resuelve la tarea headless directo en la DB: al volver a primer plano se
+  // recarga Hoy para no mostrar la tarea como pendiente.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') useDayItemsStore.getState().reload();
+    });
+    return () => sub.remove();
+  }, []);
 
   return (
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: palette.bg },
-        }}
-      >
-        <Stack.Screen name="(tabs)" />
-      </Stack>
+      <NavDrawerLayout>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: palette.bg },
+          }}
+        >
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+      </NavDrawerLayout>
       <QuickAddSheet />
       <AddMenu />
       <VoiceAddScreen />

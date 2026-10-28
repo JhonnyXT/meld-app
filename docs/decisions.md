@@ -2280,3 +2280,56 @@ concretos para que pruebe él mismo** en el celular y reporte qué ve, en vez de
 seguir manejando el dispositivo por muchos turnos. Sí vale la pena seguir
 recompilando/reinstalando cuando cambia el código — lo que hay que cortar es la
 exploración manual turno a turno vía `adb shell input tap/swipe` + screenshot.
+
+- **2026-10-21 — Quick Add/ItemDetailSheet pasan de una sola card a cards por
+  sección + botonera fija abajo** (pedido explícito del usuario con una
+  referencia visual tipo iOS "Location details"). Reemplaza la decisión
+  anterior de "UNA sola card con divisores" (`configBox`/`fieldGroup`).
+  Secciones: Grabación › Cuándo › Enlace › Organizar (`FieldSection`). El CTA
+  único dentro del scroll pasó a `SheetActions` (Cancelar + confirmar) fuera
+  del `ScrollView`.
+
+- **2026-10-21 — Navegación: menú inline de `FloatingBar` → drawer lateral que
+  empuja la pantalla** (pedido explícito del usuario con referencia visual).
+  Reemplaza la decisión 2026-09-04 de "expandir en el lugar, no abrir un
+  popup". Orden nuevo: Hoy, Calendario, Momentos | Bandeja, Categorías |
+  Ajustes, más un mini calendario del mes arriba.
+
+- **2026-10-26 — "Marcar hecho" desde la notificación vuelve a ser silencioso
+  (`opensAppToForeground: false`)** (pedido explícito del usuario: que no lo
+  lleve a la app). Revierte la decisión de usar `true`: el problema de que con
+  la app matada el listener nunca corre se resuelve con una tarea de
+  `expo-task-manager` (`notificationBackgroundTask.ts`), que
+  `expo-notifications` ejecuta en un proceso headless para botones de acción.
+  Probado en el Moto E7 Plus: app abierta, en segundo plano y matada (`am
+  kill`). Tocar el cuerpo sigue abriendo el detalle del ítem.
+
+- **2026-10-27 — Pro: categorías compartidas (decidido, sin construir).**
+  Pedido del usuario. Definido con él:
+  - Es una **lista compartida**: la categoría y todos sus ítems, que los
+    miembros ven, agregan y marcan en tiempo real (no solo la plantilla
+    nombre/ícono/color).
+  - **Solo el dueño necesita Pro**; los invitados con plan Free pueden unirse
+    y participar (cada invitación trae usuarios nuevos).
+  - Permisos **editor o lector**, elegidos por persona. Sin asignar tareas a
+    un miembro en esta primera versión.
+  - **Va después de cuentas + sync/backup en la nube** (ya decidido como Pro)
+    y se monta sobre esa infraestructura, no como un sistema aislado.
+  - Implica migrar `day_items.category` de texto copiado a una referencia por
+    id (hoy renombrar una categoría no actualiza sus ítems) — sin eso no hay
+    forma de saber qué ítems pertenecen a la categoría compartida.
+  - **Backend: Firebase** (Firestore + Auth con Google), reusando el diseño de
+    sync/espacios de `my-wallet-app` (`SYNC_ROADMAP.md` allá). Se comparó con
+    Supabase (plan gratis se pausa a los 7 días, sin cola offline en el SDK) y
+    con un VPS propio (Contabo: mantenimiento y sin offline) — descartados.
+    Archivos (notas de voz, fotos) exigen el plan Blaze: van en una segunda
+    etapa.
+  - **Límites para invitados Free**: máximo ~5-6 miembros por categoría
+    compartida (el miembro extra lo rechazan las reglas de Firestore), y un
+    usuario Free puede estar en 1-2 categorías compartidas como invitado; crear
+    las propias o estar en más pide Pro. Misma propuesta enviada a My Wallet
+    (junto con los roles editor/lector) a pedido del usuario.
+- **2026-10-27 — Los widgets interactivos (marcar desde el widget) siguen en
+  Free.** El texto de Planes decía "Widgets interactivos" como Pro; se
+  cambió a "Widgets configurables". Pro = widgets configurables/varios
+  tamaños + Live Activities.

@@ -55,7 +55,7 @@ export const es = {
   onbPlanProF3: 'Quick Add con lenguaje natural',
   onbPlanProF3Desc: 'Escribe «gym mañana 7am» y Meld lo agenda por ti.',
   onbPlanProF4: 'Widgets avanzados y más',
-  onbPlanProF4Desc: 'Widgets interactivos, Pomodoro y resumen del día con IA.',
+  onbPlanProF4Desc: 'Widgets configurables, Pomodoro y resumen del día con IA.',
   onbPlansTerms: 'Términos',
   onbPlansPrivacy: 'Privacidad',
   onbPlansStartFree: 'Empezar gratis',
@@ -386,6 +386,9 @@ export const es = {
   settingsSimBackToFree: 'Volver a Free',
   settingsSimTrialEnd: 'Simular fin de la prueba',
   settingsSimSubtitle: 'Solo para pruebas · sin cobro real',
+  settingsTestReminder: 'Probar recordatorio',
+  settingsTestReminderSubtitle: 'Crea una tarea de prueba y avisa en 10 s',
+  testReminderTaskTitle: 'Tarea de prueba',
   settingsSimTrialEndSubtitle: 'Solo para pruebas · cierra y vuelve a abrir la app',
   trialEndedTitle: 'Tu prueba de Pro terminó',
   trialEndedMessage:
@@ -449,7 +452,7 @@ export const en: Record<keyof typeof es, string> = {
   onbPlanProF3: 'Natural-language Quick Add',
   onbPlanProF3Desc: 'Type “gym tomorrow 7am” and Meld schedules it for you.',
   onbPlanProF4: 'Advanced widgets and more',
-  onbPlanProF4Desc: 'Interactive widgets, Pomodoro and an AI day summary.',
+  onbPlanProF4Desc: 'Configurable widgets, Pomodoro and an AI day summary.',
   onbPlansTerms: 'Terms',
   onbPlansPrivacy: 'Privacy',
   onbPlansStartFree: 'Start for free',
@@ -753,6 +756,9 @@ export const en: Record<keyof typeof es, string> = {
   settingsSimBackToFree: 'Back to Free',
   settingsSimTrialEnd: 'Simulate trial ending',
   settingsSimSubtitle: 'Testing only · no real charge',
+  settingsTestReminder: 'Test reminder',
+  settingsTestReminderSubtitle: 'Creates a test task and alerts in 10 s',
+  testReminderTaskTitle: 'Test task',
   settingsSimTrialEndSubtitle: 'Testing only · close and reopen the app',
   trialEndedTitle: 'Your Pro trial has ended',
   trialEndedMessage:
@@ -779,6 +785,11 @@ export const en: Record<keyof typeof es, string> = {
 export const WEEKDAY_SHORT: Record<Language, string[]> = {
   en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   es: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+};
+
+export const WEEKDAY_FULL: Record<Language, string[]> = {
+  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  es: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
 };
 
 export const MONTH_SHORT: Record<Language, string[]> = {

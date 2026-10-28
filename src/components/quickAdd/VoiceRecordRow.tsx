@@ -23,6 +23,7 @@ interface VoiceRecordRowProps {
   onDelete: () => void;
   onPermissionDenied: () => void;
   onError: () => void;
+  showBorder?: boolean;
 }
 
 function formatSeconds(seconds: number): string {
@@ -56,6 +57,7 @@ export function VoiceRecordRow({
   onDelete,
   onPermissionDenied,
   onError,
+  showBorder = true,
 }: VoiceRecordRowProps) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();
@@ -165,7 +167,7 @@ export function VoiceRecordRow({
   }
 
   return (
-    <Pressable onPress={handleStart} style={[styles.row, { borderBottomColor: palette.border }]}>
+    <Pressable onPress={handleStart} style={[styles.row, showBorder && { borderBottomWidth: 1, borderBottomColor: palette.border }]}>
       <View style={styles.left}>
         <Icon name="mic" size={20} color={palette.textDim} />
         <Text style={{ fontFamily: font.medium, fontSize: 15, color: palette.text }}>{t('tapToRecord')}</Text>
@@ -198,10 +200,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
-    borderBottomWidth: 1,
   },
   left: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  sessionCard: { borderRadius: 16, padding: 14, marginTop: 14, marginBottom: 16, gap: 14 },
+  sessionCard: { borderRadius: 16, padding: 14, marginVertical: 12, gap: 14 },
   sessionTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sessionLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   dot: { width: 10, height: 10, borderRadius: 5 },
@@ -214,8 +215,7 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: 16,
     padding: 12,
-    marginTop: 14,
-    marginBottom: 16,
+    marginVertical: 12,
   },
   playBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   waveform: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3 },
