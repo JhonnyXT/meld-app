@@ -42,12 +42,15 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.6.5",
     "@types/react": "~19.2.2",
     "babel-jest": "^30.5.2",
     "babel-preset-expo": "^57.0.7",
     "drizzle-kit": "^0.31.10",
+    "firebase": "^12.19.0",
+    "firebase-tools": "^15.34.1",
     "jest": "^30.5.2",
     "typescript": "~6.0.3"
   },
@@ -60,7 +63,9 @@
     "build:test": "./scripts/build-android.sh test",
     "eas:test": "APP_VARIANT=test eas build --profile test --platform android",
     "eas:prod": "APP_VARIANT=prod eas build --profile prod --platform android",
-    "test": "jest"
+    "test": "jest",
+    "test:rules": "./scripts/test-rules.sh",
+    "emulators": "./scripts/emulators.sh"
   },
   "private": true
 }

@@ -1,0 +1,29 @@
+{
+  "react-native": {
+    "android_bypass_emulator_url_remap": true
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "emulators": {
+    "auth": {
+      "host": "127.0.0.1",
+      "port": 9098
+    },
+    "firestore": {
+      "host": "127.0.0.1",
+      "port": 8090
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4010
+    },
+    "hub": {
+      "port": 4410
+    },
+    "logging": {
+      "port": 4510
+    },
+    "singleProjectMode": true
+  }
+}

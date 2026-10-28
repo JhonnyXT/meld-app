@@ -36,6 +36,12 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Firebase Emulator (npm run emulators): datos locales de dev y logs
+.firebase-emulator/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
 # generated native folders
 /ios
 /android

@@ -194,10 +194,22 @@ desmarcar un hábito (reutiliza su id determinístico) y crear/editar una tarea.
   necesita tests: son las dos cosas más fáciles de romper sin darse cuenta y más caras de
   debuggear a mano en un dispositivo. El resto del código (UI, domain) sigue sin tests por
   ahora, no hace falta migrar todo de una vez.
-- [ ] `firebase-tools` + `@firebase/rules-unit-testing` para el emulador (mismo paquete que usa
-  My Wallet) — todavía no instalado, es el próximo paso de esta fase.
-- [ ] Proyectos `meld-test` y `meld-prod`, Firestore con reglas que niegan todo; emulador para
-  `dev` (JDK 21, igual que My Wallet).
+- [x] **`firebase-tools` + `@firebase/rules-unit-testing` + `firebase`** (2026-10-28): emulador
+  de Firestore+Auth funcionando para `dev` sin depender de ningún proyecto real en la nube —
+  usa el project id `demo-meld` (modo "demo" de Firebase: 100% local, no pega a ningún backend).
+  `firebase.json` (`.firebaserc` → `demo-meld`), `firestore.rules` (niega todo por ahora, ver
+  abajo), `jest.rules.config.js` + `firestore-tests/rules.test.ts` (2 tests: autenticado y sin
+  autenticar, los dos niegos), `scripts/emulators.sh`/`scripts/test-rules.sh` (`npm run
+  emulators`/`npm run test:rules`), mismo JDK 21 portátil que ya tenía instalado My Wallet
+  (`~/.local/jdk-21`, Gradle sigue con Java 17 del sistema). **Puertos propios** (8090/9098/
+  4010/4410/4510, no los defaults 8080/9099/4000/4400/4500): el emulador de `my-wallet-app`
+  queda corriendo permanentemente en los default — mismo criterio que Metro en el 8081, no
+  competir con él. Verificado de punta a punta: `npm run test:rules` levanta el emulador, aplica
+  `firestore.rules`, corre los 2 tests y lo apaga limpio (sin puertos huérfanos).
+- [x] **Reglas de Firestore que niegan todo** — hecho arriba, como parte del mismo paso.
+- [ ] Proyectos reales `meld-test` y `meld-prod` en la consola de Firebase (pendiente: lo hace el
+  usuario, requiere su cuenta de Google — ver pasos abajo). El emulador de `dev` ya no depende de
+  esto.
 - [ ] `@react-native-firebase/app`/`auth`/`firestore` + `@react-native-google-signin/google-signin`
   (dependencias nativas: `prebuild --clean` + rebuild), `google-services.json` por variant.
 - [ ] Ajustes → **Cuenta**: iniciar sesión, cerrar sesión, eliminar cuenta. Sin paso en el

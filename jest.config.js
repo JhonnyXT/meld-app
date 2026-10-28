@@ -14,6 +14,7 @@ module.exports = {
     '<rootDir>/ios/',
     '<rootDir>/.expo/',
     '<rootDir>/landing/',
+    // Necesitan el emulador de Firestore: npm run test:rules (jest.rules.config.js), no npm test.
     '<rootDir>/firestore-tests/',
   ],
 };
