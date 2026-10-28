@@ -163,10 +163,11 @@ Nada visible cambia; deja todo listo para que dos teléfonos no choquen.
   renombrar/recolorear una categoría se refleje en sus ítems ya creados) queda para cuando se
   construya el filtrado por espacio en la Fase 4, tocando a la vez `dayItemsStore`/`inboxStore`/
   `useWeekAgenda`/los widgets — hacerlo ahora era más riesgo del que esta fase necesitaba.
-- [ ] Tests de las migraciones: sin infraestructura de tests en este repo (a diferencia de
-  My Wallet, que usa Jest) — verificado a mano en dispositivo con datos reales en vez de un test
-  automatizado. `pickWinner` (resolución de conflictos) no aplica todavía: no hay nada remoto con
-  qué comparar hasta la Fase 3, se implementa ahí.
+- [ ] Tests de las migraciones: sin infraestructura de tests en este repo todavía (a diferencia
+  de My Wallet, que usa Jest) — verificado a mano en dispositivo con datos reales en vez de un
+  test automatizado. Jest se instala recién en la Fase 2 (ver ahí el porqué): lo que esta Fase 1
+  toca es solo SQLite local, sin red, así que el riesgo de verificar a mano fue aceptable;
+  `pickWinner` tampoco aplica todavía (no hay nada remoto con qué comparar hasta la Fase 3).
 
 **Hecho cuando:** la app funciona igual que hoy, cada registro nuevo tiene id único y fecha de
 edición, borrar/desmarcar deja tombstone en vez de eliminar, y un dispositivo con datos previos
@@ -177,13 +178,20 @@ dispositivo con datos previos — corregido reordenando `db.ts`). Probado tambi�
 desmarcar un hábito (reutiliza su id determinístico) y crear/editar una tarea.
 
 ### Fase 2 — Firebase + cuentas con Google · M
+- [ ] **Instalar Jest** (`firebase-tools` + `@firebase/rules-unit-testing` para el emulador,
+  mismo paquete que usa My Wallet). Meld hoy no tiene NINGÚN framework de tests (ni la app ni
+  `landing/`) — se verificó todo a mano en la Fase 1. A partir de acá, lo que entra a
+  `src/sync/` y a `firestore.rules` sí necesita tests: son las dos cosas más fáciles de romper
+  sin darse cuenta y más caras de debuggear a mano en un dispositivo. El resto del código (UI,
+  domain) sigue sin tests por ahora, no hace falta migrar todo de una vez.
 - [ ] Proyectos `meld-test` y `meld-prod`, Firestore con reglas que niegan todo; emulador para
   `dev` (JDK 21, igual que My Wallet).
 - [ ] `@react-native-firebase/app`/`auth`/`firestore` + `@react-native-google-signin/google-signin`
   (dependencias nativas: `prebuild --clean` + rebuild), `google-services.json` por variant.
 - [ ] Ajustes → **Cuenta**: iniciar sesión, cerrar sesión, eliminar cuenta. Sin paso en el
   onboarding (Free no lo necesita); se ofrece al intentar algo Pro.
-- [ ] `src/sync/` con cliente y sesión + test de frontera.
+- [ ] `src/sync/` con cliente y sesión + test de frontera (Jest, como
+  `sync.boundary.test.ts` de My Wallet: falla si algo fuera de `src/sync/` importa Firebase).
 
 **Hecho cuando:** login, cierre de sesión y eliminación de cuenta funcionan en `dev` con el
 emulador, sin tocar los datos locales.
@@ -195,7 +203,9 @@ emulador, sin tocar los datos locales.
 - [ ] Restaurar en un teléfono nuevo: inicia sesión → trae todo → salta el onboarding.
 - [ ] Estado en Ajustes → Cuenta ("Respaldado hace…", "N cambios pendientes").
 - [ ] Cerrar sesión con Mantener / Borrar (T8); eliminar cuenta borra `users/{uid}`.
-- [ ] Reglas de `users/{uid}` + tests con el emulador.
+- [ ] `pickWinner` (resolución de conflictos, `updatedAt`/tombstone) como función pura + tests
+  Jest (sin red) — mismo patrón que `my-wallet-app/src/utils/syncMerge.ts`.
+- [ ] Reglas de `users/{uid}` + tests Jest contra el emulador (`npm run test:rules`).
 - [ ] Gating: solo Pro (o prueba) sube. Mientras no haya RevenueCat, usar `settingsStore.plan`
   detrás de un flag de `dev`/`test`.
 
@@ -215,7 +225,9 @@ en modo avión aparece en la nube al volver la conexión.
 - [ ] Salir, quitar a alguien, eliminar para todos; quien pierde el acceso conserva la categoría
   como propia (desconectada).
 - [ ] Indicador en la fila de quién creó o completó un ítem compartido (por definir).
-- [ ] Reglas de `spaces/**` e `inviteCodes` + tests (incluye límite de miembros y roles).
+- [ ] Reglas de `spaces/**` e `inviteCodes` + tests Jest contra el emulador (incluye límite de
+  miembros y roles editor/lector — casos obligados: un lector no puede escribir, el miembro
+  N+1 no se puede unir).
 - [ ] Pruebas con dos teléfonos y dos cuentas (Moto e7 plus + S24 Ultra), en `dev` + emulador y
   en `test` contra la nube real.
 
