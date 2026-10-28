@@ -2,6 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
 import { toDateKey } from '@/domain/date';
 import { getISOWeek } from '@/domain/week';
+import { newId } from '@/domain/id';
 import type { Moment } from '@/domain/dayItem';
 
 /**
@@ -23,7 +24,7 @@ export async function pickMomentPhotoForToday(): Promise<Moment | null> {
   const now = new Date();
   const iso = now.toISOString();
   const moment: Moment = {
-    id: `moment-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: newId(),
     createdAt: iso,
     updatedAt: iso,
     date: toDateKey(now),

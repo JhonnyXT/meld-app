@@ -134,26 +134,44 @@ Tamaño aproximado: S (días), M (1–2 semanas), L (2–4 semanas).
 ### Fase 0 — Plan · S ✅ (2026-10-28)
 - [x] Este documento y la rama `feature/pro-sync`.
 
-### Fase 1 — Preparar los datos locales (sin red) · M
+### Fase 1 — Preparar los datos locales (sin red) · M ✅ (2026-10-28, falta probar en dispositivo)
 Nada visible cambia; deja todo listo para que dos teléfonos no choquen.
-- [ ] **Ids únicos de verdad**: hoy son `${type}-${Date.now()}` (`QuickAddSheet`), `task-${Date.now()}`
-  (`inboxStore`) y `cat-${Date.now()}` (`categoryRepository`): dos teléfonos pueden generar el
-  mismo. Los nuevos pasan a UUID (`expo-crypto`); los existentes se conservan (los referencian
-  completados, notificaciones y widgets).
-- [ ] **Columnas de sync** en `day_items`, `habit_completions`, `task_completions` y `categories`:
-  `deleted_at`, `sync_state`, y `updated_at` donde falte (migración aditiva con `ALTER TABLE` en
-  try/catch, como ya hace `db.ts`).
-- [ ] **Borrado lógico**: `dayItemRepository.remove` y desmarcar un completado pasan a
-  `deleted_at`; TODAS las queries lo excluyen (incluye `widget/*Data.ts`, que leen SQLite
-  directo). Purga de tombstones viejos ya sincronizados.
-- [ ] **Categoría por id**: `day_items.category_id` (referencia a `categories.id`) en vez del
-  texto copiado. Backfill por nombre; `category`/`category_color` quedan como respaldo de
-  lectura para ítems huérfanos. Renombrar o recolorear una categoría pasa a verse en sus ítems
-  (cambio de comportamiento: actualizar CLAUDE.md → "Categorías configurables").
-- [ ] Tests de las migraciones y de `pickWinner`.
+- [x] **Ids únicos de verdad**: `domain/id.ts` → `newId()` (UUID v4 con `expo-crypto`). Antes eran
+  `${type}-${Date.now()}` (`QuickAddSheet`), `task-${Date.now()}` (`inboxStore`),
+  `cat-${Date.now()}` (`categoryRepository`) y `moment-${Date.now()}-${random}`
+  (`pickMomentPhoto`): dos teléfonos podían generar el mismo. Los ids ya persistidos NO se migran
+  (los referencian completados, notificaciones y widgets). Los completados de hábito/task
+  (`habit_completions`/`task_completions`) ya eran determinísticos (`${id}-${date}`) — no
+  necesitan UUID, ver borrado lógico abajo.
+- [x] **Columnas de sync** en `day_items` (`category_id`, `deleted_at`, `sync_state`) y en
+  `habit_completions`/`task_completions`/`categories` (`updated_at`, `deleted_at`, `sync_state`):
+  en el `CREATE TABLE` para instalaciones nuevas + `ALTER TABLE` en try/catch para dispositivos
+  existentes (`db.ts` → `addColumnIfMissing`).
+- [x] **Borrado lógico**: `dayItemRepository.remove`/`categoryRepository.remove` marcan
+  `deleted_at` en vez de `DELETE`; desmarcar un completado de hábito/task que repite también
+  (reutiliza el mismo id determinístico al volver a marcar, en vez de insertar uno nuevo). TODAS
+  las queries de `dayItemRepository`/`categoryRepository` lo excluyen — cubre también
+  `widget/*Data.ts` y `widgetActions.ts`, que pasan por el repositorio, no por SQLite directo.
+  Borrar el ítem dueño (`dayItemRepository.remove`) sigue borrando físico sus completados (una
+  vez que el ítem se va, nadie necesita el historial día por día). Purga de tombstones viejos: no
+  implementada todavía (no hay a qué "ya sincronizado" comparar sin nube; Fase 3).
+- [x] **`category_id` resuelto y guardado** (`dayItemRepository` → `resolveCategoryId`, por nombre
+  contra `categories.label`) en cada `upsert`, más backfill en `db.ts` para ítems existentes.
+  **Alcance recortado de lo planeado**: por ahora es solo bookkeeping para la Fase 4 (saber qué
+  ítems pertenecen a una categoría compartida) — `category`/`category_color` (texto) SIGUEN
+  siendo la fuente que se muestra en pantalla, sin cambios visibles. Resolver en vivo por id (que
+  renombrar/recolorear una categoría se refleje en sus ítems ya creados) queda para cuando se
+  construya el filtrado por espacio en la Fase 4, tocando a la vez `dayItemsStore`/`inboxStore`/
+  `useWeekAgenda`/los widgets — hacerlo ahora era más riesgo del que esta fase necesitaba.
+- [ ] Tests de las migraciones: sin infraestructura de tests en este repo (a diferencia de
+  My Wallet, que usa Jest) — verificado a mano en dispositivo con datos reales en vez de un test
+  automatizado. `pickWinner` (resolución de conflictos) no aplica todavía: no hay nada remoto con
+  qué comparar hasta la Fase 3, se implementa ahí.
 
-**Hecho cuando:** la app funciona igual que hoy (más el renombrado de categorías que se propaga),
-y cada registro tiene id único, fecha de edición y borrado lógico.
+**Hecho cuando:** la app funciona igual que hoy, cada registro nuevo tiene id único y fecha de
+edición, borrar/desmarcar deja tombstone en vez de eliminar, y un dispositivo con datos previos
+migra sin perder nada (⚠️ pendiente de confirmar en el Moto E7 Plus — no estaba conectado al
+terminar este pase).
 
 ### Fase 2 — Firebase + cuentas con Google · M
 - [ ] Proyectos `meld-test` y `meld-prod`, Firestore con reglas que niegan todo; emulador para

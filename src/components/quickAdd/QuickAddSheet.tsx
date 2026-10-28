@@ -52,6 +52,7 @@ import {
   frequencyTarget,
 } from '@/domain/quickAdd';
 import type { DayItem, PriorityLevel } from '@/domain/dayItem';
+import { newId } from '@/domain/id';
 
 const DEFAULT_EVENT_START_MINUTES = 16 * 60 + 30; // 4:30 PM, mismo default que antes
 
@@ -184,7 +185,7 @@ export function QuickAddSheet() {
 
   const handleSave = async () => {
     const now = new Date().toISOString();
-    const id = `${type}-${Date.now()}`;
+    const id = newId();
     const categoryLabel = category?.label ?? null;
     const categoryColor = category?.color ?? null;
 

@@ -441,6 +441,12 @@ hábitos (`habit_completions`/`isHabitScheduledOn`):
 - **`category`/`categoryColor` de `day_items` son texto copiado al crear el ítem,
   no una referencia.** Renombrar/recolorear una categoría no actualiza ítems
   existentes, y borrarla los deja con el texto huérfano (se sigue mostrando).
+  Desde `feature/pro-sync` (SYNC_ROADMAP.md, Fase 1) existe además
+  `day_items.category_id` (referencia real a `categories.id`, resuelto por
+  nombre en `dayItemRepository.upsert` + backfill en `db.ts`) — por ahora es
+  solo bookkeeping para la Fase 4 (compartir), **no cambia nada de lo de
+  arriba todavía**: lo que se muestra en pantalla sigue siendo el texto
+  copiado.
 - **`store/categoriesStore.ts`**: `categories` + `usage` (`{pending, total}`
   agrupado en memoria desde `listCategoryUsage()`). Se carga al arrancar
   (`_layout.tsx`) y al abrir la gestión.

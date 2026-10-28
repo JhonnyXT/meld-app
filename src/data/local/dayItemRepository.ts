@@ -1,10 +1,14 @@
 import { eq, and, ne, lt, isNull, isNotNull, gte, lte, like, asc } from 'drizzle-orm';
 import { db } from './db';
-import { dayItems, habitCompletions, taskCompletions } from './schema';
+import { dayItems, habitCompletions, taskCompletions, categories } from './schema';
 import type { DayItem } from '@/domain/dayItem';
 
 type Row = typeof dayItems.$inferSelect;
 type NewRow = typeof dayItems.$inferInsert;
+
+/** Toda query de lectura excluye lo borrado lógicamente (SYNC_ROADMAP.md,
+ * Fase 1) — se combina con `and(...)` en cada `where`. */
+const notDeleted = isNull(dayItems.deletedAt);
 
 function toDomain(row: Row): DayItem {
   return {
@@ -39,7 +43,20 @@ function toDomain(row: Row): DayItem {
   } as DayItem;
 }
 
-function toRow(item: DayItem): NewRow {
+/** Resuelve `categoryId` (referencia real a `categories.id`) a partir del
+ * nombre copiado en `item.category` — mismo criterio que el backfill de
+ * `db.ts`. No se expone en el tipo `DayItem` del dominio (es bookkeeping de
+ * sync, no un campo de negocio); vive solo acá, en el borde con SQLite. Si
+ * el nombre no matchea ninguna categoría viva (se borró, o el ítem nunca
+ * tuvo una), queda `null` — `category`/`categoryColor` siguen siendo la
+ * fuente de lectura real hasta que algo (Fase 4) empiece a resolver por id. */
+async function resolveCategoryId(label: string | null): Promise<string | null> {
+  if (!label) return null;
+  const rows = await db.select({ id: categories.id }).from(categories).where(eq(categories.label, label)).limit(1);
+  return rows[0]?.id ?? null;
+}
+
+function toRow(item: DayItem, categoryId: string | null): NewRow {
   const base = {
     id: item.id,
     createdAt: item.createdAt,
@@ -52,6 +69,9 @@ function toRow(item: DayItem): NewRow {
     status: item.status,
     type: item.type,
     priority: item.priority,
+    categoryId,
+    deletedAt: null,
+    syncState: 'pending' as const,
   };
 
   switch (item.type) {
@@ -81,7 +101,7 @@ function toRow(item: DayItem): NewRow {
 
 export const dayItemRepository = {
   async listByDate(date: string): Promise<DayItem[]> {
-    const rows = await db.select().from(dayItems).where(eq(dayItems.date, date));
+    const rows = await db.select().from(dayItems).where(and(eq(dayItems.date, date), notDeleted));
     return rows.map(toDomain);
   },
 
@@ -105,6 +125,7 @@ export const dayItemRepository = {
           eq(dayItems.status, 'scheduled'),
           lt(dayItems.date, beforeDateKey),
           isNull(dayItems.repeatRule),
+          notDeleted,
         ),
       );
     return rows.map(toDomain);
@@ -114,7 +135,7 @@ export const dayItemRepository = {
     const rows = await db
       .select()
       .from(dayItems)
-      .where(and(gte(dayItems.date, startKey), lte(dayItems.date, endKey)));
+      .where(and(gte(dayItems.date, startKey), lte(dayItems.date, endKey), notDeleted));
     return rows.map(toDomain);
   },
 
@@ -122,7 +143,7 @@ export const dayItemRepository = {
     const rows = await db
       .select()
       .from(dayItems)
-      .where(and(isNull(dayItems.date), eq(dayItems.status, 'inbox')));
+      .where(and(isNull(dayItems.date), eq(dayItems.status, 'inbox'), notDeleted));
     return rows.map(toDomain);
   },
 
@@ -132,7 +153,7 @@ export const dayItemRepository = {
     const rows = await db
       .select()
       .from(dayItems)
-      .where(like(dayItems.title, `%${trimmed}%`))
+      .where(and(like(dayItems.title, `%${trimmed}%`), notDeleted))
       .orderBy(asc(dayItems.date));
     return rows.map(toDomain);
   },
@@ -144,7 +165,7 @@ export const dayItemRepository = {
     const rows = await db
       .select()
       .from(dayItems)
-      .where(and(isNotNull(dayItems.reminderAt), gte(dayItems.reminderAt, nowIso)))
+      .where(and(isNotNull(dayItems.reminderAt), gte(dayItems.reminderAt, nowIso), notDeleted))
       .orderBy(asc(dayItems.reminderAt));
     return rows.map(toDomain);
   },
@@ -156,26 +177,38 @@ export const dayItemRepository = {
     const rows = await db
       .selectDistinct({ title: dayItems.title })
       .from(dayItems)
-      .where(eq(dayItems.type, 'habit'))
+      .where(and(eq(dayItems.type, 'habit'), notDeleted))
       .orderBy(asc(dayItems.title));
     return rows.map((r) => r.title);
   },
 
   async getById(id: string): Promise<DayItem | null> {
-    const rows = await db.select().from(dayItems).where(eq(dayItems.id, id)).limit(1);
+    const rows = await db.select().from(dayItems).where(and(eq(dayItems.id, id), notDeleted)).limit(1);
     return rows[0] ? toDomain(rows[0]) : null;
   },
 
   async upsert(item: DayItem): Promise<void> {
-    const row = toRow(item);
+    const categoryId = await resolveCategoryId(item.category);
+    const row = toRow(item, categoryId);
     await db
       .insert(dayItems)
       .values(row)
       .onConflictDoUpdate({ target: dayItems.id, set: row });
   },
 
+  /** Borrado lógico (SYNC_ROADMAP.md, Fase 1) — marca `deleted_at` en vez de
+   * eliminar la fila, para que un futuro respaldo en la nube sepa que hay
+   * que borrarla también ahí. Sin nube todavía, el efecto visible es el
+   * mismo de siempre (todas las queries excluyen `deleted_at`). El historial
+   * de completados (hábito/task que repite) SÍ se borra físico: una vez que
+   * el ítem dueño desaparece, nadie necesita enterarse día por día de que
+   * sus completados también desaparecieron. */
   async remove(id: string): Promise<void> {
-    await db.delete(dayItems).where(eq(dayItems.id, id));
+    const now = new Date().toISOString();
+    await db
+      .update(dayItems)
+      .set({ deletedAt: now, updatedAt: now, syncState: 'pending' })
+      .where(eq(dayItems.id, id));
     await db.delete(habitCompletions).where(eq(habitCompletions.habitId, id));
     await db.delete(taskCompletions).where(eq(taskCompletions.taskId, id));
   },
@@ -191,23 +224,38 @@ export const dayItemRepository = {
     const rows = await db
       .select()
       .from(dayItems)
-      .where(and(eq(dayItems.type, 'habit'), ne(dayItems.status, 'inbox')));
+      .where(and(eq(dayItems.type, 'habit'), ne(dayItems.status, 'inbox'), notDeleted));
     return rows.map(toDomain);
   },
 
-  /** Alterna (inserta/borra) el registro de "hecho" de un hábito para `date`.
-   * Devuelve el nuevo estado (`true` = quedó marcado como hecho). */
+  /** Alterna (marca hecho/deshecho) el registro de "hecho" de un hábito para
+   * `date`. El id es determinístico (`${habitId}-${date}`), así que
+   * desmarcar y volver a marcar el mismo día reutiliza la misma fila
+   * (limpia `deleted_at` en vez de insertar una nueva) — necesario porque,
+   * a diferencia de borrar el ítem entero, acá sí puede volver a marcarse
+   * (SYNC_ROADMAP.md, Fase 1: desmarcar es un tombstone, no un borrado
+   * físico, para que la nube se entere). Devuelve el nuevo estado (`true` =
+   * quedó marcado como hecho). */
   async toggleHabitCompletion(habitId: string, date: string): Promise<boolean> {
-    const existing = await db
-      .select()
-      .from(habitCompletions)
-      .where(and(eq(habitCompletions.habitId, habitId), eq(habitCompletions.date, date)))
-      .limit(1);
-    if (existing.length > 0) {
-      await db.delete(habitCompletions).where(eq(habitCompletions.id, existing[0].id));
+    const id = `${habitId}-${date}`;
+    const now = new Date().toISOString();
+    const existing = await db.select().from(habitCompletions).where(eq(habitCompletions.id, id)).limit(1);
+    const isActive = existing.length > 0 && !existing[0].deletedAt;
+    if (isActive) {
+      await db
+        .update(habitCompletions)
+        .set({ deletedAt: now, updatedAt: now, syncState: 'pending' })
+        .where(eq(habitCompletions.id, id));
       return false;
     }
-    await db.insert(habitCompletions).values({ id: `${habitId}-${date}`, habitId, date });
+    if (existing.length > 0) {
+      await db
+        .update(habitCompletions)
+        .set({ deletedAt: null, updatedAt: now, syncState: 'pending' })
+        .where(eq(habitCompletions.id, id));
+    } else {
+      await db.insert(habitCompletions).values({ id, habitId, date, updatedAt: now, syncState: 'pending' });
+    }
     return true;
   },
 
@@ -222,6 +270,7 @@ export const dayItemRepository = {
           eq(habitCompletions.habitId, habitId),
           gte(habitCompletions.date, fromDate),
           lte(habitCompletions.date, toDate),
+          isNull(habitCompletions.deletedAt),
         ),
       );
     return rows.map((r) => r.date);
@@ -236,7 +285,9 @@ export const dayItemRepository = {
     const rows = await db
       .select()
       .from(habitCompletions)
-      .where(and(gte(habitCompletions.date, fromDate), lte(habitCompletions.date, toDate)));
+      .where(
+        and(gte(habitCompletions.date, fromDate), lte(habitCompletions.date, toDate), isNull(habitCompletions.deletedAt)),
+      );
     return rows.map((r) => ({ habitId: r.habitId, date: r.date }));
   },
 
@@ -250,24 +301,33 @@ export const dayItemRepository = {
     const rows = await db
       .select()
       .from(dayItems)
-      .where(and(eq(dayItems.type, 'task'), isNotNull(dayItems.repeatRule), ne(dayItems.status, 'inbox')));
+      .where(and(eq(dayItems.type, 'task'), isNotNull(dayItems.repeatRule), ne(dayItems.status, 'inbox'), notDeleted));
     return rows.map(toDomain);
   },
 
-  /** Alterna (inserta/borra) el registro de "hecho" de una task que repite
-   * para `date` — mismo patrón que `toggleHabitCompletion`. Una task sin
-   * `repeatRule` nunca pasa por acá, sigue usando `status` directo. */
+  /** Alterna (marca hecho/deshecho) el registro de "hecho" de una task que
+   * repite para `date` — mismo patrón que `toggleHabitCompletion`. Una task
+   * sin `repeatRule` nunca pasa por acá, sigue usando `status` directo. */
   async toggleTaskCompletion(taskId: string, date: string): Promise<boolean> {
-    const existing = await db
-      .select()
-      .from(taskCompletions)
-      .where(and(eq(taskCompletions.taskId, taskId), eq(taskCompletions.date, date)))
-      .limit(1);
-    if (existing.length > 0) {
-      await db.delete(taskCompletions).where(eq(taskCompletions.id, existing[0].id));
+    const id = `${taskId}-${date}`;
+    const now = new Date().toISOString();
+    const existing = await db.select().from(taskCompletions).where(eq(taskCompletions.id, id)).limit(1);
+    const isActive = existing.length > 0 && !existing[0].deletedAt;
+    if (isActive) {
+      await db
+        .update(taskCompletions)
+        .set({ deletedAt: now, updatedAt: now, syncState: 'pending' })
+        .where(eq(taskCompletions.id, id));
       return false;
     }
-    await db.insert(taskCompletions).values({ id: `${taskId}-${date}`, taskId, date });
+    if (existing.length > 0) {
+      await db
+        .update(taskCompletions)
+        .set({ deletedAt: null, updatedAt: now, syncState: 'pending' })
+        .where(eq(taskCompletions.id, id));
+    } else {
+      await db.insert(taskCompletions).values({ id, taskId, date, updatedAt: now, syncState: 'pending' });
+    }
     return true;
   },
 
@@ -277,7 +337,14 @@ export const dayItemRepository = {
     const rows = await db
       .select()
       .from(taskCompletions)
-      .where(and(eq(taskCompletions.taskId, taskId), gte(taskCompletions.date, fromDate), lte(taskCompletions.date, toDate)));
+      .where(
+        and(
+          eq(taskCompletions.taskId, taskId),
+          gte(taskCompletions.date, fromDate),
+          lte(taskCompletions.date, toDate),
+          isNull(taskCompletions.deletedAt),
+        ),
+      );
     return rows.map((r) => r.date);
   },
 
@@ -291,7 +358,7 @@ export const dayItemRepository = {
     const rows = await db
       .select({ category: dayItems.category, status: dayItems.status })
       .from(dayItems)
-      .where(isNotNull(dayItems.category));
+      .where(and(isNotNull(dayItems.category), notDeleted));
     return rows.map((r) => ({ category: r.category!, status: r.status }));
   },
 };

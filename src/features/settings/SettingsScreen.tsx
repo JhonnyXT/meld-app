@@ -25,6 +25,7 @@ import { useDayItemsStore } from '@/store/dayItemsStore';
 import { toDateKey } from '@/domain/date';
 import { trialDaysLeft } from '@/domain/trial';
 import { isDev, isTest } from '@/constants/appVariant';
+import { newId } from '@/domain/id';
 
 const THEME_LABEL_KEY: Record<ThemePreference, TranslationKey> = {
   system: 'themeSystem',
@@ -94,7 +95,7 @@ export function SettingsScreen() {
   const handleTestReminder = async () => {
     const now = new Date();
     const item = {
-      id: `task-test-${now.getTime()}`,
+      id: newId(),
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
       date: toDateKey(now),

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
+import { newId } from '@/domain/id';
 import type { DayItem } from '@/domain/dayItem';
 import { cancelReminderNotification, syncReminderNotification } from '@/services/notifications';
 import { toDateKey } from '@/domain/date';
@@ -56,7 +57,7 @@ export const useInboxStore = create<InboxState>((set, get) => ({
     if (!trimmed) return;
     const now = new Date().toISOString();
     const item: DayItem = {
-      id: `task-${Date.now()}`,
+      id: newId(),
       createdAt: now,
       updatedAt: now,
       date: null,

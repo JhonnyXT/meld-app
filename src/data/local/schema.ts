@@ -48,6 +48,18 @@ export const dayItems = sqliteTable('day_items', {
   // Moment
   mediaUri: text('media_uri'),
   weekOfYear: integer('week_of_year'),
+
+  // Sync (SYNC_ROADMAP.md, Fase 1). `categoryId` es la referencia real a
+  // `categories.id` — `category`/`categoryColor` de arriba se conservan como
+  // texto copiado (fallback de lectura si la categoría se borró o para
+  // ítems viejos sin `categoryId`, ver `dayItemRepository`). `deletedAt` es
+  // un borrado lógico (tombstone): sin nube todavía no cambia nada visible,
+  // pero todas las queries ya lo excluyen para no tener que tocarlas de
+  // nuevo cuando exista el respaldo. `syncState` queda sin usar hasta la
+  // Fase 3 (no hay a qué sincronizar todavía).
+  categoryId: text('category_id'),
+  deletedAt: text('deleted_at'),
+  syncState: text('sync_state', { enum: ['synced', 'pending'] }).notNull().default('pending'),
 });
 
 /** Un registro por día que un hábito se marcó como hecho. Es la fuente real
@@ -59,6 +71,11 @@ export const habitCompletions = sqliteTable('habit_completions', {
   id: text('id').primaryKey(),
   habitId: text('habit_id').notNull(),
   date: text('date').notNull(),
+  // Sync (Fase 1) — ver el comentario de `dayItems`. `id` ya es determinístico
+  // (`${habitId}-${date}`), así que no hace falta UUID acá.
+  updatedAt: text('updated_at'),
+  deletedAt: text('deleted_at'),
+  syncState: text('sync_state', { enum: ['synced', 'pending'] }),
 });
 
 /** Un registro por día que una task QUE REPITE (`repeatRule` no null) se
@@ -69,17 +86,25 @@ export const taskCompletions = sqliteTable('task_completions', {
   id: text('id').primaryKey(),
   taskId: text('task_id').notNull(),
   date: text('date').notNull(),
+  // Sync (Fase 1) — ver el comentario de `habitCompletions`.
+  updatedAt: text('updated_at'),
+  deletedAt: text('deleted_at'),
+  syncState: text('sync_state', { enum: ['synced', 'pending'] }),
 });
 
 /** Catálogo de categorías configurable por el usuario (Ajustes > Categorías,
  * ver `domain/category.ts`) — reemplaza la lista fija que vivía en
  * `domain/quickAdd.ts`. `category`/`categoryColor` en `day_items` siguen
- * siendo texto copiado al crear el ítem, no una referencia real a esta
- * tabla. */
+ * siendo texto copiado al crear el ítem; `dayItemRepository` también
+ * resuelve y guarda `categoryId` (ver Fase 1 del roadmap de sync). */
 export const categories = sqliteTable('categories', {
   id: text('id').primaryKey(),
   label: text('label').notNull(),
   icon: text('icon').notNull(),
   color: text('color').notNull(),
   sortOrder: integer('sort_order').notNull().default(0),
+  // Sync (Fase 1) — ver el comentario de `dayItems`.
+  updatedAt: text('updated_at'),
+  deletedAt: text('deleted_at'),
+  syncState: text('sync_state', { enum: ['synced', 'pending'] }),
 });

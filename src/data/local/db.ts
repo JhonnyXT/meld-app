@@ -6,6 +6,19 @@ const sqlite = openDatabaseSync('meld.db');
 
 export const db = drizzle(sqlite, { schema });
 
+/** Agrega una columna si no existe. SQLite no soporta "ADD COLUMN IF NOT
+ * EXISTS": el `catch` absorbe "duplicate column name", que es el caso
+ * esperado en la mayoría de los arranques (ya corrió antes). Usado para
+ * migrar dispositivos con datos previos; una instalación nueva ya la trae
+ * en el `CREATE TABLE`. */
+function addColumnIfMissing(table: string, columnDdl: string) {
+  try {
+    sqlite.execSync(`ALTER TABLE ${table} ADD COLUMN ${columnDdl};`);
+  } catch {
+    // Columna ya existe — no-op.
+  }
+}
+
 export function initDb() {
   sqlite.execSync(`
     CREATE TABLE IF NOT EXISTS day_items (
@@ -35,44 +48,57 @@ export function initDb() {
       audio_file_uri TEXT,
       duration_seconds REAL,
       media_uri TEXT,
-      week_of_year INTEGER
+      week_of_year INTEGER,
+      category_id TEXT,
+      deleted_at TEXT,
+      sync_state TEXT NOT NULL DEFAULT 'pending'
     );
   `);
   sqlite.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_date ON day_items(date);');
   sqlite.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_status ON day_items(status);');
+  sqlite.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_category_id ON day_items(category_id);');
 
-  // Migración liviana: SQLite no soporta "ADD COLUMN IF NOT EXISTS", y el
-  // `CREATE TABLE IF NOT EXISTS` de arriba no agrega columnas nuevas a una
-  // tabla ya existente en un dispositivo con datos previos — por eso este
-  // `ALTER TABLE` envuelto en try/catch (falla con "duplicate column name" si
-  // ya corrió antes, que es el caso esperado en la mayoría de los arranques).
-  try {
-    sqlite.execSync('ALTER TABLE day_items ADD COLUMN health_metric_target REAL;');
-  } catch {
-    // Columna ya existe — no-op.
-  }
+  addColumnIfMissing('day_items', 'health_metric_target REAL');
+  // Sync (SYNC_ROADMAP.md, Fase 1) — dispositivos con datos previos a estas
+  // 3 columnas. `sync_state` necesita un DEFAULT porque la columna queda
+  // NOT NULL (SQLite exige uno para agregar NOT NULL a una tabla con filas).
+  addColumnIfMissing('day_items', 'category_id TEXT');
+  addColumnIfMissing('day_items', 'deleted_at TEXT');
+  addColumnIfMissing('day_items', "sync_state TEXT NOT NULL DEFAULT 'pending'");
 
   sqlite.execSync(`
     CREATE TABLE IF NOT EXISTS habit_completions (
       id TEXT PRIMARY KEY NOT NULL,
       habit_id TEXT NOT NULL,
-      date TEXT NOT NULL
+      date TEXT NOT NULL,
+      updated_at TEXT,
+      deleted_at TEXT,
+      sync_state TEXT
     );
   `);
   sqlite.execSync(
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_habit_completions_habit_date ON habit_completions(habit_id, date);',
   );
+  addColumnIfMissing('habit_completions', 'updated_at TEXT');
+  addColumnIfMissing('habit_completions', 'deleted_at TEXT');
+  addColumnIfMissing('habit_completions', 'sync_state TEXT');
 
   sqlite.execSync(`
     CREATE TABLE IF NOT EXISTS task_completions (
       id TEXT PRIMARY KEY NOT NULL,
       task_id TEXT NOT NULL,
-      date TEXT NOT NULL
+      date TEXT NOT NULL,
+      updated_at TEXT,
+      deleted_at TEXT,
+      sync_state TEXT
     );
   `);
   sqlite.execSync(
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_task_completions_task_date ON task_completions(task_id, date);',
   );
+  addColumnIfMissing('task_completions', 'updated_at TEXT');
+  addColumnIfMissing('task_completions', 'deleted_at TEXT');
+  addColumnIfMissing('task_completions', 'sync_state TEXT');
 
   sqlite.execSync(`
     CREATE TABLE IF NOT EXISTS categories (
@@ -80,9 +106,16 @@ export function initDb() {
       label TEXT NOT NULL,
       icon TEXT NOT NULL,
       color TEXT NOT NULL,
-      sort_order INTEGER NOT NULL DEFAULT 0
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT,
+      deleted_at TEXT,
+      sync_state TEXT
     );
   `);
+  addColumnIfMissing('categories', 'updated_at TEXT');
+  addColumnIfMissing('categories', 'deleted_at TEXT');
+  addColumnIfMissing('categories', 'sync_state TEXT');
+
   // 3 categorías por default, una sola vez (tabla vacía = primer arranque o
   // instalación nueva) — a partir de ahí son filas normales, el usuario
   // puede renombrarlas/recolorearlas/borrarlas como a cualquier otra.
@@ -95,4 +128,15 @@ export function initDb() {
         ('cat-health', 'Health', 'favorite', '#5dde97', 2);
     `);
   }
+
+  // Backfill de `category_id` (SYNC_ROADMAP.md, Fase 1): ítems creados antes
+  // de esta columna solo tienen el texto copiado (`category`). Se resuelve
+  // por nombre contra la tabla de categorías — idempotente (una vez resuelto
+  // un ítem, `category_id IS NULL` deja de incluirlo en corridas futuras), y
+  // barato incluso en cada arranque dado el volumen de esta app.
+  sqlite.execSync(`
+    UPDATE day_items
+    SET category_id = (SELECT id FROM categories WHERE categories.label = day_items.category LIMIT 1)
+    WHERE category_id IS NULL AND category IS NOT NULL;
+  `);
 }
