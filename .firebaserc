@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "demo-meld"
+    "default": "demo-meld",
+    "test": "meld-test-b197c",
+    "prod": "meld-prod-d6b61"
   }
 }

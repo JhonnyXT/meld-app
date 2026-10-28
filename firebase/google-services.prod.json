@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "248457116448",
+    "project_id": "meld-prod-d6b61",
+    "storage_bucket": "meld-prod-d6b61.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:248457116448:android:4016a35a47ff2c3d8ef545",
+        "android_client_info": {
+          "package_name": "app.meld"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "248457116448-fgr2lflok7tv890qk15jd5mppoig3s8u.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmgC5-CTNW4kapoeQ1gGhzJ7ZwPpGnCuo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "248457116448-fgr2lflok7tv890qk15jd5mppoig3s8u.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

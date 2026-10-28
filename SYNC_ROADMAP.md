@@ -207,9 +207,16 @@ desmarcar un hábito (reutiliza su id determinístico) y crear/editar una tarea.
   competir con él. Verificado de punta a punta: `npm run test:rules` levanta el emulador, aplica
   `firestore.rules`, corre los 2 tests y lo apaga limpio (sin puertos huérfanos).
 - [x] **Reglas de Firestore que niegan todo** — hecho arriba, como parte del mismo paso.
-- [ ] Proyectos reales `meld-test` y `meld-prod` en la consola de Firebase (pendiente: lo hace el
-  usuario, requiere su cuenta de Google — ver pasos abajo). El emulador de `dev` ya no depende de
-  esto.
+- [x] **Proyectos reales en la consola de Firebase** (2026-10-28, hecho por el usuario):
+  `meld-test-b197c` (`app.meld.mobile.test`) y `meld-prod-d6b61` (`app.meld`). Firestore edición
+  Standard, `(default)`, región `nam5`, modo producción (deny-all, mismo punto de partida que
+  `firestore.rules`). App Android registrada en cada uno con el SHA-1 de la debug keystore de
+  este entorno (`9E:D3:E1:9D:E8:73:69:9E:0F:1D:22:5E:BE:4E:B6:59:13:7F:DB:41`) — falta sumar el
+  SHA-1 de las keystores de EAS (`eas credentials`) cuando el usuario haga `eas login`.
+  `google-services.test.json`/`google-services.prod.json` descargados a `firebase/` (no son
+  secretos, van embebidos en el APK — se committean, mismo patrón que `my-wallet-app`).
+  **Pendiente de confirmar**: Authentication → Sign-in method → Google habilitado en los dos
+  proyectos (no confirmado todavía en esta conversación).
 - [ ] `@react-native-firebase/app`/`auth`/`firestore` + `@react-native-google-signin/google-signin`
   (dependencias nativas: `prebuild --clean` + rebuild), `google-services.json` por variant.
 - [ ] Ajustes → **Cuenta**: iniciar sesión, cerrar sesión, eliminar cuenta. Sin paso en el
