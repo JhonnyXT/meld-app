@@ -178,12 +178,24 @@ dispositivo con datos previos — corregido reordenando `db.ts`). Probado tambi�
 desmarcar un hábito (reutiliza su id determinístico) y crear/editar una tarea.
 
 ### Fase 2 — Firebase + cuentas con Google · M
-- [ ] **Instalar Jest** (`firebase-tools` + `@firebase/rules-unit-testing` para el emulador,
-  mismo paquete que usa My Wallet). Meld hoy no tiene NINGÚN framework de tests (ni la app ni
-  `landing/`) — se verificó todo a mano en la Fase 1. A partir de acá, lo que entra a
-  `src/sync/` y a `firestore.rules` sí necesita tests: son las dos cosas más fáciles de romper
-  sin darse cuenta y más caras de debuggear a mano en un dispositivo. El resto del código (UI,
-  domain) sigue sin tests por ahora, no hace falta migrar todo de una vez.
+- [x] **Instalar Jest** (2026-10-28): `jest`/`@types/jest`/`babel-jest`/`@types/node` +
+  `jest.config.js` (mismo patrón que My Wallet: `testMatch` en `*.test.ts`, mock de
+  `expo-crypto` vía `moduleNameMapper` porque es un módulo nativo que Jest-en-Node no puede
+  cargar, `landing/`/`android/`/`ios/` ignorados). `npm test` corre la suite. Agregado
+  `"types": ["node", "jest"]` al `tsconfig.json` — sin eso, TypeScript 6.0.3 (a diferencia de
+  My Wallet, en 5.9.x) no incluía los globals ambient de `@types/node`/`@types/jest`
+  automáticamente y `tsc --noEmit` fallaba con "Cannot find name 'it'/'expect'/`__dirname`".
+  Agregado `src/sync/sync.boundary.test.ts` (guardia de la Regla #3) con solo el primer `it` de
+  My Wallet — el segundo (que confirma que `src/sync/` sí importa Firebase) se suma recién
+  cuando ese directorio tenga código real, para no dejar un test que siempre falla mientras
+  `src/sync/` está vacío.
+  Meld hoy no tiene NINGÚN OTRO framework de tests (ni la app ni `landing/`) — se verificó todo
+  a mano en la Fase 1. A partir de acá, lo que entra a `src/sync/` y a `firestore.rules` sí
+  necesita tests: son las dos cosas más fáciles de romper sin darse cuenta y más caras de
+  debuggear a mano en un dispositivo. El resto del código (UI, domain) sigue sin tests por
+  ahora, no hace falta migrar todo de una vez.
+- [ ] `firebase-tools` + `@firebase/rules-unit-testing` para el emulador (mismo paquete que usa
+  My Wallet) — todavía no instalado, es el próximo paso de esta fase.
 - [ ] Proyectos `meld-test` y `meld-prod`, Firestore con reglas que niegan todo; emulador para
   `dev` (JDK 21, igual que My Wallet).
 - [ ] `@react-native-firebase/app`/`auth`/`firestore` + `@react-native-google-signin/google-signin`
