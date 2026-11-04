@@ -240,9 +240,11 @@ desmarcar un hábito (reutiliza su id determinístico) y crear/editar una tarea.
   `expo-build-properties` (ya la pedía el resto del árbol, sin relación con este bug puntual).
   Build `assembleDebug` verde, instalado y probado en un Samsung S24 Ultra (no en el Moto E7
   Plus de siempre — dispositivo distinto en esta sesión): la app abre con los datos reales del
-  usuario sin crashear. **Pendiente de confirmar por el usuario**: que Ajustes → Cuenta
-  renderiza y el botón de iniciar sesión no rompe nada (los toques por `adb` no llegaban a la
-  pantalla en este dispositivo, a diferencia del Moto E7 Plus — verificación manual pendiente).
+  usuario sin crashear. **Confirmado por el usuario** (verificación manual — los toques por
+  `adb` no llegaban a la pantalla en este dispositivo): Ajustes → Cuenta renderiza, y tocar
+  "Iniciar sesión con Google" abre el selector de cuentas nativo — confirma
+  `GoogleSignin.configure({ webClientId })` + Play Services + el SDK nativo de punta a punta,
+  sin elegir cuenta todavía (eso depende del emulador de Auth, próximo paso).
 
 **Hecho cuando:** login, cierre de sesión y eliminación de cuenta funcionan en `dev` con el
 emulador, sin tocar los datos locales.
