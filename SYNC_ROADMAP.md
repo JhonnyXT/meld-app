@@ -259,18 +259,43 @@ desmarcar un hábito (reutiliza su id determinístico) y crear/editar una tarea.
 **Hecho cuando:** login, cierre de sesión y eliminación de cuenta funcionan en `dev` con el
 emulador, sin tocar los datos locales.
 
-### Fase 3 — Respaldo en la nube · L
-- [ ] Push de todo lo marcado ✅ en el inventario; primera subida al iniciar sesión (traer → unir
-  → subir).
-- [ ] Pull en los disparadores de arriba; reprogramar notificaciones y refrescar widgets al bajar.
-- [ ] Restaurar en un teléfono nuevo: inicia sesión → trae todo → salta el onboarding.
-- [ ] Estado en Ajustes → Cuenta ("Respaldado hace…", "N cambios pendientes").
-- [ ] Cerrar sesión con Mantener / Borrar (T8); eliminar cuenta borra `users/{uid}`.
-- [ ] `pickWinner` (resolución de conflictos, `updatedAt`/tombstone) como función pura + tests
-  Jest (sin red) — mismo patrón que `my-wallet-app/src/utils/syncMerge.ts`.
-- [ ] Reglas de `users/{uid}` + tests Jest contra el emulador (`npm run test:rules`).
-- [ ] Gating: solo Pro (o prueba) sube. Mientras no haya RevenueCat, usar `settingsStore.plan`
-  detrás de un flag de `dev`/`test`.
+### Fase 3 — Respaldo en la nube · L (en curso, 2026-11-04)
+- [x] `pickWinner` (resolución de conflictos, `updatedAt`/tombstone) como función pura + tests
+  Jest — `src/sync/merge.ts`, sobre ISO strings (no epoch ms como `my-wallet-app`, ver el
+  comentario del archivo).
+- [x] Reglas de `users/{uid}` + tests Jest contra el emulador (`npm run test:rules`): el dueño
+  lee/escribe cualquier subcolección (`items`/`habitCompletions`/`taskCompletions`/`categories`),
+  nadie más — ni otro usuario autenticado ni sin sesión. `spaces/**` (Fase 4) sigue denegado.
+- [x] Push de todo lo marcado ✅ en el inventario (items, `habitCompletions`, `taskCompletions`,
+  categorías) — `src/sync/engine.ts` → `push()`, lee `sync_state = 'pending'` directo de SQLite
+  (Fase 1 ya lo mantiene al día, no hace falta un mapa de versiones subidas aparte como en
+  `my-wallet-app`). Primera subida al iniciar sesión vía `startSync()` → `onAuthStateChanged`.
+- [x] Pull en los disparadores (sesión iniciada, primer plano cada 30s, `syncNow()` manual):
+  decide con `pickWinner`, aplica en SQLite como `synced` (no vuelve a subir lo recién bajado),
+  reprograma notificaciones (`syncReminderNotification`/`cancelReminderNotification`) y refresca
+  widgets. Cambios locales disparan solo subida, con 3s de espera para agrupar (vía
+  `src/data/local/localChanges.ts`, nuevo — pub-sub de "algo cambió en SQLite" para que
+  `src/sync/` sepa sin que los repositorios importen Firebase).
+- [x] Estado en Ajustes → Cuenta: fila "Respaldado hace…"/"Sincronizando…"/"Sin conexión"/"N
+  cambios sin subir", tocarla sincroniza ya (`syncNow()`).
+- [x] Eliminar cuenta borra `users/{uid}` completo (`deleteAllUserData`) antes de borrar el
+  usuario de Firebase Auth.
+- [x] Gating: `push()` exige `settingsStore.plan === 'pro'` (incluye la prueba simulada); `pull()`
+  corre siempre, sin plan, para que alguien que tuvo Pro no pierda acceso a lo ya respaldado.
+- [ ] **Pendiente, alcance recortado a propósito** (documentado para no perder de vista, no son
+  bugs): los Ajustes visuales (tema/idioma/espaciado/estilo de completado) y
+  `onboardingCompleted` **todavía no sincronizan** — "restaurar en un teléfono nuevo" trae los
+  items/hábitos/categorías pero el onboarding no se saltea solo todavía. Hace falta un
+  `updatedAt` propio en `settingsStore` (no existe hoy) + un doc `users/{uid}/settings/app`, igual
+  al borrador del modelo en Firestore más arriba — tamaño mediano, se puede hacer aparte sin
+  tocar nada de lo de items.
+- [ ] **Cerrar sesión con Mantener / Borrar (T8)** — todavía no implementado: cerrar sesión hoy
+  (`signOut`, Fase 2) nunca toca los datos locales, que es el comportamiento más seguro mientras
+  no esté esto. Falta la pregunta "Mantener / Borrar de este teléfono" + el wipeo real
+  (bloqueado si `pendingChanges() > 0`, igual que `my-wallet-app`).
+- [ ] **Verificación real en dispositivo** — todo lo de arriba compila (`tsc`) y pasa Jest/reglas,
+  pero el flujo completo de push→pull entre dos teléfonos (o reinstalar y restaurar) todavía no
+  se probó con la app corriendo. Próximo paso antes de dar la fase por cerrada.
 
 **Hecho cuando:** desinstalar, reinstalar, iniciar sesión y ver exactamente lo mismo; y lo creado
 en modo avión aparece en la nube al volver la conexión.

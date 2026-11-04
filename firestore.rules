@@ -1,11 +1,16 @@
 rules_version = '2';
 
-// Sync (SYNC_ROADMAP.md). Fase 2: niega todo — todavía no hay nada que leer o escribir en
-// Firestore. Las reglas reales de users/{uid} llegan en la Fase 3, y spaces/{id}/inviteCodes en
-// la Fase 4 (diseño de referencia en my-wallet-app/firestore.rules). Tests:
-// firestore-tests/rules.test.ts (npm run test:rules).
+// Sync (SYNC_ROADMAP.md). Fase 3: cada usuario solo lee y escribe lo suyo, bajo users/{uid} (las
+// subcolecciones son items/habitCompletions/taskCompletions/categories, ver src/sync/mappers.ts
+// -> COLLECTION_PATH). spaces/{id}/inviteCodes llegan en la Fase 4 (diseño de referencia en
+// my-wallet-app/firestore.rules). Todo lo demás se niega. Tests: firestore-tests/rules.test.ts
+// (npm run test:rules).
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
