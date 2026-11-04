@@ -6,7 +6,8 @@ rama `feature/pro-sync`; `main` sigue 100% local y es lo que va a los testers de
 Adaptado del diseño ya probado en `my-wallet-app` (`SYNC_ROADMAP.md` de ese repo). Decisiones de
 producto en `docs/decisions.md` (2026-10-27).
 
-**Estado:** Fase 0 (este documento). Nada implementado todavía.
+**Estado:** Fase 2 completa (2026-11-03) — login con Google funcionando de punta a punta contra
+el emulador de `dev`. Sigue la Fase 3 (respaldo en la nube).
 
 ---
 
@@ -177,7 +178,7 @@ category_id" (bug real: el índice de `category_id` se creaba antes de agregar l
 dispositivo con datos previos — corregido reordenando `db.ts`). Probado también: completar/
 desmarcar un hábito (reutiliza su id determinístico) y crear/editar una tarea.
 
-### Fase 2 — Firebase + cuentas con Google · M
+### Fase 2 — Firebase + cuentas con Google · M ✅ (2026-11-03)
 - [x] **Instalar Jest** (2026-10-28): `jest`/`@types/jest`/`babel-jest`/`@types/node` +
   `jest.config.js` (mismo patrón que My Wallet: `testMatch` en `*.test.ts`, mock de
   `expo-crypto` vía `moduleNameMapper` porque es un módulo nativo que Jest-en-Node no puede
@@ -240,11 +241,20 @@ desmarcar un hábito (reutiliza su id determinístico) y crear/editar una tarea.
   `expo-build-properties` (ya la pedía el resto del árbol, sin relación con este bug puntual).
   Build `assembleDebug` verde, instalado y probado en un Samsung S24 Ultra (no en el Moto E7
   Plus de siempre — dispositivo distinto en esta sesión): la app abre con los datos reales del
-  usuario sin crashear. **Confirmado por el usuario** (verificación manual — los toques por
-  `adb` no llegaban a la pantalla en este dispositivo): Ajustes → Cuenta renderiza, y tocar
-  "Iniciar sesión con Google" abre el selector de cuentas nativo — confirma
-  `GoogleSignin.configure({ webClientId })` + Play Services + el SDK nativo de punta a punta,
-  sin elegir cuenta todavía (eso depende del emulador de Auth, próximo paso).
+  usuario sin crashear.
+  **Login de punta a punta contra el emulador — confirmado (2026-11-03)**: con `npm run
+  emulators` corriendo (puertos propios 9098/8090, `adb reverse` activo), iniciar sesión con
+  Google, cerrar sesión, volver a iniciar sesión y eliminar cuenta funcionan los cuatro,
+  verificados tanto en la UI (la fila de Cuenta cambia de estado en cada paso, el
+  `ConfirmDialog` de eliminar se ve bien) como del lado del servidor (`GET
+  identitytoolkit.googleapis.com/.../accounts:query` contra el emulador: 1 cuenta tras
+  iniciar sesión, 0 tras eliminar). **Bug real encontrado y corregido en el camino**: el
+  primer intento de login tiraba `DEVELOPER_ERROR` (código 10) de Google Sign-In — el SHA-1
+  que se había registrado en Firebase era el de `~/.android/debug.keystore` (la global del
+  sistema), pero `assembleDebug` firma con `android/app/debug.keystore` (local al proyecto,
+  parte de la plantilla de Expo/RN, con una huella distinta:
+  `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`). Corregido agregando esa
+  huella a las apps `app.meld.mobile`/`app.meld.mobile.test` en `meld-test-b197c`.
 
 **Hecho cuando:** login, cierre de sesión y eliminación de cuenta funcionan en `dev` con el
 emulador, sin tocar los datos locales.
