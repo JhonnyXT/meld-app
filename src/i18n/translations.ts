@@ -383,6 +383,14 @@ export const es = {
   settingsAccountSignInSubtitle: 'Opcional — Meld funciona igual sin cuenta',
   settingsAccountSignedInAs: 'Conectado como {email}',
   settingsAccountSignOut: 'Cerrar sesión',
+  settingsAccountSignOutConfirmTitle: '¿Cerrar sesión?',
+  settingsAccountSignOutConfirmMessage:
+    'Tu respaldo en la nube se queda ahí. Elige qué hacer con lo que tienes guardado en este teléfono.',
+  settingsAccountSignOutKeep: 'Mantener en el teléfono',
+  settingsAccountSignOutWipe: 'Borrar de este teléfono',
+  settingsAccountSignOutPendingMessage:
+    'Tienes {count} cambios sin subir — ciérra sesión y se suben la próxima vez que inicies, o espera a que termine de sincronizar. No se puede borrar lo de este teléfono mientras haya cambios sin subir.',
+  settingsAccountSignOutPendingConfirm: 'Cerrar sesión',
   settingsAccountDeleteAccount: 'Eliminar cuenta',
   settingsAccountDeleteConfirmTitle: '¿Eliminar tu cuenta?',
   settingsAccountDeleteConfirmMessage:
@@ -773,6 +781,14 @@ export const en: Record<keyof typeof es, string> = {
   settingsAccountSignInSubtitle: 'Optional — Meld works the same without an account',
   settingsAccountSignedInAs: 'Signed in as {email}',
   settingsAccountSignOut: 'Sign out',
+  settingsAccountSignOutConfirmTitle: 'Sign out?',
+  settingsAccountSignOutConfirmMessage:
+    'Your cloud backup stays put. Choose what to do with what you have saved on this phone.',
+  settingsAccountSignOutKeep: 'Keep on this phone',
+  settingsAccountSignOutWipe: 'Delete from this phone',
+  settingsAccountSignOutPendingMessage:
+    "You have {count} changes not backed up yet — sign out and they upload next time you sign in, or wait for sync to finish. You can't delete what's on this phone while changes are pending.",
+  settingsAccountSignOutPendingConfirm: 'Sign out',
   settingsAccountDeleteAccount: 'Delete account',
   settingsAccountDeleteConfirmTitle: 'Delete your account?',
   settingsAccountDeleteConfirmMessage:

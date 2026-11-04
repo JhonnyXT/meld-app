@@ -3,5 +3,13 @@
 export { signInWithGoogle, signOut, type SessionUser } from './session';
 export { useSession } from './useSession';
 export { AuthError, authErrorMessage, classifyAuthError, type AuthErrorKind } from './errors';
-export { deleteAccountAndCloudData, pendingChanges, requestSync, startSync, syncNow } from './engine';
+export {
+  deleteAccountAndCloudData,
+  pendingChanges,
+  requestSync,
+  signOutAndWipeLocalData,
+  signOutKeepingLocalData,
+  startSync,
+  syncNow,
+} from './engine';
 export { useSyncStatus, type SyncPhase } from './status';

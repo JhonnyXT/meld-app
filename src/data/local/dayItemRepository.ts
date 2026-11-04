@@ -477,17 +477,28 @@ export const habitCompletionSyncRepository = {
       .limit(1);
     return rows[0] ? { updatedAt: rows[0].updatedAt ?? EPOCH, deletedAt: rows[0].deletedAt } : null;
   },
+  // Conflicto por `(habit_id, date)` (el índice único real), no por `id`: `id` es solo una
+  // caché derivada de ese par (ver el comentario de la columna en `schema.ts`), y una fila vieja
+  // con un `id` distinto para el MISMO par (datos de antes de esa convención, o — bug real visto
+  // en dispositivo al probar T8 — un re-seed con un esquema de id distinto) tiraba abajo el pull
+  // entero con "UNIQUE constraint failed" en vez de simplemente fusionarse con la fila local.
   async applyRemoteUpsert(id: string, habitId: string, date: string, updatedAt: string): Promise<void> {
     await db
       .insert(habitCompletions)
       .values({ id, habitId, date, updatedAt, deletedAt: null, syncState: 'synced' })
-      .onConflictDoUpdate({ target: habitCompletions.id, set: { updatedAt, deletedAt: null, syncState: 'synced' } });
+      .onConflictDoUpdate({
+        target: [habitCompletions.habitId, habitCompletions.date],
+        set: { updatedAt, deletedAt: null, syncState: 'synced' },
+      });
   },
   async applyRemoteDelete(id: string, habitId: string, date: string, deletedAt: string): Promise<void> {
     await db
       .insert(habitCompletions)
       .values({ id, habitId, date, updatedAt: deletedAt, deletedAt, syncState: 'synced' })
-      .onConflictDoUpdate({ target: habitCompletions.id, set: { updatedAt: deletedAt, deletedAt, syncState: 'synced' } });
+      .onConflictDoUpdate({
+        target: [habitCompletions.habitId, habitCompletions.date],
+        set: { updatedAt: deletedAt, deletedAt, syncState: 'synced' },
+      });
   },
 };
 
@@ -512,16 +523,23 @@ export const taskCompletionSyncRepository = {
       .limit(1);
     return rows[0] ? { updatedAt: rows[0].updatedAt ?? EPOCH, deletedAt: rows[0].deletedAt } : null;
   },
+  // Mismo criterio que `habitCompletionSyncRepository` — conflicto por `(task_id, date)`, no `id`.
   async applyRemoteUpsert(id: string, taskId: string, date: string, updatedAt: string): Promise<void> {
     await db
       .insert(taskCompletions)
       .values({ id, taskId, date, updatedAt, deletedAt: null, syncState: 'synced' })
-      .onConflictDoUpdate({ target: taskCompletions.id, set: { updatedAt, deletedAt: null, syncState: 'synced' } });
+      .onConflictDoUpdate({
+        target: [taskCompletions.taskId, taskCompletions.date],
+        set: { updatedAt, deletedAt: null, syncState: 'synced' },
+      });
   },
   async applyRemoteDelete(id: string, taskId: string, date: string, deletedAt: string): Promise<void> {
     await db
       .insert(taskCompletions)
       .values({ id, taskId, date, updatedAt: deletedAt, deletedAt, syncState: 'synced' })
-      .onConflictDoUpdate({ target: taskCompletions.id, set: { updatedAt: deletedAt, deletedAt, syncState: 'synced' } });
+      .onConflictDoUpdate({
+        target: [taskCompletions.taskId, taskCompletions.date],
+        set: { updatedAt: deletedAt, deletedAt, syncState: 'synced' },
+      });
   },
 };

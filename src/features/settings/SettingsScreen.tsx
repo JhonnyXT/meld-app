@@ -14,8 +14,10 @@ import {
   useSession,
   useSyncStatus,
   signInWithGoogle,
-  signOut as signOutOfGoogle,
+  signOutKeepingLocalData,
+  signOutAndWipeLocalData,
   deleteAccountAndCloudData,
+  pendingChanges,
   syncNow,
   AuthError,
   authErrorMessage,
@@ -163,6 +165,9 @@ export function SettingsScreen() {
   })();
   const [accountBusy, setAccountBusy] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  // Cerrar sesión con Mantener/Borrar (SYNC_ROADMAP.md, Fase 3, T8): `null` = cerrado,
+  // `0`/`N` = abierto con la cantidad de cambios sin subir que decide qué botones mostrar.
+  const [signOutPending, setSignOutPending] = useState<number | null>(null);
 
   const handleSignIn = async () => {
     setAccountBusy(true);
@@ -176,10 +181,30 @@ export function SettingsScreen() {
     }
   };
 
-  const handleSignOut = async () => {
+  const openSignOutDialog = async () => {
     setAccountBusy(true);
     try {
-      await signOutOfGoogle();
+      setSignOutPending(await pendingChanges());
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+
+  const handleSignOutKeep = async () => {
+    setSignOutPending(null);
+    setAccountBusy(true);
+    try {
+      await signOutKeepingLocalData();
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+
+  const handleSignOutWipe = async () => {
+    setSignOutPending(null);
+    setAccountBusy(true);
+    try {
+      await signOutAndWipeLocalData();
     } finally {
       setAccountBusy(false);
     }
@@ -235,7 +260,7 @@ export function SettingsScreen() {
                 icon="log-out"
                 title={t('settingsAccountSignOut')}
                 showBorder
-                onPress={accountBusy ? undefined : handleSignOut}
+                onPress={accountBusy ? undefined : openSignOutDialog}
               />
               <SettingRow
                 icon="delete-outline"
@@ -398,6 +423,26 @@ export function SettingsScreen() {
         cancelLabel={t('settingsAccountCancel')}
         onConfirm={handleDeleteAccount}
         onCancel={() => setDeleteConfirmVisible(false)}
+      />
+
+      {/* Cerrar sesión con Mantener/Borrar (T8): con cambios sin subir, "Borrar" ni se ofrece —
+          solo queda cerrar sesión manteniendo los datos (nunca se pierde nada sin aviso). */}
+      <ConfirmDialog
+        visible={signOutPending !== null}
+        icon="log-out"
+        title={t('settingsAccountSignOutConfirmTitle')}
+        message={
+          signOutPending && signOutPending > 0
+            ? t('settingsAccountSignOutPendingMessage', { count: signOutPending })
+            : t('settingsAccountSignOutConfirmMessage')
+        }
+        cancelLabel={signOutPending && signOutPending > 0 ? t('settingsAccountCancel') : t('settingsAccountSignOutKeep')}
+        confirmLabel={
+          signOutPending && signOutPending > 0 ? t('settingsAccountSignOutPendingConfirm') : t('settingsAccountSignOutWipe')
+        }
+        tone={signOutPending && signOutPending > 0 ? 'accent' : 'danger'}
+        onCancel={signOutPending && signOutPending > 0 ? () => setSignOutPending(null) : handleSignOutKeep}
+        onConfirm={signOutPending && signOutPending > 0 ? handleSignOutKeep : handleSignOutWipe}
       />
     </Screen>
   );

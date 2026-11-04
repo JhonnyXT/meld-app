@@ -17,10 +17,13 @@ import {
   taskCompletionSyncRepository,
 } from '@/data/local/dayItemRepository';
 import { onLocalChange } from '@/data/local/localChanges';
+import { wipeLocalData } from '@/data/local/wipeLocalData';
 import { useCategoriesStore } from '@/store/categoriesStore';
 import { useDayItemsStore } from '@/store/dayItemsStore';
+import { useInboxStore } from '@/store/inboxStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { cancelReminderNotification, syncReminderNotification } from '@/services/notifications';
+import { refreshAppBadge } from '@/services/appBadge';
 import { refreshWidgets } from '@/widget/refreshWidgets';
 import { ensureFirebase } from './firebase';
 import { pickWinner } from './merge';
@@ -41,7 +44,7 @@ import { advanceCursor, type SyncMeta } from './meta';
 import { clearMeta, loadMeta, saveMeta } from './metaStore';
 import { deleteAllUserData, pullCollection, pushBatch, type PushOp } from './remote';
 import { isOffline, withTimeout } from './net';
-import { deleteAccount } from './session';
+import { deleteAccount, signOut } from './session';
 import { useSyncStatus } from './status';
 
 /** Sin red no se espera más de esto por corrida (ver `net.ts`). */
@@ -327,4 +330,41 @@ export async function deleteAccountAndCloudData(): Promise<void> {
   });
   await clearMeta();
   useSyncStatus.getState().set({ phase: 'idle', pending: 0, lastSyncAt: null });
+}
+
+// ─── Cuenta: cerrar sesión ──────────────────────────────────────────────────
+
+/**
+ * Cerrar sesión dejando los datos del teléfono tal cual (SYNC_ROADMAP.md, T8 — "Mantener"). El
+ * respaldo en la nube sigue ahí; si se vuelve a iniciar sesión con la misma cuenta, `pull` lo trae
+ * de nuevo. No bloquea aunque haya cambios sin subir — "Mantener" nunca pierde nada.
+ */
+export async function signOutKeepingLocalData(): Promise<void> {
+  if (running) await running.catch(() => undefined);
+  await signOut();
+  await clearMeta();
+  useSyncStatus.getState().set({ phase: 'idle', pending: 0, lastSyncAt: null });
+}
+
+/**
+ * Cerrar sesión Y borrar los datos de este teléfono (SYNC_ROADMAP.md, T8 — "Borrar"). El caller
+ * (Ajustes) ya confirmó con el usuario y ya verificó `pendingChanges() === 0` antes de ofrecer
+ * esta opción — acá no se vuelve a chequear porque entre ambos pasos no hay forma de que algo
+ * nuevo quede pendiente (ningún otro flujo escribe en SQLite durante un modal de confirmación).
+ * El respaldo en la nube NO se toca (a diferencia de `deleteAccountAndCloudData`): sigue
+ * disponible si el usuario vuelve a iniciar sesión más adelante, en este teléfono o en otro.
+ */
+export async function signOutAndWipeLocalData(): Promise<void> {
+  if (running) await running.catch(() => undefined);
+  await signOut();
+  await wipeLocalData();
+  await clearMeta();
+  useSyncStatus.getState().set({ phase: 'idle', pending: 0, lastSyncAt: null });
+  await Promise.all([
+    useDayItemsStore.getState().reload(),
+    useInboxStore.getState().reload(),
+    useCategoriesStore.getState().load(),
+  ]);
+  await refreshWidgets().catch(() => undefined);
+  await refreshAppBadge().catch(() => undefined);
 }

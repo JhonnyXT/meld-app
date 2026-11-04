@@ -289,10 +289,16 @@ emulador, sin tocar los datos locales.
   `updatedAt` propio en `settingsStore` (no existe hoy) + un doc `users/{uid}/settings/app`, igual
   al borrador del modelo en Firestore más arriba — tamaño mediano, se puede hacer aparte sin
   tocar nada de lo de items.
-- [ ] **Cerrar sesión con Mantener / Borrar (T8)** — todavía no implementado: cerrar sesión hoy
-  (`signOut`, Fase 2) nunca toca los datos locales, que es el comportamiento más seguro mientras
-  no esté esto. Falta la pregunta "Mantener / Borrar de este teléfono" + el wipeo real
-  (bloqueado si `pendingChanges() > 0`, igual que `my-wallet-app`).
+- [x] **Cerrar sesión con Mantener / Borrar (T8)** (2026-11-04): Ajustes → Cuenta → "Cerrar
+  sesión" abre un diálogo que decide con `pendingChanges()`. Sin nada pendiente: "Mantener en el
+  teléfono" (`signOutKeepingLocalData` — cierra sesión, limpia el cursor de sync, los datos del
+  teléfono quedan igual) o "Borrar de este teléfono" (`signOutAndWipeLocalData` — además borra las
+  4 tablas de SQLite vía `data/local/wipeLocalData.ts`, re-siembra las 3 categorías default igual
+  que una instalación nueva, cancela notificaciones programadas y refresca stores/widgets/badge).
+  Con algo pendiente, "Borrar" ni se ofrece — el diálogo explica que hay N cambios sin subir y solo
+  deja cerrar sesión manteniendo los datos (nunca se pierde nada sin aviso, mismo criterio que
+  `my-wallet-app`). Ninguna de las dos toca el respaldo en la nube — sigue ahí si se vuelve a
+  iniciar sesión, en este teléfono o en otro.
 - [x] **Verificación real en dispositivo** (2026-11-04): con el emulador corriendo, prueba de Pro
   activada y login real, el push subió los 42 `items`/55 `habitCompletions`/3 `categories` del
   seed (confirmado consultando el emulador por REST, no solo mirando la UI — los toques por

@@ -315,11 +315,15 @@ export async function seedIfEmpty(): Promise<void> {
   );
 
   const completionRows = habitSeeds.flatMap((h) =>
-    h.doneOffsets.map((offset) => ({
-      id: `${h.id}-${offset}`,
-      habitId: h.id,
-      date: toDateKey(addDays(now, -offset)),
-    })),
+    h.doneOffsets.map((offset) => {
+      const date = toDateKey(addDays(now, -offset));
+      // Mismo esquema de id que `dayItemRepository.toggleHabitCompletion` (`${habitId}-${date}`,
+      // no `${habitId}-${offset}`) — con offset, un re-seed (p. ej. "Borrar de este teléfono" en
+      // dev, que reinstala vacío) generaba un id distinto para el mismo (habit_id, date) que ya
+      // existía en la nube, y el pull siguiente tiraba "UNIQUE constraint failed" (bug real, visto
+      // en dispositivo al probar T8).
+      return { id: `${h.id}-${date}`, habitId: h.id, date };
+    }),
   );
 
   // ── Repartido por el mes (Calendario) ──────────────────────────────────
