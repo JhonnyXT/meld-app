@@ -1,7 +1,24 @@
-import { eq, and, ne, lt, isNull, isNotNull, gte, lte, like, asc } from 'drizzle-orm';
+import { eq, and, ne, lt, isNull, isNotNull, gte, lte, like, asc, inArray } from 'drizzle-orm';
 import { db } from './db';
 import { dayItems, habitCompletions, taskCompletions, categories } from './schema';
+import { emitLocalChange } from './localChanges';
 import type { DayItem } from '@/domain/dayItem';
+
+/** Lo mínimo para que `src/sync/` decida con `pickWinner` sin traer el ítem entero. */
+export interface SyncVersion {
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+/** Un `day_items` pendiente de subir: `item` es `null` cuando es un borrado (tombstone, sin
+ * contenido que mandar — ver `src/sync/mappers.ts` → `tombstoneDoc`). */
+export interface PendingDayItem {
+  id: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  categoryId: string | null;
+  item: DayItem | null;
+}
 
 type Row = typeof dayItems.$inferSelect;
 type NewRow = typeof dayItems.$inferInsert;
@@ -9,6 +26,12 @@ type NewRow = typeof dayItems.$inferInsert;
 /** Toda query de lectura excluye lo borrado lógicamente (SYNC_ROADMAP.md,
  * Fase 1) — se combina con `and(...)` en cada `where`. */
 const notDeleted = isNull(dayItems.deletedAt);
+
+/** `updated_at` nulo en `habit_completions`/`task_completions` = fila de antes de la Fase 1
+ * (columna agregada por `ALTER TABLE`, sin backfill — ver `db.ts`). Se trata como "lo más viejo
+ * posible": nunca le gana a nada remoto con fecha real, pero tampoco rompe `pickWinner` (que
+ * exige un ISO parseable). */
+const EPOCH = '1970-01-01T00:00:00.000Z';
 
 function toDomain(row: Row): DayItem {
   return {
@@ -194,6 +217,7 @@ export const dayItemRepository = {
       .insert(dayItems)
       .values(row)
       .onConflictDoUpdate({ target: dayItems.id, set: row });
+    emitLocalChange();
   },
 
   /** Borrado lógico (SYNC_ROADMAP.md, Fase 1) — marca `deleted_at` en vez de
@@ -211,6 +235,7 @@ export const dayItemRepository = {
       .where(eq(dayItems.id, id));
     await db.delete(habitCompletions).where(eq(habitCompletions.habitId, id));
     await db.delete(taskCompletions).where(eq(taskCompletions.taskId, id));
+    emitLocalChange();
   },
 
   /** Todos los hábitos existentes (definición recurrente) — a diferencia de
@@ -246,6 +271,7 @@ export const dayItemRepository = {
         .update(habitCompletions)
         .set({ deletedAt: now, updatedAt: now, syncState: 'pending' })
         .where(eq(habitCompletions.id, id));
+      emitLocalChange();
       return false;
     }
     if (existing.length > 0) {
@@ -256,6 +282,7 @@ export const dayItemRepository = {
     } else {
       await db.insert(habitCompletions).values({ id, habitId, date, updatedAt: now, syncState: 'pending' });
     }
+    emitLocalChange();
     return true;
   },
 
@@ -318,6 +345,7 @@ export const dayItemRepository = {
         .update(taskCompletions)
         .set({ deletedAt: now, updatedAt: now, syncState: 'pending' })
         .where(eq(taskCompletions.id, id));
+      emitLocalChange();
       return false;
     }
     if (existing.length > 0) {
@@ -328,6 +356,7 @@ export const dayItemRepository = {
     } else {
       await db.insert(taskCompletions).values({ id, taskId, date, updatedAt: now, syncState: 'pending' });
     }
+    emitLocalChange();
     return true;
   },
 
@@ -360,5 +389,130 @@ export const dayItemRepository = {
       .from(dayItems)
       .where(and(isNotNull(dayItems.category), notDeleted));
     return rows.map((r) => ({ category: r.category!, status: r.status }));
+  },
+
+  // ─── Sync (SYNC_ROADMAP.md, Fase 3) ──────────────────────────────────────
+  // `src/sync/` es el único que llama a lo de acá abajo — nunca pantallas ni stores. Nada de esto
+  // pasa por `notDeleted`: la sync necesita ver también los tombstones (para subirlos, o para
+  // decidir con `pickWinner` si un borrado remoto le gana a una edición local viva).
+
+  /** `day_items` con `sync_state = 'pending'` — todavía no reflejados en la nube. */
+  async listPendingSync(): Promise<PendingDayItem[]> {
+    const rows = await db.select().from(dayItems).where(eq(dayItems.syncState, 'pending'));
+    return rows.map((row) => ({
+      id: row.id,
+      updatedAt: row.updatedAt,
+      deletedAt: row.deletedAt,
+      categoryId: row.categoryId,
+      item: row.deletedAt ? null : toDomain(row),
+    }));
+  },
+
+  /** Marca como subidas las filas que `src/sync/` acaba de confirmar en Firestore. */
+  async markSynced(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await db.update(dayItems).set({ syncState: 'synced' }).where(inArray(dayItems.id, ids));
+  },
+
+  /** Versión local de un ítem (exista o no), para que `src/sync/` llame a `pickWinner` antes de
+   * aplicar algo bajado de la nube. `null` = no existe en este teléfono (gana remoto siempre). */
+  async getSyncVersion(id: string): Promise<SyncVersion | null> {
+    const rows = await db
+      .select({ updatedAt: dayItems.updatedAt, deletedAt: dayItems.deletedAt })
+      .from(dayItems)
+      .where(eq(dayItems.id, id))
+      .limit(1);
+    return rows[0] ?? null;
+  },
+
+  /** Escribe un ítem bajado de la nube (ya ganó `pickWinner`) como `synced` — a diferencia de
+   * `upsert()`, que siempre deja `pending` (sería subirlo de vuelta sin necesidad). */
+  async applyRemoteUpsert(item: DayItem, categoryId: string | null): Promise<void> {
+    const row = { ...toRow(item, categoryId), syncState: 'synced' as const };
+    await db.insert(dayItems).values(row).onConflictDoUpdate({ target: dayItems.id, set: row });
+  },
+
+  /** Tombstone bajado de la nube (ya ganó `pickWinner`) para un id que puede no existir todavía
+   * en este teléfono — a diferencia de `remove()`, no asume que la fila ya está. */
+  async applyRemoteDelete(id: string, deletedAt: string): Promise<void> {
+    const existing = await db.select({ id: dayItems.id }).from(dayItems).where(eq(dayItems.id, id)).limit(1);
+    if (existing.length > 0) {
+      await db.update(dayItems).set({ deletedAt, updatedAt: deletedAt, syncState: 'synced' }).where(eq(dayItems.id, id));
+    }
+    // Si nunca existió acá, no hay nada que borrar — un tombstone de un ítem que este teléfono
+    // nunca tuvo no necesita fila propia (a diferencia de users/{uid} en Firestore, que sí la
+    // necesita para que otros dispositivos se enteren).
+  },
+};
+
+/** Pendientes de `habit_completions`/`task_completions` (misma forma para ambas tablas). */
+export interface PendingCompletion {
+  id: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  habitId?: string;
+  taskId?: string;
+  date: string;
+}
+
+export const habitCompletionSyncRepository = {
+  async listPendingSync(): Promise<PendingCompletion[]> {
+    const rows = await db.select().from(habitCompletions).where(eq(habitCompletions.syncState, 'pending'));
+    return rows.map((r) => ({ id: r.id, updatedAt: r.updatedAt ?? EPOCH, deletedAt: r.deletedAt, habitId: r.habitId, date: r.date }));
+  },
+  async markSynced(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await db.update(habitCompletions).set({ syncState: 'synced' }).where(inArray(habitCompletions.id, ids));
+  },
+  async getSyncVersion(id: string): Promise<SyncVersion | null> {
+    const rows = await db
+      .select({ updatedAt: habitCompletions.updatedAt, deletedAt: habitCompletions.deletedAt })
+      .from(habitCompletions)
+      .where(eq(habitCompletions.id, id))
+      .limit(1);
+    return rows[0] ? { updatedAt: rows[0].updatedAt ?? EPOCH, deletedAt: rows[0].deletedAt } : null;
+  },
+  async applyRemoteUpsert(id: string, habitId: string, date: string, updatedAt: string): Promise<void> {
+    await db
+      .insert(habitCompletions)
+      .values({ id, habitId, date, updatedAt, deletedAt: null, syncState: 'synced' })
+      .onConflictDoUpdate({ target: habitCompletions.id, set: { updatedAt, deletedAt: null, syncState: 'synced' } });
+  },
+  async applyRemoteDelete(id: string, habitId: string, date: string, deletedAt: string): Promise<void> {
+    await db
+      .insert(habitCompletions)
+      .values({ id, habitId, date, updatedAt: deletedAt, deletedAt, syncState: 'synced' })
+      .onConflictDoUpdate({ target: habitCompletions.id, set: { updatedAt: deletedAt, deletedAt, syncState: 'synced' } });
+  },
+};
+
+export const taskCompletionSyncRepository = {
+  async listPendingSync(): Promise<PendingCompletion[]> {
+    const rows = await db.select().from(taskCompletions).where(eq(taskCompletions.syncState, 'pending'));
+    return rows.map((r) => ({ id: r.id, updatedAt: r.updatedAt ?? EPOCH, deletedAt: r.deletedAt, taskId: r.taskId, date: r.date }));
+  },
+  async markSynced(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await db.update(taskCompletions).set({ syncState: 'synced' }).where(inArray(taskCompletions.id, ids));
+  },
+  async getSyncVersion(id: string): Promise<SyncVersion | null> {
+    const rows = await db
+      .select({ updatedAt: taskCompletions.updatedAt, deletedAt: taskCompletions.deletedAt })
+      .from(taskCompletions)
+      .where(eq(taskCompletions.id, id))
+      .limit(1);
+    return rows[0] ? { updatedAt: rows[0].updatedAt ?? EPOCH, deletedAt: rows[0].deletedAt } : null;
+  },
+  async applyRemoteUpsert(id: string, taskId: string, date: string, updatedAt: string): Promise<void> {
+    await db
+      .insert(taskCompletions)
+      .values({ id, taskId, date, updatedAt, deletedAt: null, syncState: 'synced' })
+      .onConflictDoUpdate({ target: taskCompletions.id, set: { updatedAt, deletedAt: null, syncState: 'synced' } });
+  },
+  async applyRemoteDelete(id: string, taskId: string, date: string, deletedAt: string): Promise<void> {
+    await db
+      .insert(taskCompletions)
+      .values({ id, taskId, date, updatedAt: deletedAt, deletedAt, syncState: 'synced' })
+      .onConflictDoUpdate({ target: taskCompletions.id, set: { updatedAt: deletedAt, deletedAt, syncState: 'synced' } });
   },
 };

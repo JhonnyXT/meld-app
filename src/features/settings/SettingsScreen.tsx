@@ -10,7 +10,17 @@ import { SettingRow } from '@/components/settings/SettingRow';
 import { AccentColorRow } from '@/components/settings/AccentColorRow';
 import { Toggle } from '@/components/Toggle';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { useSession, signInWithGoogle, signOut as signOutOfGoogle, deleteAccount, AuthError, authErrorMessage } from '@/sync';
+import {
+  useSession,
+  useSyncStatus,
+  signInWithGoogle,
+  signOut as signOutOfGoogle,
+  deleteAccountAndCloudData,
+  syncNow,
+  AuthError,
+  authErrorMessage,
+} from '@/sync';
+import { formatRelativeCreated } from '@/domain/date';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useTranslation, type TranslationKey } from '@/i18n';
 import {
@@ -48,7 +58,7 @@ const COMPLETED_STYLE_LABEL_KEY: Record<CompletedItemStyle, TranslationKey> = {
 
 export function SettingsScreen() {
   const { palette, font } = useTheme();
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const notificationsEnabled = useSettingsStore((s) => s.notificationsEnabled);
   const setNotificationsEnabled = useSettingsStore((s) => s.setNotificationsEnabled);
   const [notificationsCanAskAgain, setNotificationsCanAskAgain] = useState(true);
@@ -133,6 +143,24 @@ export function SettingsScreen() {
   // Cuenta (SYNC_ROADMAP.md, Fase 2): iniciar sesión es opcional, no bloquea nada de la app. Sin
   // Firestore todavía (Fase 3) — por ahora solo abre/cierra sesión y permite borrar la cuenta.
   const { user: sessionUser } = useSession();
+  const syncStatus = useSyncStatus();
+  const syncStatusLabel = (() => {
+    switch (syncStatus.phase) {
+      case 'syncing':
+        return t('settingsAccountSyncing');
+      case 'offline':
+        return t('settingsAccountOffline');
+      case 'error':
+        return t('settingsAccountSyncError');
+      case 'paused':
+        return t('settingsAccountPaused');
+      default:
+        if (syncStatus.pending > 0) return t('settingsAccountPending', { count: syncStatus.pending });
+        return syncStatus.lastSyncAt
+          ? t('settingsAccountSynced', { time: formatRelativeCreated(new Date(syncStatus.lastSyncAt).toISOString(), lang) })
+          : t('settingsAccountNeverSynced');
+    }
+  })();
   const [accountBusy, setAccountBusy] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
@@ -161,7 +189,7 @@ export function SettingsScreen() {
     setDeleteConfirmVisible(false);
     setAccountBusy(true);
     try {
-      await deleteAccount();
+      await deleteAccountAndCloudData();
     } finally {
       setAccountBusy(false);
     }
@@ -196,6 +224,12 @@ export function SettingsScreen() {
                 title={sessionUser.name ?? sessionUser.email ?? ''}
                 subtitle={sessionUser.email ? t('settingsAccountSignedInAs', { email: sessionUser.email }) : undefined}
                 showBorder
+              />
+              <SettingRow
+                icon="cloud"
+                title={syncStatusLabel}
+                showBorder
+                onPress={accountBusy ? undefined : () => void syncNow()}
               />
               <SettingRow
                 icon="log-out"

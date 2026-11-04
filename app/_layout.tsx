@@ -34,6 +34,7 @@ import { TrialEndedDialog } from '@/components/TrialEndedDialog';
 import { NavDrawerLayout } from '@/components/navDrawer/NavDrawer';
 import { OnboardingScreen } from '@/features/onboarding/OnboardingScreen';
 import { useSettingsStore } from '@/store/settingsStore';
+import { startSync } from '@/sync';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -69,6 +70,10 @@ function RootStack() {
   // mismo patrón que el deep link de arriba (evento en caliente + chequeo
   // en frío al arrancar).
   useEffect(() => registerNotificationResponseHandling(() => useDayItemsStore.getState().reload()), []);
+
+  // Respaldo en la nube (SYNC_ROADMAP.md, Fase 3): sin sesión no hace nada hasta que la haya
+  // (ver `src/sync/engine.ts` → `startSync`).
+  useEffect(startSync, []);
 
   // "Marcar hecho" desde la notificación con la app en segundo plano lo
   // resuelve la tarea headless directo en la DB: al volver a primer plano se
