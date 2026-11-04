@@ -35,6 +35,7 @@ import {
   habitCompletionToDoc,
   taskCompletionToDoc,
   tombstoneDoc,
+  type AppSettingsDoc,
   type CategoryDoc,
   type DayItemDoc,
   type HabitCompletionDoc,
@@ -42,7 +43,14 @@ import {
 } from './mappers';
 import { advanceCursor, type SyncMeta } from './meta';
 import { clearMeta, loadMeta, saveMeta } from './metaStore';
-import { deleteAllUserData, pullCollection, pushBatch, type PushOp } from './remote';
+import {
+  deleteAllUserData,
+  getUserSettingsDoc,
+  pullCollection,
+  pushBatch,
+  setUserSettingsDoc,
+  type PushOp,
+} from './remote';
 import { isOffline, withTimeout } from './net';
 import { deleteAccount, signOut } from './session';
 import { useSyncStatus } from './status';
@@ -211,6 +219,42 @@ async function push(uid: string): Promise<void> {
   await pushCategories(uid);
 }
 
+// ─── Ajustes visuales — un solo documento, LWW (SYNC_ROADMAP.md, Fase 3) ──────────
+
+const SETTINGS_EPOCH = '1970-01-01T00:00:00.000Z';
+
+function localSettingsDoc(): AppSettingsDoc {
+  const s = useSettingsStore.getState();
+  return {
+    theme: s.themePreference,
+    accent: s.accent,
+    language: s.language,
+    listSpacing: s.listSpacing,
+    completedItemStyle: s.completedItemStyle,
+    habitsInToday: s.habitsInTodayEnabled,
+    coolHabits: s.coolHabitsEnabled,
+    onboardingCompleted: s.onboardingCompleted,
+    updatedAt: s.settingsUpdatedAt ?? SETTINGS_EPOCH,
+  };
+}
+
+/** Trae y, si corresponde, sube — ver el mismo patrón en `pickWinner`. Sin lista de pendientes
+ * (es un solo documento): basta comparar `updatedAt` cada corrida, es barato (1 lectura). Si gana
+ * lo local pero nunca se tocó en este teléfono (`settingsUpdatedAt` null = los defaults de
+ * `settingsStore.ts`), no sube nada — evita pisar un respaldo real con un doc vacío recién
+ * instalado. */
+async function syncSettings(uid: string, canBackup: boolean): Promise<void> {
+  const remote = await getUserSettingsDoc(uid);
+  const local = localSettingsDoc();
+  if (remote && pickWinner(local, remote.data) === 'remote') {
+    useSettingsStore.getState().applyRemoteSettings(remote.data);
+    return;
+  }
+  if (canBackup && useSettingsStore.getState().settingsUpdatedAt) {
+    await withTimeout(setUserSettingsDoc(uid, local));
+  }
+}
+
 // ─── Pendientes (para Ajustes → Cuenta) ──────────────────────────────────────
 
 export async function pendingChanges(): Promise<number> {
@@ -241,6 +285,7 @@ async function syncOnce(uid: string, opts: { pull: boolean }): Promise<void> {
   status.set({ phase: 'syncing' });
   try {
     if (opts.pull) meta = await pull(uid, meta);
+    await syncSettings(uid, canBackup);
     if (canBackup) await push(uid);
     meta = { ...meta, lastSyncAt: Date.now() };
     await saveMeta(meta);

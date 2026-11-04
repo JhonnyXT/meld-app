@@ -282,13 +282,25 @@ emulador, sin tocar los datos locales.
   usuario de Firebase Auth.
 - [x] Gating: `push()` exige `settingsStore.plan === 'pro'` (incluye la prueba simulada); `pull()`
   corre siempre, sin plan, para que alguien que tuvo Pro no pierda acceso a lo ya respaldado.
-- [ ] **Pendiente, alcance recortado a propósito** (documentado para no perder de vista, no son
-  bugs): los Ajustes visuales (tema/idioma/espaciado/estilo de completado) y
-  `onboardingCompleted` **todavía no sincronizan** — "restaurar en un teléfono nuevo" trae los
-  items/hábitos/categorías pero el onboarding no se saltea solo todavía. Hace falta un
-  `updatedAt` propio en `settingsStore` (no existe hoy) + un doc `users/{uid}/settings/app`, igual
-  al borrador del modelo en Firestore más arriba — tamaño mediano, se puede hacer aparte sin
-  tocar nada de lo de items.
+- [x] **Ajustes visuales sincronizan** (2026-11-04): `settingsStore.settingsUpdatedAt` (nuevo) se
+  actualiza en cada setter sincronizable (tema/acento/idioma/espaciado/estilo de completado/
+  hábitos en Hoy/hábitos "cool"/`onboardingCompleted`) vía el helper `touch()`, que además llama
+  `emitLocalChange()` — mismo pub-sub y debounce de 3s que ya usan los repositorios de SQLite, sin
+  que `settingsStore` importe Firebase (Regla #3). `src/sync/engine.ts` → `syncSettings()` compara
+  con `users/{uid}/settings/app` (un solo documento, `src/sync/remote.ts` →
+  `getUserSettingsDoc`/`setUserSettingsDoc`) vía el mismo `pickWinner` que los ítems — sin lista de
+  pendientes ni tombstone, un documento no necesita ninguna de las dos. Corre en cada
+  `syncOnce()`, con o sin `pull` (así un cambio de ajuste sin ítems de por medio también sube).
+  Quedan afuera a propósito: `notificationsEnabled` (atado al permiso del SO de este teléfono, no
+  algo que restaurar) y `plan`/prueba simulada (Fase 5, la fuente de verdad va a ser la
+  suscripción). `deleteAllUserData` ahora también borra `settings/app`. **Verificado en
+  dispositivo** (2026-11-04, Samsung S24 Ultra → Moto E7 Plus, misma cuenta): cambiar Tema a
+  "Claro" en el S24 llegó solo al Moto (confirmado también por REST contra el emulador). **Bug
+  real encontrado y corregido en el camino**: `getUserSettingsDoc` llamaba `snap.exists` como
+  propiedad en vez de `snap.exists()` (método en la API modular de `@react-native-firebase/
+  firestore`) — siempre truthy, así que nunca devolvía `null` para un doc inexistente y
+  `snap.data()` tiraba `Cannot read property 'serverUpdatedAt' of undefined`, rompiendo CUALQUIER
+  sync (no solo ajustes) apenas se agregó este código.
 - [x] **Cerrar sesión con Mantener / Borrar (T8)** (2026-11-04): Ajustes → Cuenta → "Cerrar
   sesión" abre un diálogo que decide con `pendingChanges()`. Sin nada pendiente: "Mantener en el
   teléfono" (`signOutKeepingLocalData` — cierra sesión, limpia el cursor de sync, los datos del

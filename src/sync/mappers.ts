@@ -115,3 +115,22 @@ export function categoryToDoc(category: Category, updatedAt: string): CategoryDo
 export function docToCategory(id: string, doc: CategoryDoc): Category {
   return { id, label: doc.label, icon: doc.icon as IconName, color: doc.color, sortOrder: doc.sortOrder };
 }
+
+// ─── Ajustes visuales (users/{uid}/settings/app) ──────────────────────────────────
+// A diferencia de `items`/`habitCompletions`/etc. (muchos documentos, `sync_state` por fila), acá
+// hay UN solo documento por usuario — mismo criterio last-write-wins vía `pickWinner`, pero sin
+// lista de pendientes ni tombstone (no hay "borrar" un ajuste). Alcance: SYNC_ROADMAP.md, Fase 3,
+// "Ajustes visuales" — tema/acento/idioma/espaciado/estilo de completado/hábitos en Hoy/hábitos
+// "cool" + si ya pasó el onboarding. Deliberadamente afuera: `notificationsEnabled` (atado al
+// permiso del SO de ESTE teléfono, no algo que restaurar) y `plan`/prueba simulada (Fase 5).
+
+export interface AppSettingsDoc extends VersionedDoc {
+  theme: string;
+  accent: string;
+  language: string;
+  listSpacing: string;
+  completedItemStyle: string;
+  habitsInToday: boolean;
+  coolHabits: boolean;
+  onboardingCompleted: boolean;
+}

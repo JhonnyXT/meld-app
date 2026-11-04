@@ -10,12 +10,14 @@
 import {
   collection,
   doc,
+  getDocFromServer,
   getDocsFromServer,
   getFirestore,
   limit,
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   startAfter,
   Timestamp,
   where,
@@ -26,7 +28,7 @@ import {
   type QuerySnapshot,
 } from '@react-native-firebase/firestore';
 import { ensureFirebase } from './firebase';
-import { COLLECTION_PATH, type ItemCollection, type RemoteDoc, type VersionedDoc } from './mappers';
+import { COLLECTION_PATH, type AppSettingsDoc, type ItemCollection, type RemoteDoc, type VersionedDoc } from './mappers';
 
 const PAGE_SIZE = 300;
 /** Firestore admite 500 operaciones por lote; se deja margen. */
@@ -113,4 +115,18 @@ export async function deleteAllUserData(uid: string): Promise<void> {
       await batch.commit();
     }
   }
+  await writeBatch(firestore).delete(doc(firestore, 'users', uid, 'settings', 'app')).commit();
+}
+
+// ─── Ajustes visuales — un solo documento, sin paginar (ver `mappers.ts`) ──────────
+
+export async function getUserSettingsDoc(uid: string): Promise<RemoteDoc<AppSettingsDoc> | null> {
+  const snap = await getDocFromServer(doc(db(), 'users', uid, 'settings', 'app'));
+  if (!snap.exists()) return null;
+  const data = snap.data() as AppSettingsDoc & { serverUpdatedAt: unknown };
+  return { id: snap.id, data, serverUpdatedAt: millis(data.serverUpdatedAt) };
+}
+
+export async function setUserSettingsDoc(uid: string, data: AppSettingsDoc): Promise<void> {
+  await setDoc(doc(db(), 'users', uid, 'settings', 'app'), { ...data, serverUpdatedAt: serverTimestamp() });
 }
