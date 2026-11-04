@@ -1,24 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, Pressable, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import Animated, {
-  FadeIn,
-  FadeOut,
-  LinearTransition,
-  runOnJS,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, LinearTransition, runOnJS } from 'react-native-reanimated';
 import { Screen } from '@/components/Screen';
 import { TopAppBar } from '@/components/TopAppBar';
 import { DayBar } from '@/components/DayBar';
 import { Icon } from '@/components/Icon';
 import { EmptyState } from '@/components/EmptyState';
-import { SyncPullIndicator, type SyncPullPhase } from '@/components/SyncPullIndicator';
 import { TodayItemRow } from './TodayItemRow';
 import { TodayGroupHeader } from './TodayGroupHeader';
 import { ListSkeleton } from '@/components/ListSkeleton';
@@ -42,31 +31,6 @@ import { formatHeaderDate, formatDayBarDate, formatShortDateLabel, addDays, toDa
 import { syncNow, useSession, useSyncStatus } from '@/sync';
 
 const ROW_TRANSITION = LinearTransition.duration(220);
-
-// Deslizar hacia abajo para traer cambios (SYNC_ROADMAP.md, Fase 3) — mismo diseño y mecánica que
-// `my-wallet-app` (`app/(tabs)/index.tsx`): el contenido baja con resistencia de goma (cada px
-// cuesta más que el anterior, tope `PULL_MAX_OFFSET`); soltar pasado `PULL_HOLD_OFFSET` trae.
-// El gesto se captura en el HEADER (TopAppBar), no en la lista: en Android el `ScrollView`
-// nativo se queda con cualquier arrastre vertical sobre la lista y el gesto casi nunca se
-// activaba (mismo problema que ya resolvieron ahí) — como los dos comparten los mismos shared
-// values, deslizar sobre el header mueve la lista igual.
-const PULL_MAX_OFFSET = 150;
-const PULL_HOLD_OFFSET = 64;
-const PULL_RUBBER = 0.75;
-// Una sync rápida (sin cambios) igual se ve: el indicador gira al menos este tiempo, y el ✓
-// queda un instante antes de que el contenido suba.
-const PULL_MIN_REFRESH_MS = 700;
-const PULL_DONE_MS = 450;
-// Sin conexión la sync sigue esperando en segundo plano (reintenta sola); la animación no espera
-// tanto — pasado esto muestra "sin conexión".
-const PULL_MAX_WAIT_MS = 8000;
-const PULL_OFFLINE_MS = 1100;
-
-/** Curva de goma (la de iOS): crece casi 1:1 al principio y se endurece hacia el tope. */
-function rubberBand(distance: number): number {
-  'worklet';
-  return PULL_MAX_OFFSET * (1 - 1 / ((distance * PULL_RUBBER) / PULL_MAX_OFFSET + 1));
-}
 
 // Orden de las secciones cuando la lista de Today está agrupada por tipo
 // (toggle del ícono de filtro en el header). Momentos no aparece en Today.
@@ -118,99 +82,14 @@ export function TodayScreen() {
   const [grouped, setGrouped] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
-  // Deslizar hacia abajo para traer cambios (SYNC_ROADMAP.md, Fase 3) — sube lo pendiente y trae
-  // lo nuevo sin tener que cerrar y volver a abrir la app. `syncNow()` nunca rechaza (sin sesión
-  // no hace nada; sin conexión queda "offline" y reintenta solo, ver `src/sync/engine.ts`).
+  // Al entrar a Hoy (o volver a esta pestaña): trae cambios pendientes de subir/bajar
+  // (SYNC_ROADMAP.md, Fase 3) sin que el usuario tenga que cerrar y volver a abrir la app. Sin
+  // gesto custom — directo al entrar, usando el mismo placeholder (`ListSkeleton`) que el arranque
+  // inicial: `reload()` ya marca `loading` mientras consulta SQLite (ver `dayItemsStore.reload`),
+  // así que no hace falta nada especial para mostrarlo acá. `syncNow()` nunca rechaza (sin sesión
+  // no hace nada; sin conexión reintenta sola en segundo plano, ver `src/sync/engine.ts`) — un
+  // segundo `reload()` después de que termina trae lo que haya bajado.
   const { user: sessionUser } = useSession();
-  const reducedMotion = useReducedMotion();
-  const syncEnabled = !!sessionUser && !searchActive;
-  const [syncPhase, setSyncPhase] = useState<SyncPullPhase>('idle');
-  const syncPhaseRef = useRef<SyncPullPhase>('idle');
-  const setPhase = useCallback((phase: SyncPullPhase) => {
-    syncPhaseRef.current = phase;
-    setSyncPhase(phase);
-  }, []);
-  const pullOffset = useSharedValue(0);
-  const pullProgress = useSharedValue(0);
-  const pullArmed = useSharedValue(false);
-  const pulledStyle = useAnimatedStyle(() => ({ transform: [{ translateY: pullOffset.value }] }));
-
-  const springPullOffset = useCallback(
-    (toValue: number, onDone?: () => void) => {
-      let called = false;
-      const done = () => {
-        if (called) return;
-        called = true;
-        onDone?.();
-      };
-      // Bajar a la posición de espera: firme, sin rebote. Volver: con un rebote suave.
-      const config = toValue === 0 ? { stiffness: 220, damping: 18 } : { stiffness: 320, damping: 30 };
-      pullOffset.value = withSpring(toValue, config, (finished) => {
-        if (finished && onDone) runOnJS(done)();
-      });
-      if (onDone) setTimeout(done, 900);
-    },
-    [pullOffset],
-  );
-
-  const pullToSync = useCallback(() => {
-    setPhase('refreshing');
-    pullProgress.value = 1;
-    springPullOffset(PULL_HOLD_OFFSET);
-    const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-    const synced = Promise.race([syncNow().catch(() => undefined), wait(PULL_MAX_WAIT_MS)]);
-    Promise.all([synced, wait(PULL_MIN_REFRESH_MS)]).then(async () => {
-      await Promise.all([reload(), reloadInbox()]);
-      // "syncing" acá = pasó el tope sin respuesta: igual que sin conexión.
-      const ok = useSyncStatus.getState().phase === 'idle';
-      setPhase(ok ? 'done' : 'offline');
-      Haptics.notificationAsync(ok ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning).catch(
-        () => undefined,
-      );
-      setTimeout(
-        () =>
-          springPullOffset(0, () => {
-            if (syncPhaseRef.current === 'done' || syncPhaseRef.current === 'offline') setPhase('idle');
-          }),
-        ok ? PULL_DONE_MS : PULL_OFFLINE_MS,
-      );
-    });
-  }, [pullProgress, setPhase, springPullOffset, reload, reloadInbox]);
-
-  const resetPull = useCallback(() => {
-    springPullOffset(0, () => {
-      if (syncPhaseRef.current === 'pulling') setPhase('idle');
-    });
-  }, [springPullOffset, setPhase]);
-
-  const hapticArmChange = useCallback((armed: boolean) => {
-    Haptics.impactAsync(armed ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
-  }, []);
-
-  // Captura solo un arrastre claro hacia abajo — `onStart` (no `onBegin`) recién dispara una vez
-  // cruzado `activeOffsetY`, así un toque simple en los íconos del header nunca llega a "jalar".
-  const syncPanGesture = Gesture.Pan()
-    .enabled(syncEnabled && syncPhase === 'idle')
-    .activeOffsetY(10)
-    .onStart(() => {
-      pullArmed.value = false;
-      runOnJS(setPhase)('pulling');
-    })
-    .onUpdate((e) => {
-      const offset = rubberBand(Math.max(e.translationY, 0));
-      pullOffset.value = offset;
-      const progress = Math.min(offset / PULL_HOLD_OFFSET, 1);
-      pullProgress.value = progress;
-      const armed = progress >= 1;
-      if (armed !== pullArmed.value) {
-        pullArmed.value = armed;
-        runOnJS(hapticArmChange)(armed);
-      }
-    })
-    .onEnd(() => {
-      if (pullArmed.value) runOnJS(pullToSync)();
-      else runOnJS(resetPull)();
-    });
 
   useEffect(() => {
     // Data de muestra SOLO en dev (iterar día a día necesita algo para ver) —
@@ -228,11 +107,25 @@ export function TodayScreen() {
     setStoreDate(selectedDate);
   }, [selectedDate]);
 
+  // El Stack de Expo Router no desmonta Today al navegar a otra pantalla: al volver, la lista
+  // vieja sigue en `items`, así que `loading && visibleRows.length === 0` (la condición de
+  // `ListSkeleton` del arranque) nunca se cumple y la recarga/sync de arriba pasaba en silencio
+  // detrás del contenido viejo — bug real, reportado en dispositivo ("se tarda un poco... no se ve
+  // el esqueleto"). `enteringToday` fuerza el mismo esqueleto del arranque también acá, sin
+  // depender de que la lista esté vacía.
+  const [enteringToday, setEnteringToday] = useState(false);
   useFocusEffect(
     useCallback(() => {
-      reload();
-      reloadInbox();
-    }, [reload, reloadInbox]),
+      setEnteringToday(true);
+      (async () => {
+        await Promise.all([reload(), reloadInbox()]);
+        if (sessionUser) {
+          await syncNow().catch(() => undefined);
+          await Promise.all([reload(), reloadInbox()]);
+        }
+        setEnteringToday(false);
+      })();
+    }, [reload, reloadInbox, sessionUser]),
   );
 
   useEffect(() => {
@@ -315,8 +208,6 @@ export function TodayScreen() {
 
   return (
     <Screen style={{ paddingHorizontal: 0 }}>
-      <GestureDetector gesture={syncPanGesture}>
-      <View style={styles.headerSlot}>
       <View style={{ paddingHorizontal: 16 }}>
         <TopAppBar
           title={t('today')}
@@ -351,20 +242,8 @@ export function TodayScreen() {
           </Animated.View>
         ) : null}
       </View>
-      <View style={styles.syncIndicatorSlot} pointerEvents="none">
-        <SyncPullIndicator
-          offset={pullOffset}
-          progress={pullProgress}
-          phase={syncPhase}
-          holdOffset={PULL_HOLD_OFFSET}
-          reducedMotion={reducedMotion}
-        />
-      </View>
-      </View>
-      </GestureDetector>
 
       <GestureDetector gesture={swipeDayGesture}>
-      <Animated.View style={[{ flex: 1 }, pulledStyle]}>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[styles.list, { paddingHorizontal: 16 }]}
@@ -377,7 +256,7 @@ export function TodayScreen() {
               {t('searchNoResults', { query: searchQuery })}
             </Text>
           </Animated.View>
-        ) : !isFiltering && loading && visibleRows.length === 0 ? (
+        ) : !isFiltering && (enteringToday || (loading && visibleRows.length === 0)) ? (
           <Animated.View exiting={FadeOut.duration(160)}>
             <ListSkeleton />
           </Animated.View>
@@ -439,7 +318,6 @@ export function TodayScreen() {
           visibleRows.map(renderTodayRow)
         )}
       </ScrollView>
-      </Animated.View>
       </GestureDetector>
 
       <DayBar
@@ -460,11 +338,6 @@ export function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerSlot: { position: 'relative' },
-  // Se ancla justo donde termina el header (`top: '100%'`, no un px fijo — el header cambia de
-  // alto con la barra de búsqueda abierta) y se centra con el recorrido real en
-  // `SyncPullIndicator` (`offset`/`holdOffset`).
-  syncIndicatorSlot: { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10 },
   list: { flexGrow: 1, gap: 12, paddingTop: 8, paddingBottom: 160 },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingBottom: 160 },
   searchBarRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 12 },
