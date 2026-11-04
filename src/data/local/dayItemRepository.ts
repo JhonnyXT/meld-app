@@ -1,4 +1,4 @@
-import { eq, and, ne, lt, isNull, isNotNull, gte, lte, like, asc, inArray } from 'drizzle-orm';
+import { eq, and, or, ne, lt, isNull, isNotNull, gte, lte, like, asc, inArray } from 'drizzle-orm';
 import { db } from './db';
 import { dayItems, habitCompletions, taskCompletions, categories } from './schema';
 import { emitLocalChange } from './localChanges';
@@ -456,8 +456,13 @@ export interface PendingCompletion {
 }
 
 export const habitCompletionSyncRepository = {
+  // `sync_state IS NULL` = fila de antes de la Fase 1 — tratarla como pendiente también, o nunca
+  // sube.
   async listPendingSync(): Promise<PendingCompletion[]> {
-    const rows = await db.select().from(habitCompletions).where(eq(habitCompletions.syncState, 'pending'));
+    const rows = await db
+      .select()
+      .from(habitCompletions)
+      .where(or(eq(habitCompletions.syncState, 'pending'), isNull(habitCompletions.syncState)));
     return rows.map((r) => ({ id: r.id, updatedAt: r.updatedAt ?? EPOCH, deletedAt: r.deletedAt, habitId: r.habitId, date: r.date }));
   },
   async markSynced(ids: string[]): Promise<void> {
@@ -487,8 +492,12 @@ export const habitCompletionSyncRepository = {
 };
 
 export const taskCompletionSyncRepository = {
+  // `sync_state IS NULL` = fila de antes de la Fase 1 — ver el mismo comentario arriba.
   async listPendingSync(): Promise<PendingCompletion[]> {
-    const rows = await db.select().from(taskCompletions).where(eq(taskCompletions.syncState, 'pending'));
+    const rows = await db
+      .select()
+      .from(taskCompletions)
+      .where(or(eq(taskCompletions.syncState, 'pending'), isNull(taskCompletions.syncState)));
     return rows.map((r) => ({ id: r.id, updatedAt: r.updatedAt ?? EPOCH, deletedAt: r.deletedAt, taskId: r.taskId, date: r.date }));
   },
   async markSynced(ids: string[]): Promise<void> {

@@ -293,9 +293,20 @@ emulador, sin tocar los datos locales.
   (`signOut`, Fase 2) nunca toca los datos locales, que es el comportamiento más seguro mientras
   no esté esto. Falta la pregunta "Mantener / Borrar de este teléfono" + el wipeo real
   (bloqueado si `pendingChanges() > 0`, igual que `my-wallet-app`).
-- [ ] **Verificación real en dispositivo** — todo lo de arriba compila (`tsc`) y pasa Jest/reglas,
-  pero el flujo completo de push→pull entre dos teléfonos (o reinstalar y restaurar) todavía no
-  se probó con la app corriendo. Próximo paso antes de dar la fase por cerrada.
+- [x] **Verificación real en dispositivo** (2026-11-04): con el emulador corriendo, prueba de Pro
+  activada y login real, el push subió los 42 `items`/55 `habitCompletions`/3 `categories` del
+  seed (confirmado consultando el emulador por REST, no solo mirando la UI — los toques por
+  `adb` seguían sin llegar de forma confiable a la pantalla en este Samsung). **Bug real
+  encontrado y corregido en el camino**: las filas insertadas directo por SQL sin pasar por el
+  repositorio (las 3 categorías default de `db.ts`, y los `habit_completions` del seed) quedaban
+  con `sync_state` NULL — `listPendingSync()` solo buscaba `'pending'` exacto, así que esas filas
+  nunca subían. `categories` daba 0/3 antes del fix, 3/3 después; `habitCompletions` iba a dar
+  1/55 (solo lo tocado por `toggleHabitCompletion`, que sí usa el repositorio) — corregido
+  tratando `sync_state IS NULL` como pendiente también, en los 3 repositorios
+  (`dayItemRepository`/`categoryRepository`). No afecta a `day_items`, esa columna es
+  `NOT NULL DEFAULT 'pending'` desde la Fase 1. Pull no se probó con datos reales todavía (nada
+  que bajar en una cuenta nueva) — queda para una próxima sesión con un segundo dispositivo o una
+  reinstalación.
 
 **Hecho cuando:** desinstalar, reinstalar, iniciar sesión y ver exactamente lo mismo; y lo creado
 en modo avión aparece en la nube al volver la conexión.

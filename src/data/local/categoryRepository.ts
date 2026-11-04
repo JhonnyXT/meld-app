@@ -1,4 +1,4 @@
-import { eq, asc, isNull, inArray } from 'drizzle-orm';
+import { eq, asc, isNull, inArray, or } from 'drizzle-orm';
 import { db } from './db';
 import { categories } from './schema';
 import type { Category } from '@/domain/category';
@@ -82,8 +82,13 @@ export const categoryRepository = {
 
   // ─── Sync (SYNC_ROADMAP.md, Fase 3) — ver el mismo bloque en `dayItemRepository.ts` ──────────
 
+  // `sync_state IS NULL` = categoría de antes de la Fase 1, o las 3 default que `db.ts` inserta
+  // directo por SQL sin pasar por acá — tratarla como pendiente también, o nunca sube.
   async listPendingSync(): Promise<PendingCategory[]> {
-    const rows = await db.select().from(categories).where(eq(categories.syncState, 'pending'));
+    const rows = await db
+      .select()
+      .from(categories)
+      .where(or(eq(categories.syncState, 'pending'), isNull(categories.syncState)));
     return rows.map((row) => ({
       id: row.id,
       updatedAt: row.updatedAt ?? EPOCH,

@@ -127,11 +127,12 @@ export function initDb() {
   // puede renombrarlas/recolorearlas/borrarlas como a cualquier otra.
   const categoryCount = sqlite.getFirstSync<{ c: number }>('SELECT COUNT(*) as c FROM categories;');
   if (categoryCount && categoryCount.c === 0) {
+    const now = new Date().toISOString();
     sqlite.execSync(`
-      INSERT INTO categories (id, label, icon, color, sort_order) VALUES
-        ('cat-work', 'Work', 'briefcase', '#4F84FF', 0),
-        ('cat-personal', 'Personal', 'person', '#A55CFF', 1),
-        ('cat-health', 'Health', 'favorite', '#5dde97', 2);
+      INSERT INTO categories (id, label, icon, color, sort_order, updated_at, sync_state) VALUES
+        ('cat-work', 'Work', 'briefcase', '#4F84FF', 0, '${now}', 'pending'),
+        ('cat-personal', 'Personal', 'person', '#A55CFF', 1, '${now}', 'pending'),
+        ('cat-health', 'Health', 'favorite', '#5dde97', 2, '${now}', 'pending');
     `);
   }
 
