@@ -134,3 +134,72 @@ export interface AppSettingsDoc extends VersionedDoc {
   coolHabits: boolean;
   onboardingCompleted: boolean;
 }
+
+// ─── Espacios compartidos (Fase 4) ──────────────────────────────────────────────
+// `spaces/{spaceId}` es la categoría compartida: sus ítems viajan ahí (no al respaldo personal de
+// `users/{uid}/items`), igual que el ítem compartido de `my-wallet-app` pero con 3 subcolecciones
+// en vez de una (`items`/`habitCompletions`/`taskCompletions`, en vez de `transactions`) y
+// `config/category` en vez de `config/list`. Puro: solo describe la forma del documento — la
+// lectura/escritura real (reglas en `firestore.rules`) llega en un paso aparte, junto con la UI y
+// el motor de sync (este archivo no importa Firebase, Regla #3).
+
+/** El espacio en sí (T11: roles editor/lector; T10: tamaño máximo — ver `maxMembers()` en
+ * `firestore.rules`). `editorUids` ausente = legado, todos los miembros son editores (mismo
+ * fallback que las reglas). */
+export interface SpaceDoc {
+  ownerUid: string;
+  memberUids: string[];
+  editorUids?: string[];
+  createdAt: string;
+  deletedAt?: string | null;
+}
+
+/** Una fila por persona (`spaces/{id}/members/{uid}`, id = su propio uid — a diferencia de
+ * `my-wallet-app`, Meld no tiene la variante "persona sin app"). `leftAt` queda como registro de
+ * quién pasó por el espacio; `memberUids` de `SpaceDoc` es la fuente de verdad de quién sigue
+ * adentro. Pensado para el indicador "quién creó/completó esto" (SYNC_ROADMAP.md, Fase 4 — "por
+ * definir" todavía cómo se usa en la UI). */
+export interface SpaceMemberDoc {
+  name: string;
+  joinedAt: string;
+  leftAt?: string | null;
+  updatedAt: string;
+}
+
+/** Lo compartido de la categoría — mismo contenido que `CategoryDoc` salvo `sortOrder` (no aplica
+ * a un espacio, que no convive con otras categorías locales en una lista ordenada). */
+export interface SpaceCategoryDoc {
+  label: string;
+  icon: string;
+  color: string;
+  updatedAt: string;
+}
+
+/** Código de invitación de un solo espacio (`inviteCodes/{code}`, id = el código mismo —
+ * `firestore.rules` exige que no exista ya, así nunca se pisa uno vigente). `role` decide con qué
+ * permiso se une quien lo use (`spaces/{id}` → reglas de `update`); ausente = `'editor'` (mismo
+ * fallback que las reglas, ver `firestore.rules`). `expiresAt` es epoch ms al escribir desde la
+ * app (`remote.ts` lo convierte a `Timestamp` de Firestore, igual que `serverTimestamp()` en
+ * `pushBatch`) — las reglas exigen que no pase de 8 días desde el momento del `create`. */
+export interface InviteCodeDoc {
+  spaceId: string;
+  createdBy: string;
+  role?: 'editor' | 'viewer';
+  expiresAt: number;
+}
+
+/** `items`/`habitCompletions`/`taskCompletions` de un espacio son casi lo mismo que los
+ * personales, SIN `categoryId` (la categoría es el espacio entero, no hace falta apuntar a
+ * cuál) — D5 del diseño de My Wallet: mover un ítem a otra categoría (sea personal o compartida)
+ * le da un id nuevo en el destino + tombstone del viejo, nunca se "migra" el mismo documento. */
+export type SpaceItemDoc = Omit<DayItemDoc, 'categoryId'>;
+
+export function dayItemToSpaceDoc(item: DayItem): SpaceItemDoc {
+  const { id: _id, ...rest } = item;
+  return stripUndefined({ ...rest, deletedAt: null }) as SpaceItemDoc;
+}
+
+export function docToDayItemFromSpace(id: string, doc: SpaceItemDoc): DayItem {
+  const { deletedAt: _deletedAt, ...rest } = doc;
+  return { ...rest, id } as unknown as DayItem;
+}

@@ -43,7 +43,7 @@ el emulador de `dev`. Sigue la Fase 3 (respaldo en la nube).
 | T7 | **Primer login con datos en el teléfono y en la nube: se unen** | Nada se pierde (ids estables, Fase 1). |
 | T8 | **Al cerrar sesión se pregunta** "Mantener / Borrar de este teléfono" | Borrar se bloquea si hay cambios sin subir. |
 | T9 | **Compartir: solo el dueño necesita Pro**; invitados Free participan | Cada invitación trae usuarios nuevos; paga quien organiza. |
-| T10 | **Límites**: máx. ~6 miembros por categoría compartida; un usuario Free puede estar en 1-2 categorías compartidas como invitado | Controla costo y deja un motivo claro para pasar a Pro. Número exacto a cerrar en la Fase 4. |
+| T10 | **Límites**: máx. **6** miembros por categoría compartida (`maxMembers()` en `firestore.rules`, probado — el 7mo no se une); un usuario Free puede estar en **2** categorías compartidas como invitado | Controla costo y deja un motivo claro para pasar a Pro. El límite de miembros lo exigen las reglas (server-side); el de categorías-como-invitado por usuario es solo de la app (sin Cloud Functions no hay contador server-side que lo haga cumplir de verdad — ver nota de `maxMembers()`). |
 | T11 | **Roles editor / lector**, elegidos por el dueño por persona | Las reglas de Firestore lo validan (`editorUids`). Sin asignar tareas a una persona en v1. |
 | T12 | **Primero solo tareas, eventos, hábitos y notas en la nube**; notas de voz y fotos de Momentos después | Los archivos necesitan Cloud Storage, que exige el plan Blaze desde feb-2026. Se suman cuando haya ingresos de Pro (Fase 6). |
 | T13 | **Recordatorios: de cada persona** | Las notificaciones locales se programan en cada teléfono; en una categoría compartida, poner hora no hace sonar el teléfono de los demás. |
@@ -342,9 +342,26 @@ en modo avión aparece en la nube al volver la conexión.
 - [ ] Salir, quitar a alguien, eliminar para todos; quien pierde el acceso conserva la categoría
   como propia (desconectada).
 - [ ] Indicador en la fila de quién creó o completó un ítem compartido (por definir).
-- [ ] Reglas de `spaces/**` e `inviteCodes` + tests Jest contra el emulador (incluye límite de
-  miembros y roles editor/lector — casos obligados: un lector no puede escribir, el miembro
-  N+1 no se puede unir).
+- [x] **Modelo de datos + reglas de `spaces/**` e `inviteCodes` + tests** (2026-11-04): diseño
+  adaptado de `my-wallet-app/firestore.rules` (mismo patrón de roles/límites — funciones
+  `isMember`/`isMemberAfter`/`canWrite`/`isOwner`/`isEditor`/`isEditorAfter`/`canEdit`,
+  `maxMembers() = 6`), con las subcolecciones de Meld en vez de las de My Wallet:
+  `items`/`habitCompletions`/`taskCompletions` (en vez de `transactions`) y `config/category` (en
+  vez de `config/list`). `members/{uid}` queda más simple que en My Wallet — sin la variante
+  "persona sin app" (Meld no la tiene): una fila por persona, id = su propio uid, que cualquier
+  miembro crea/edita para sí (el dueño también puede tocar la de otro, para quitarlo). Tipos puros
+  en `src/sync/mappers.ts` (`SpaceDoc`/`SpaceMemberDoc`/`SpaceCategoryDoc`/`InviteCodeDoc`/
+  `SpaceItemDoc` + `dayItemToSpaceDoc`/`docToDayItemFromSpace`) — sin Firebase, Regla #3; `remote.ts`/
+  `engine.ts`/UI quedan para un paso aparte. **32 tests nuevos** en `firestore-tests/rules.test.ts`
+  (`npm run test:rules`), cubriendo: crear espacio (dueño=self, editorUids=[self]), leer/escribir
+  como miembro, un no-miembro no lee nada, descubrir por `memberUids array-contains`, unirse con
+  código (vigente/vencido/inexistente/de otro espacio/espacio eliminado), códigos no se enumeran,
+  límite de 6 miembros (el 7mo falla, el 6to entra), roles editor/lector (código de editor suma a
+  `editorUids`, de lector no; un lector no escribe ítems/config pero sí lee; solo el dueño cambia
+  roles, nadie se autopromueve; legado sin `editorUids` = todos editores; un lector solo invita
+  como lector), mi propio miembro (nadie edita la fila de otro salvo el dueño), salir/quitar/
+  eliminar (salir en lote, el dueño quita pero no se autoagrega/autoquita, eliminar marca +
+  permite borrar todo + los demás dejan de leer).
 - [ ] Pruebas con dos teléfonos y dos cuentas (Moto e7 plus + S24 Ultra), en `dev` + emulador y
   en `test` contra la nube real.
 

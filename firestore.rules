@@ -2,13 +2,190 @@ rules_version = '2';
 
 // Sync (SYNC_ROADMAP.md). Fase 3: cada usuario solo lee y escribe lo suyo, bajo users/{uid} (las
 // subcolecciones son items/habitCompletions/taskCompletions/categories, ver src/sync/mappers.ts
-// -> COLLECTION_PATH). spaces/{id}/inviteCodes llegan en la Fase 4 (diseño de referencia en
-// my-wallet-app/firestore.rules). Todo lo demás se niega. Tests: firestore-tests/rules.test.ts
-// (npm run test:rules).
+// -> COLLECTION_PATH).
+//
+// Fase 4: categorías compartidas. spaces/{id} (diseño adaptado de my-wallet-app/firestore.rules —
+// mismo patrón de roles/límites, subcolecciones distintas: items/habitCompletions/taskCompletions
+// en vez de transactions, config/category en vez de config/list, members/{uid} sin la variante
+// "persona sin app" de My Wallet, que Meld no tiene) e inviteCodes/{code}. Todo lo demás se niega.
+// Tests: firestore-tests/rules.test.ts (npm run test:rules).
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{uid}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Protección de costo (T10): tamaño máximo de un espacio, dueño incluido. El límite de
+    // cuántos espacios puede tener/unirse un usuario Free como invitado es solo de la app (sin
+    // Cloud Functions no hay forma de contarlo del lado del servidor); este es el único tope que
+    // las reglas pueden hacer cumplir.
+    function maxMembers() {
+      return 6;
+    }
+    function signedIn() {
+      return request.auth != null;
+    }
+    function spacePath(id) {
+      return /databases/$(database)/documents/spaces/$(id);
+    }
+    // Miembro vigente de un espacio no eliminado, antes de esta escritura.
+    function isMember(id) {
+      return signedIn() && exists(spacePath(id))
+        && request.auth.uid in get(spacePath(id)).data.memberUids
+        && get(spacePath(id)).data.get('deletedAt', null) == null;
+    }
+    // Lo mismo, después de la escritura (o del lote): crear el espacio y sus documentos en un
+    // mismo lote, donde get() todavía no ve el espacio.
+    function isMemberAfter(id) {
+      return signedIn() && existsAfter(spacePath(id))
+        && request.auth.uid in getAfter(spacePath(id)).data.memberUids
+        && getAfter(spacePath(id)).data.get('deletedAt', null) == null;
+    }
+    // Antes o después: salir en un lote (leftAt + quitarse) ya no es miembro después.
+    function canWrite(id) {
+      return isMember(id) || isMemberAfter(id);
+    }
+    function isOwner(id) {
+      return signedIn() && exists(spacePath(id))
+        && get(spacePath(id)).data.ownerUid == request.auth.uid;
+    }
+    // Miembro con permiso de editar (T11). Compatibilidad: un espacio creado antes de este campo
+    // no trae `editorUids` — se trata como "todos editores" (cae a `memberUids`), para no romper
+    // nada hasta que el dueño cambie un rol.
+    function isEditor(id) {
+      return isMember(id)
+        && request.auth.uid in get(spacePath(id)).data.get('editorUids', get(spacePath(id)).data.memberUids);
+    }
+    // Lo mismo, después de la escritura: crear el espacio y su config/sus ítems en un mismo
+    // lote, donde get() todavía no ve el espacio — mismo patrón que isMemberAfter/canWrite.
+    function isEditorAfter(id) {
+      return isMemberAfter(id)
+        && request.auth.uid in getAfter(spacePath(id)).data.get('editorUids', getAfter(spacePath(id)).data.memberUids);
+    }
+    function canEdit(id) {
+      return isEditor(id) || isEditorAfter(id);
+    }
+    function changedOnly(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    match /spaces/{id} {
+      // Incluye un espacio eliminado (deletedAt): así sus miembros se enteran.
+      allow get: if signedIn() && request.auth.uid in resource.data.memberUids;
+      // Descubrir mis espacios: query con where("memberUids", "array-contains", uid).
+      allow list: if signedIn() && request.auth.uid in resource.data.memberUids;
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.memberUids == [request.auth.uid]
+        // El dueño siempre es editor (T11).
+        && request.resource.data.editorUids == [request.auth.uid]
+        && request.resource.data.get('deletedAt', null) == null;
+      allow update: if signedIn() && (
+        // Dueño: quitar a otros (nunca agregar) y eliminar (deletedAt). Sigue siendo miembro.
+        (resource.data.ownerUid == request.auth.uid
+          && changedOnly(['memberUids', 'deletedAt', 'serverUpdatedAt'])
+          && resource.data.memberUids.hasAll(request.resource.data.memberUids)
+          && request.auth.uid in request.resource.data.memberUids)
+        // Dueño: cambiar el rol de alguien (T11). Sigue siendo subconjunto de memberUids y el
+        // dueño sigue siendo editor; no se puede promover ni degradar a sí mismo.
+        || (resource.data.ownerUid == request.auth.uid
+          && changedOnly(['editorUids', 'serverUpdatedAt'])
+          && request.resource.data.editorUids.removeAll(resource.data.memberUids).size() == 0
+          && request.auth.uid in request.resource.data.editorUids)
+        // Unirse: un no miembro se agrega solo a sí mismo, con un código vigente de ESTE espacio,
+        // y nunca por encima del tamaño máximo (T10). El rol lo trae el código: si es de editor,
+        // también se agrega a `editorUids`; de lector, no se toca ese arreglo.
+        || (!(request.auth.uid in resource.data.memberUids)
+          && resource.data.get('deletedAt', null) == null
+          && request.resource.data.memberUids.hasAll(resource.data.memberUids)
+          && request.resource.data.memberUids.size() == resource.data.memberUids.size() + 1
+          && request.resource.data.memberUids.size() <= maxMembers()
+          && request.auth.uid in request.resource.data.memberUids
+          && request.resource.data.joinCode is string
+          && exists(/databases/$(database)/documents/inviteCodes/$(request.resource.data.joinCode))
+          && get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.joinCode)).data.spaceId == id
+          && get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.joinCode)).data.expiresAt > request.time
+          && (
+            // Ojo: `resource.data.get('editorUids', resource.data.memberUids)` (el fallback de
+            // isEditor) sirve para LEER, pero no para esta cuenta: un espacio legado no tiene el
+            // campo de verdad, y `arrayUnion` sobre un campo ausente parte de `[]`, no del
+            // fallback. Por eso aquí el único cambio permitido es agregarse a sí mismo (nunca a
+            // otro) y nunca quitar a quien ya estuviera en `editorUids` de verdad.
+            (get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.joinCode)).data.get('role', 'editor') == 'editor'
+              && changedOnly(['memberUids', 'joinCode', 'editorUids', 'serverUpdatedAt'])
+              && request.resource.data.editorUids.removeAll(resource.data.get('editorUids', [])).hasOnly([request.auth.uid])
+              && resource.data.get('editorUids', []).removeAll(request.resource.data.editorUids).size() == 0)
+            || (get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.joinCode)).data.get('role', 'editor') == 'viewer'
+              && changedOnly(['memberUids', 'joinCode', 'serverUpdatedAt'])
+              && !(request.auth.uid in resource.data.get('editorUids', resource.data.memberUids)))
+          ))
+        // Salir: un miembro que no es el dueño solo se quita a sí mismo. No toca `editorUids`: un
+        // uid que ya no es miembro tampoco pasa `isEditor` (la revisa junto con `isMember`), así
+        // que un rastro suyo ahí queda inerte — permitir tocar ese arreglo aquí abriría la puerta
+        // a que alguien se agregue a `editorUids` disfrazado de "estoy saliendo".
+        || (request.auth.uid in resource.data.memberUids
+          && resource.data.ownerUid != request.auth.uid
+          && changedOnly(['memberUids', 'serverUpdatedAt'])
+          && request.resource.data.memberUids == resource.data.memberUids.removeAll([request.auth.uid]))
+      );
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+
+      // Una fila por persona, id = su propio uid (Meld no tiene la variante "persona sin app" de
+      // My Wallet) — { name, joinedAt, leftAt?, updatedAt }. Agregar o editar la propia es
+      // "unirse"/"actualizar mi nombre", no "editar el espacio": cualquier miembro, no solo un
+      // editor. El dueño además puede tocar (y borrar) la de cualquiera, para quitar a alguien.
+      match /members/{uid} {
+        allow read: if isMember(id) || isOwner(id);
+        allow create: if canWrite(id) && uid == request.auth.uid;
+        allow update: if canWrite(id) && (uid == request.auth.uid || isOwner(id));
+        allow delete: if isOwner(id) || (canWrite(id) && uid == request.auth.uid);
+      }
+
+      // Lo compartido de la categoría: nombre, ícono, color.
+      match /config/{doc} {
+        allow read: if isMember(id) || isOwner(id);
+        allow create, update: if canEdit(id);
+        allow delete: if isOwner(id);
+      }
+
+      // Cualquier editor crea, edita o borra (lógico, con tombstone — mismo criterio que
+      // users/{uid}/items) cualquier ítem/completado del espacio, sin importar quién lo creó; un
+      // lector solo lee. Borrar de verdad (delete real de Firestore) solo el dueño, al eliminar
+      // el espacio entero.
+      match /items/{itemId} {
+        allow read: if isMember(id) || isOwner(id);
+        allow create, update: if canEdit(id);
+        allow delete: if isOwner(id);
+      }
+      match /habitCompletions/{cid} {
+        allow read: if isMember(id) || isOwner(id);
+        allow create, update: if canEdit(id);
+        allow delete: if isOwner(id);
+      }
+      match /taskCompletions/{cid} {
+        allow read: if isMember(id) || isOwner(id);
+        allow create, update: if canEdit(id);
+        allow delete: if isOwner(id);
+      }
+    }
+
+    // Códigos de invitación. Se leen solo sabiendo el código (sin list ajeno: no se enumeran).
+    match /inviteCodes/{code} {
+      allow get: if signedIn();
+      // Solo los propios (para borrarlos al eliminar el espacio).
+      allow list: if signedIn() && resource.data.createdBy == request.auth.uid;
+      // create no pisa uno existente (eso sería update, que no se permite). Invitar como lector
+      // lo hace cualquier miembro; invitar como editor (T11), solo quien ya es editor — un lector
+      // no puede reclutar a alguien con más permiso del que tiene él mismo.
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.spaceId is string
+        && isMember(request.resource.data.spaceId)
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt <= request.time + duration.value(8, 'd')
+        && (request.resource.data.get('role', 'editor') == 'viewer'
+          || isEditor(request.resource.data.spaceId));
+      allow delete: if signedIn() && resource.data.createdBy == request.auth.uid;
     }
 
     match /{document=**} {
