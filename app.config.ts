@@ -1,4 +1,6 @@
+import { existsSync, readFileSync } from 'fs';
 import type { ExpoConfig } from 'expo/config';
+import { webClientIdFrom } from './firebase/googleServices';
 
 // ─── Build variants ─────────────────────────────────────────────────────────
 // Patrón portado de my-wallet-app / habit-tracker (ver CLAUDE.md → Build variants).
@@ -44,6 +46,19 @@ const current = variants[variant];
 // Uno por variant, como el resto del aislamiento entre dev/test/prod.
 const widgetAppGroup = `group.${current.package}.widget`;
 
+// ─── Firebase (SYNC_ROADMAP.md, T6) ─────────────────────────────────────────
+// dev y test comparten el proyecto meld-test-b197c: dev lo usa solo para el cliente OAuth del
+// login (sus datos van al Firebase Emulator, ver src/sync/firebase.ts), no a la nube real. prod →
+// meld-prod-d6b61, proyecto aparte.
+const googleServicesFile =
+  variant === 'prod' ? './firebase/google-services.prod.json' : './firebase/google-services.test.json';
+
+// Google Sign-In (versión gratis) no detecta el webClientId: se saca del mismo JSON al compilar.
+// Sin el archivo (clon nuevo) la config sigue resolviendo; el build nativo sí lo exige.
+const googleWebClientId = existsSync(googleServicesFile)
+  ? webClientIdFrom(JSON.parse(readFileSync(googleServicesFile, 'utf8')), current.package)
+  : undefined;
+
 // `newArchEnabled` es válida en el schema de app.json/app.config pero todavía
 // no está en el tipo `ExpoConfig` de este SDK — se extiende el tipo acá en vez
 // de perder el chequeo de tipos del resto de la config con un `as any`.
@@ -70,6 +85,7 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
   },
   android: {
     package: current.package,
+    googleServicesFile,
     // El ícono es el logo tal cual, igual en los 3 variants (a pedido
     // explícito — antes cada variant teñía el fondo con su propio color y el
     // logo quedaba "encajonado"). `backgroundImage` es el degradado negro
@@ -209,6 +225,9 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
       },
     ],
     '@bacons/apple-targets',
+    '@react-native-firebase/app',
+    '@react-native-firebase/auth',
+    '@react-native-google-signin/google-signin',
   ],
   experiments: {
     typedRoutes: true,
@@ -216,6 +235,7 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
   extra: {
     appVariant: variant,
     widgetAppGroup,
+    googleWebClientId,
     // Proyecto de EAS (creado en expo.dev). Como `app.config.ts` es dinámico,
     // `eas init` no puede escribir esto solo — va acá a mano. El mismo
     // projectId sirve para los 3 variants (dev/test/prod); lo que los separa

@@ -2,10 +2,6 @@
  * Guardia estática de la Regla #3 de SYNC_ROADMAP.md: la red (Firebase / Google Sign-In) solo
  * vive en `src/sync/`. Pantallas, stores, hooks, repositorios y utilidades importan la API de
  * `@/sync`, nunca Firebase directo.
- *
- * El segundo `it` (src/sync/ sí los importa) se agrega cuando este directorio tenga código real
- * con un import de Firebase/Google Sign-In — todavía no, src/sync/ está vacío (Fase 2, antes de
- * instalar @react-native-firebase/*). Sin ese código, esa aserción sería un falso positivo.
  */
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative } from 'path';
@@ -27,4 +23,9 @@ const offenders = SCANNED.flatMap((p) => sourceFiles(join(ROOT, p)))
 
 it('ningún archivo fuera de src/sync/ importa Firebase ni Google Sign-In', () => {
   expect(offenders).toEqual([]);
+});
+
+it('src/sync/ sí los importa (la guardia mira el lugar correcto)', () => {
+  const sync = sourceFiles(join(ROOT, 'src', 'sync'));
+  expect(sync.some((f) => NETWORK_IMPORT.test(readFileSync(f, 'utf8')))).toBe(true);
 });

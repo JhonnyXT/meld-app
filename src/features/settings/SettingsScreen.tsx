@@ -9,6 +9,8 @@ import { SettingsSection } from '@/components/settings/SettingsSection';
 import { SettingRow } from '@/components/settings/SettingRow';
 import { AccentColorRow } from '@/components/settings/AccentColorRow';
 import { Toggle } from '@/components/Toggle';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useSession, signInWithGoogle, signOut as signOutOfGoogle, deleteAccount, AuthError, authErrorMessage } from '@/sync';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useTranslation, type TranslationKey } from '@/i18n';
 import {
@@ -128,6 +130,43 @@ export function SettingsScreen() {
     if (status.granted) setNotificationsEnabled(true);
   };
 
+  // Cuenta (SYNC_ROADMAP.md, Fase 2): iniciar sesión es opcional, no bloquea nada de la app. Sin
+  // Firestore todavía (Fase 3) — por ahora solo abre/cierra sesión y permite borrar la cuenta.
+  const { user: sessionUser } = useSession();
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+
+  const handleSignIn = async () => {
+    setAccountBusy(true);
+    try {
+      await signInWithGoogle();
+    } catch (e) {
+      const message = e instanceof AuthError ? authErrorMessage(e.kind) : authErrorMessage('unknown');
+      if (message) console.warn('[account] sign-in failed:', message);
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setAccountBusy(true);
+    try {
+      await signOutOfGoogle();
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteConfirmVisible(false);
+    setAccountBusy(true);
+    try {
+      await deleteAccount();
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+
   return (
     <Screen style={{ paddingHorizontal: 0 }}>
       <ScreenHeader
@@ -149,6 +188,38 @@ export function SettingsScreen() {
         contentContainerStyle={[styles.content, { paddingHorizontal: 16 }]}
         showsVerticalScrollIndicator={false}
       >
+        <SettingsSection title={t('settingsSectionAccount')}>
+          {sessionUser ? (
+            <>
+              <SettingRow
+                icon="person"
+                title={sessionUser.name ?? sessionUser.email ?? ''}
+                subtitle={sessionUser.email ? t('settingsAccountSignedInAs', { email: sessionUser.email }) : undefined}
+                showBorder
+              />
+              <SettingRow
+                icon="log-out"
+                title={t('settingsAccountSignOut')}
+                showBorder
+                onPress={accountBusy ? undefined : handleSignOut}
+              />
+              <SettingRow
+                icon="delete-outline"
+                title={t('settingsAccountDeleteAccount')}
+                onPress={accountBusy ? undefined : () => setDeleteConfirmVisible(true)}
+              />
+            </>
+          ) : (
+            <SettingRow
+              icon="person"
+              title={t('settingsAccountSignIn')}
+              subtitle={t('settingsAccountSignInSubtitle')}
+              onPress={accountBusy ? undefined : handleSignIn}
+              right={<Icon name="chevron-right" size={18} color={palette.textDim} />}
+            />
+          )}
+        </SettingsSection>
+
         <SettingsSection title={t('settingsSectionPlan')}>
           <SettingRow
             icon="sparkles"
@@ -282,6 +353,17 @@ export function SettingsScreen() {
             </Text>
           </View>
         }
+      />
+
+      <ConfirmDialog
+        visible={deleteConfirmVisible}
+        icon="delete-outline"
+        title={t('settingsAccountDeleteConfirmTitle')}
+        message={t('settingsAccountDeleteConfirmMessage')}
+        confirmLabel={t('settingsAccountDeleteConfirmButton')}
+        cancelLabel={t('settingsAccountCancel')}
+        onConfirm={handleDeleteAccount}
+        onCancel={() => setDeleteConfirmVisible(false)}
       />
     </Screen>
   );

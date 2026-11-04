@@ -70,6 +70,7 @@ import {
   ShoppingCart,
   Music,
   Plane,
+  LogOut,
   type LucideIcon,
 } from 'lucide-react-native';
 import type { IconName } from '@/domain/iconNames';
@@ -148,6 +149,7 @@ const ICON_MAP: Record<IconName, LucideIcon> = {
   cart: ShoppingCart,
   music: Music,
   plane: Plane,
+  'log-out': LogOut,
 };
 
 interface IconProps {

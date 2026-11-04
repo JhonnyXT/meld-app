@@ -7,6 +7,35 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:473133939786:android:8b3e6a4bb42a0b9bc83ab3",
+        "android_client_info": {
+          "package_name": "app.meld.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "473133939786-kmk024s4n5vs9ch12drbtrg832p2h2ng.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPpkQXUJNQ60_ZUkDl1kK8nevM_qbBDek"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "473133939786-kmk024s4n5vs9ch12drbtrg832p2h2ng.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:473133939786:android:09f0e85be23cf1cac83ab3",
         "android_client_info": {
           "package_name": "app.meld.mobile.test"

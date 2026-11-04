@@ -80,4 +80,5 @@ export type IconName =
   | 'star'
   | 'cart'
   | 'music'
-  | 'plane';
+  | 'plane'
+  | 'log-out';

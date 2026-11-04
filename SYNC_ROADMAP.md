@@ -215,8 +215,20 @@ desmarcar un hábito (reutiliza su id determinístico) y crear/editar una tarea.
   SHA-1 de las keystores de EAS (`eas credentials`) cuando el usuario haga `eas login`.
   `google-services.test.json`/`google-services.prod.json` descargados a `firebase/` (no son
   secretos, van embebidos en el APK — se committean, mismo patrón que `my-wallet-app`).
-  **Pendiente de confirmar**: Authentication → Sign-in method → Google habilitado en los dos
-  proyectos (no confirmado todavía en esta conversación).
+  Authentication → Sign-in method → Google habilitado en los dos proyectos (confirmado por el
+  usuario). Se sumó una tercera app Android dentro de `meld-test-b197c` con el paquete
+  `app.meld.mobile` (el de dev) — dev y test comparten ese mismo `google-services.test.json`,
+  cada uno resuelve su propio `webClientId` por paquete (`firebase/googleServices.js`).
+- [ ] `@react-native-firebase/app`/`auth`/`firestore` + `@react-native-google-signin/
+  google-signin` (dependencias nativas: `prebuild --clean` + rebuild), `google-services.json`
+  por variant — **instalado y cableado en código** (2026-11-03): `app.config.ts` resuelve
+  `googleServicesFile`/`googleWebClientId` por variant, `src/sync/` tiene `firebase.ts`
+  (cliente + conexión al emulador en `dev`, puertos propios 9098/8090),
+  `session.ts`/`errors.ts`/`useSession.ts`/`index.ts` (iniciar/cerrar sesión, eliminar cuenta,
+  todo detrás de `AuthError` tipado). Ajustes → sección **Cuenta** ya tiene el flujo de
+  iniciar/cerrar sesión y eliminar cuenta (con `ConfirmDialog`), sin tocar Firestore todavía
+  (eso es la Fase 3). **Falta el `expo prebuild --platform android --clean` + rebuild en
+  dispositivo** — sin eso estas dependencias nativas no existen en el APK instalado todavía.
 - [ ] `@react-native-firebase/app`/`auth`/`firestore` + `@react-native-google-signin/google-signin`
   (dependencias nativas: `prebuild --clean` + rebuild), `google-services.json` por variant.
 - [ ] Ajustes → **Cuenta**: iniciar sesión, cerrar sesión, eliminar cuenta. Sin paso en el

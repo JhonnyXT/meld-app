@@ -378,6 +378,19 @@ export const es = {
   settingsCategories: 'Categorías',
   settingsCategoriesSubtitle: 'Crea, edita y elimina categorías',
 
+  settingsSectionAccount: 'Cuenta',
+  settingsAccountSignIn: 'Iniciar sesión con Google',
+  settingsAccountSignInSubtitle: 'Opcional — Meld funciona igual sin cuenta',
+  settingsAccountSignedInAs: 'Conectado como {email}',
+  settingsAccountSignOut: 'Cerrar sesión',
+  settingsAccountDeleteAccount: 'Eliminar cuenta',
+  settingsAccountDeleteConfirmTitle: '¿Eliminar tu cuenta?',
+  settingsAccountDeleteConfirmMessage:
+    'Se borra tu cuenta de Google de Meld. Lo que tienes guardado en este teléfono no se toca.',
+  settingsAccountDeleteConfirmButton: 'Eliminar',
+  settingsAccountCancel: 'Cancelar',
+  settingsAccountErrorGeneric: 'No se pudo completar. Inténtalo de nuevo en un momento.',
+
   settingsSectionPlan: 'Plan',
   settingsPlanFree: 'Todo lo esencial, gratis para siempre',
   settingsPlanPro: 'Suscripción activa',
@@ -747,6 +760,19 @@ export const en: Record<keyof typeof es, string> = {
 
   settingsCategories: 'Categories',
   settingsCategoriesSubtitle: 'Create, edit and remove categories',
+
+  settingsSectionAccount: 'Account',
+  settingsAccountSignIn: 'Sign in with Google',
+  settingsAccountSignInSubtitle: 'Optional — Meld works the same without an account',
+  settingsAccountSignedInAs: 'Signed in as {email}',
+  settingsAccountSignOut: 'Sign out',
+  settingsAccountDeleteAccount: 'Delete account',
+  settingsAccountDeleteConfirmTitle: 'Delete your account?',
+  settingsAccountDeleteConfirmMessage:
+    "This removes your Google account from Meld. What's saved on this phone stays untouched.",
+  settingsAccountDeleteConfirmButton: 'Delete',
+  settingsAccountCancel: 'Cancel',
+  settingsAccountErrorGeneric: "Couldn't complete that. Try again in a moment.",
 
   settingsSectionPlan: 'Plan',
   settingsPlanFree: 'All the essentials, free forever',
