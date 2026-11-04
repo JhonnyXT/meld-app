@@ -219,22 +219,30 @@ desmarcar un hábito (reutiliza su id determinístico) y crear/editar una tarea.
   usuario). Se sumó una tercera app Android dentro de `meld-test-b197c` con el paquete
   `app.meld.mobile` (el de dev) — dev y test comparten ese mismo `google-services.test.json`,
   cada uno resuelve su propio `webClientId` por paquete (`firebase/googleServices.js`).
-- [ ] `@react-native-firebase/app`/`auth`/`firestore` + `@react-native-google-signin/
-  google-signin` (dependencias nativas: `prebuild --clean` + rebuild), `google-services.json`
-  por variant — **instalado y cableado en código** (2026-11-03): `app.config.ts` resuelve
-  `googleServicesFile`/`googleWebClientId` por variant, `src/sync/` tiene `firebase.ts`
-  (cliente + conexión al emulador en `dev`, puertos propios 9098/8090),
-  `session.ts`/`errors.ts`/`useSession.ts`/`index.ts` (iniciar/cerrar sesión, eliminar cuenta,
-  todo detrás de `AuthError` tipado). Ajustes → sección **Cuenta** ya tiene el flujo de
-  iniciar/cerrar sesión y eliminar cuenta (con `ConfirmDialog`), sin tocar Firestore todavía
-  (eso es la Fase 3). **Falta el `expo prebuild --platform android --clean` + rebuild en
-  dispositivo** — sin eso estas dependencias nativas no existen en el APK instalado todavía.
-- [ ] `@react-native-firebase/app`/`auth`/`firestore` + `@react-native-google-signin/google-signin`
-  (dependencias nativas: `prebuild --clean` + rebuild), `google-services.json` por variant.
-- [ ] Ajustes → **Cuenta**: iniciar sesión, cerrar sesión, eliminar cuenta. Sin paso en el
-  onboarding (Free no lo necesita); se ofrece al intentar algo Pro.
-- [ ] `src/sync/` con cliente y sesión + test de frontera (Jest, como
-  `sync.boundary.test.ts` de My Wallet: falla si algo fuera de `src/sync/` importa Firebase).
+- [x] **`@react-native-firebase/app`/`auth`/`firestore` + `@react-native-google-signin/
+  google-signin`** (2026-11-03): `app.config.ts` resuelve `googleServicesFile`/
+  `googleWebClientId` por variant, `src/sync/` tiene `firebase.ts` (cliente + conexión al
+  emulador en `dev`, puertos propios 9098/8090), `session.ts`/`errors.ts`/`useSession.ts`/
+  `index.ts` (iniciar/cerrar sesión, eliminar cuenta, todo detrás de `AuthError` tipado).
+  Ajustes → sección **Cuenta** tiene el flujo de iniciar/cerrar sesión y eliminar cuenta (con
+  `ConfirmDialog`, sin paso en el onboarding — se ofrece al intentar algo Pro), sin tocar
+  Firestore todavía (eso es la Fase 3). `sync.boundary.test.ts` (ya existía desde el paso de
+  Jest) confirma los dos lados: nada fuera de `src/sync/` importa Firebase, y `src/sync/` sí.
+  **`expo prebuild --clean` + rebuild en dispositivo — hecho, con un bug real en el camino**:
+  `@react-native-firebase/auth` 27.1.0 (firebase-bom 35.0.2) rompía `compileDebugKotlin` con
+  "Module was compiled with an incompatible version of Kotlin" — el AAR de
+  `firebase-auth-25.0.0` está compilado con metadata 2.4.0, y el Kotlin que resuelve Expo por
+  default (2.0.21) solo lee hasta 2.1.0. Instalar `expo-build-properties` y subir
+  `android.kotlinVersion` a 2.2.20 NO alcanzó (mismo error exacto) — el AAR en sí pedía más de
+  lo que cualquier Kotlin 2.2.x puede leer. Lo que sí resolvió: bajar
+  `@react-native-firebase/{app,auth,firestore}` a **26.0.0** (firebase-bom 34.15.0, un AAR de
+  `firebase-auth` más viejo y compatible). Se deja igual la versión de Kotlin 2.2.20 vía
+  `expo-build-properties` (ya la pedía el resto del árbol, sin relación con este bug puntual).
+  Build `assembleDebug` verde, instalado y probado en un Samsung S24 Ultra (no en el Moto E7
+  Plus de siempre — dispositivo distinto en esta sesión): la app abre con los datos reales del
+  usuario sin crashear. **Pendiente de confirmar por el usuario**: que Ajustes → Cuenta
+  renderiza y el botón de iniciar sesión no rompe nada (los toques por `adb` no llegaban a la
+  pantalla en este dispositivo, a diferencia del Moto E7 Plus — verificación manual pendiente).
 
 **Hecho cuando:** login, cierre de sesión y eliminación de cuenta funcionan en `dev` con el
 emulador, sin tocar los datos locales.

@@ -228,6 +228,19 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
     '@react-native-firebase/app',
     '@react-native-firebase/auth',
     '@react-native-google-signin/google-signin',
+    [
+      'expo-build-properties',
+      {
+        // El default de Expo (2.0.21) no compila contra Kotlin 2.2.20, que ya aparecía como
+        // constraint resuelto en el árbol de dependencias antes de fijarla acá explícito.
+        // (El bug real que bloqueaba el build — "Module was compiled with an incompatible
+        // version of Kotlin", metadata 2.4.0 vs. 2.1.0 esperado, en el AAR de firebase-auth de
+        // @react-native-firebase/auth 27.x — se resolvió bajando a 26.0.0, que usa firebase-bom
+        // 34.15.0 en vez de 35.0.2; ver package.json. Esta versión de Kotlin se deja igual,
+        // ya la pedía el resto del árbol.)
+        android: { kotlinVersion: '2.2.20' },
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,
