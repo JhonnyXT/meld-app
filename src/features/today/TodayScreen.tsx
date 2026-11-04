@@ -187,11 +187,11 @@ export function TodayScreen() {
     Haptics.impactAsync(armed ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
   }, []);
 
-  // Captura solo un arrastre claro hacia abajo (no compite con tocar los íconos del header).
+  // Captura solo un arrastre claro hacia abajo — `onStart` (no `onBegin`) recién dispara una vez
+  // cruzado `activeOffsetY`, así un toque simple en los íconos del header nunca llega a "jalar".
   const syncPanGesture = Gesture.Pan()
     .enabled(syncEnabled && syncPhase === 'idle')
-    .activeOffsetY([8, 1000])
-    .failOffsetX([-20, 20])
+    .activeOffsetY(10)
     .onStart(() => {
       pullArmed.value = false;
       runOnJS(setPhase)('pulling');
