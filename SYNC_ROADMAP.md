@@ -385,9 +385,10 @@ en modo avión aparece en la nube al volver la conexión.
   reasignar `space_id` en el mismo id) todavía no tiene flujo — hoy nada en Quick Add/detalle
   distingue categorías compartidas, así que ese cruce de límite ni se puede intentar desde la UI
   todavía. 21 tests (`npm test`) siguen en verde, incluye 1 nuevo para
-  `dayItemToSpaceDoc`/`docToDayItemFromSpace`. Sin probar en dispositivo real todavía (ningún
-  teléfono conectado en esta sesión) — confirmar que la migración corre limpio en una instalación
-  con datos antes de seguir con el motor de sync.
+  `dayItemToSpaceDoc`/`docToDayItemFromSpace`. **Verificado en dispositivo** (2026-11-04, Moto E7
+  Plus, instalación con 25 ítems reales de sesiones anteriores): la migración corrió limpio, sin
+  errores de SQLite; Today cargó los mismos 25 ítems de siempre y la sync siguió sincronizando
+  ("Respaldado Ahora mismo" en Ajustes → Cuenta) — las columnas nuevas no rompieron nada.
 - [ ] Pruebas con dos teléfonos y dos cuentas (Moto e7 plus + S24 Ultra), en `dev` + emulador y
   en `test` contra la nube real.
 
