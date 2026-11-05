@@ -204,3 +204,45 @@ export async function getSpaceMember(spaceId: string, uid: string): Promise<Remo
 export async function setSpaceMember(spaceId: string, uid: string, data: SpaceMemberDoc): Promise<void> {
   await setDoc(doc(db(), 'spaces', spaceId, 'members', uid), { ...data, serverUpdatedAt: serverTimestamp() });
 }
+
+/** Crea `spaces/{spaceId}` (compartir una categoría, SYNC_ROADMAP.md Fase 4) — `spaceId` es
+ * siempre el `id` de la categoría que se comparte (ver el comentario largo en
+ * `data/local/schema.ts` → `categories.spaceId`). `setDoc` sobre un id que ya existe lo
+ * actualizaría en vez de crearlo; `firestore.rules` no tiene regla de `update` para un espacio
+ * recién creado por su dueño salvo las ramas de quitar miembro/cambiar rol/unirse, así que un
+ * intento de re-crear un espacio existente simplemente falla por permisos (nunca pisa uno ajeno). */
+export async function createSpaceDoc(spaceId: string, data: SpaceDoc): Promise<void> {
+  await setDoc(doc(db(), 'spaces', spaceId), { ...data, serverUpdatedAt: serverTimestamp() });
+}
+
+/** Borra puntualmente documentos de `users/{uid}/{kind}` por id — usado al compartir una
+ * categoría (SYNC_ROADMAP.md, Fase 4): sus ítems/completados/la categoría misma dejan de vivir en
+ * el respaldo personal (de ahí en más viven en `spaces/{id}/...`), así que su fila vieja ahí (si
+ * ya se había subido) se tombstona de verdad en vez de quedar huérfana. Borrar un id que nunca se
+ * subió (o que ya no existe) es inofensivo: `batch.delete()` de un documento ausente no falla. */
+export async function deletePersonalDocs(uid: string, kind: ItemCollection, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const firestore = db();
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    const batch = writeBatch(firestore);
+    for (const id of ids.slice(i, i + BATCH_SIZE)) {
+      batch.delete(doc(firestore, 'users', uid, COLLECTION_PATH[kind], id));
+    }
+    await batch.commit();
+  }
+}
+
+/** Genera un código de invitación (`inviteCodes/{code}`) — `create` no pisa uno existente
+ * (`firestore.rules`: eso sería `update`, que no se permite), así que una colisión al generar el
+ * código al azar simplemente falla por permisos y se reintenta con otro. */
+export async function createInviteCode(
+  code: string,
+  data: { spaceId: string; createdBy: string; role: 'editor' | 'viewer'; expiresAtMs: number },
+): Promise<void> {
+  await setDoc(doc(db(), 'inviteCodes', code), {
+    spaceId: data.spaceId,
+    createdBy: data.createdBy,
+    role: data.role,
+    expiresAt: Timestamp.fromMillis(data.expiresAtMs),
+  });
+}

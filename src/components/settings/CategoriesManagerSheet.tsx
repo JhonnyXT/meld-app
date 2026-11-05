@@ -9,6 +9,7 @@ import { useTranslation } from '@/i18n';
 import { useCategoriesSheetStore } from '@/store/categoriesSheetStore';
 import { useCategoriesStore } from '@/store/categoriesStore';
 import { CategoryFormModal } from './CategoryFormModal';
+import { ShareCategorySheet } from './ShareCategorySheet';
 import type { Category } from '@/domain/category';
 import type { IconName } from '@/domain/iconNames';
 
@@ -34,10 +35,20 @@ export function CategoriesManagerSheet() {
   const [formVisible, setFormVisible] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
+  const [sharing, setSharing] = useState<Category | null>(null);
 
   useEffect(() => {
     if (visible) load();
   }, [visible, load]);
+
+  // Mientras la hoja de compartir está abierta, `shareCategory()` recarga `categories` (nueva
+  // categoría ligada al espacio recién creado) — refleja esa versión fresca en `sharing` para que
+  // `ShareCategorySheet` sepa que ya no hace falta volver a crear el espacio.
+  useEffect(() => {
+    if (!sharing) return;
+    const updated = categories.find((c) => c.id === sharing.id);
+    if (updated && updated !== sharing) setSharing(updated);
+  }, [categories, sharing]);
 
   const openCreate = () => {
     setEditing(null);
@@ -117,6 +128,7 @@ export function CategoriesManagerSheet() {
                 : catUsage.pending === 0
                   ? t('categoryAllDone')
                   : String(catUsage.pending);
+              const canShare = !cat.space || cat.space.role === 'editor';
               return (
                 <Pressable
                   key={cat.id}
@@ -133,6 +145,17 @@ export function CategoriesManagerSheet() {
                     <Text style={{ fontFamily: font.regular, fontSize: 14, color: palette.textDim, marginRight: 6 }}>
                       {trailing}
                     </Text>
+                  ) : null}
+                  {canShare ? (
+                    <Pressable
+                      onPress={() => setSharing(cat)}
+                      hitSlop={8}
+                      style={styles.shareButton}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('a11yShareCategory')}
+                    >
+                      <Icon name={cat.space ? 'users' : 'share'} size={18} color={cat.space ? palette.accent : palette.textDim} />
+                    </Pressable>
                   ) : null}
                   <Icon name="chevron-right" size={18} color={palette.textDim} />
                 </Pressable>
@@ -159,6 +182,8 @@ export function CategoriesManagerSheet() {
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}
       />
+
+      <ShareCategorySheet visible={!!sharing} category={sharing} onClose={() => setSharing(null)} />
     </Modal>
   );
 }
@@ -170,4 +195,5 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 20, paddingBottom: 40 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1 },
   rowIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  shareButton: { padding: 4 },
 });

@@ -22,6 +22,7 @@ import { onLocalChange } from '@/data/local/localChanges';
 import { wipeLocalData } from '@/data/local/wipeLocalData';
 import type { IconName } from '@/domain/iconNames';
 import type { SpaceRole } from '@/domain/category';
+import { generateInviteCode } from '@/domain/inviteCode';
 import { useCategoriesStore } from '@/store/categoriesStore';
 import { useDayItemsStore } from '@/store/dayItemsStore';
 import { useInboxStore } from '@/store/inboxStore';
@@ -52,7 +53,10 @@ import {
 import { advanceCursor, forgetSpace, spaceCursorKey, type SyncMeta } from './meta';
 import { clearMeta, loadMeta, saveMeta } from './metaStore';
 import {
+  createInviteCode,
+  createSpaceDoc,
   deleteAllUserData,
+  deletePersonalDocs,
   discoverSpaces,
   getSpaceConfig,
   getUserSettingsDoc,
@@ -423,6 +427,70 @@ async function pushSpaces(): Promise<void> {
     }
     await categoryRepository.markSynced([p.id]);
   }
+}
+
+// ─── Compartir una categoría (SYNC_ROADMAP.md, Fase 4) ───────────────────────────
+
+/** Vence a los 7 días (ver "Reglas de seguridad" del roadmap) — `firestore.rules` solo exige
+ * `<= 8 días`, se deja un día de margen. */
+const INVITE_CODE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Convierte una categoría personal en un espacio compartido del que soy dueño: crea `spaces/{id}`
+ * (mismo `id` que la categoría — ver el comentario largo en `data/local/schema.ts` →
+ * `categories.spaceId`) + `config/category`, liga la categoría local, migra sus ítems/completados
+ * existentes (`dayItemRepository.migrateCategoryToSpace` + el mismo método en
+ * `habitCompletionSyncRepository`/`taskCompletionSyncRepository`) y tombstona en
+ * `users/{uid}/...` lo que ya se había subido ahí (de ahora en más esa categoría y su contenido
+ * viven solo en `spaces/{id}/...`). Lanza si no hay sesión, si la categoría no existe o si ya
+ * está compartida (la UI no debería dejar llegar hasta acá en esos casos, pero el motor no confía
+ * ciegamente en quien llama).
+ */
+export async function shareCategory(categoryId: string): Promise<void> {
+  const uid = currentUid();
+  if (!uid) throw new Error('shareCategory: sin sesión');
+  const cat = (await categoryRepository.list()).find((c) => c.id === categoryId);
+  if (!cat) throw new Error('shareCategory: categoría no encontrada');
+  if (cat.space) throw new Error('shareCategory: ya está compartida');
+
+  const now = new Date().toISOString();
+  await withTimeout(createSpaceDoc(categoryId, { ownerUid: uid, memberUids: [uid], editorUids: [uid], createdAt: now, deletedAt: null }));
+  await withTimeout(setSpaceConfig(categoryId, { label: cat.label, icon: cat.icon, color: cat.color, updatedAt: now }));
+  // Si esta categoría ya se había subido como personal antes de compartirla, esa fila queda
+  // huérfana (de ahora en más vive en spaces/{id}/config/category, no en users/{uid}/categories).
+  await withTimeout(deletePersonalDocs(uid, 'categories', [categoryId])).catch(() => undefined);
+
+  await categoryRepository.setSpaceLink(categoryId, { spaceId: categoryId, role: 'editor', ownerUid: uid });
+
+  const { itemIds, habitIds, taskIds } = await dayItemRepository.migrateCategoryToSpace(categoryId);
+  const habitCompletionIds = await habitCompletionSyncRepository.migrateForHabits(habitIds, categoryId);
+  const taskCompletionIds = await taskCompletionSyncRepository.migrateForTasks(taskIds, categoryId);
+  await Promise.all([
+    withTimeout(deletePersonalDocs(uid, 'items', itemIds)),
+    withTimeout(deletePersonalDocs(uid, 'habitCompletions', habitCompletionIds)),
+    withTimeout(deletePersonalDocs(uid, 'taskCompletions', taskCompletionIds)),
+  ]).catch(() => undefined);
+
+  await useCategoriesStore.getState().load();
+  requestSync({ pull: false });
+}
+
+/** Genera un código de invitación para un espacio del que ya soy miembro (compartir de nuevo, o
+ * invitar a más gente). Reintenta con otro código al azar si el generado ya existe (colisión
+ * rarísima, 32⁶ combinaciones — ver `domain/inviteCode.ts`). */
+export async function createCategoryInviteCode(spaceId: string, role: 'editor' | 'viewer'): Promise<string> {
+  const uid = currentUid();
+  if (!uid) throw new Error('createCategoryInviteCode: sin sesión');
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = generateInviteCode();
+    try {
+      await withTimeout(createInviteCode(code, { spaceId, createdBy: uid, role, expiresAtMs: Date.now() + INVITE_CODE_TTL_MS }));
+      return code;
+    } catch (e) {
+      if (attempt === 4) throw e;
+    }
+  }
+  throw new Error('createCategoryInviteCode: no se pudo generar un código');
 }
 
 // ─── Ajustes visuales — un solo documento, LWW (SYNC_ROADMAP.md, Fase 3) ──────────

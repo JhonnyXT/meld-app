@@ -499,6 +499,33 @@ export const dayItemRepository = {
       .where(eq(dayItems.spaceId, spaceId));
     emitLocalChange();
   },
+
+  /** Al COMPARTIR una categoría existente (SYNC_ROADMAP.md, Fase 4): sus ítems ya en el teléfono
+   * viajan al espacio nuevo (`spaceId` = `categoryId`, mismo criterio que una categoría recién
+   * traída de la nube) y quedan `pending` para que el próximo push los suba a
+   * `spaces/{categoryId}/items` en vez de (o además de, si ya estaban subidos) al respaldo
+   * personal — quien llama usa los `habitIds`/`taskIds` devueltos para migrar también sus
+   * `habit_completions`/`task_completions`, y los `itemIds` para tombstonear la copia vieja en
+   * `users/{uid}/items` si la había (ver `src/sync/engine.ts` → `shareCategory`). A diferencia de
+   * D5 (mover UN ítem entre categorías ya existentes), acá el `id` no cambia: el ítem no se mueve
+   * de categoría, es la categoría la que pasa de personal a compartida. */
+  async migrateCategoryToSpace(categoryId: string): Promise<{ itemIds: string[]; habitIds: string[]; taskIds: string[] }> {
+    const rows = await db
+      .select({ id: dayItems.id, type: dayItems.type })
+      .from(dayItems)
+      .where(and(eq(dayItems.categoryId, categoryId), notDeleted));
+    const itemIds = rows.map((r) => r.id);
+    const habitIds = rows.filter((r) => r.type === 'habit').map((r) => r.id);
+    const taskIds = rows.filter((r) => r.type === 'task').map((r) => r.id);
+    if (itemIds.length > 0) {
+      await db
+        .update(dayItems)
+        .set({ spaceId: categoryId, updatedAt: new Date().toISOString(), syncState: 'pending' })
+        .where(inArray(dayItems.id, itemIds));
+      emitLocalChange();
+    }
+    return { itemIds, habitIds, taskIds };
+  },
 };
 
 /** Pendientes de `habit_completions`/`task_completions` (misma forma para ambas tablas). */
@@ -591,6 +618,22 @@ export const habitCompletionSyncRepository = {
       .where(eq(habitCompletions.spaceId, spaceId));
     emitLocalChange();
   },
+
+  /** Mismo criterio que `dayItemRepository.migrateCategoryToSpace`, para los completados de los
+   * hábitos que esa migración encontró en la categoría (su `habitIds`). */
+  async migrateForHabits(habitIds: string[], spaceId: string): Promise<string[]> {
+    if (habitIds.length === 0) return [];
+    const rows = await db.select({ id: habitCompletions.id }).from(habitCompletions).where(inArray(habitCompletions.habitId, habitIds));
+    const ids = rows.map((r) => r.id);
+    if (ids.length > 0) {
+      await db
+        .update(habitCompletions)
+        .set({ spaceId, updatedAt: new Date().toISOString(), syncState: 'pending' })
+        .where(inArray(habitCompletions.id, ids));
+      emitLocalChange();
+    }
+    return ids;
+  },
 };
 
 export const taskCompletionSyncRepository = {
@@ -657,5 +700,21 @@ export const taskCompletionSyncRepository = {
       .set({ spaceId: null, updatedAt: new Date().toISOString(), syncState: 'pending' })
       .where(eq(taskCompletions.spaceId, spaceId));
     emitLocalChange();
+  },
+
+  /** Mismo criterio que `habitCompletionSyncRepository.migrateForHabits`, para las tasks que
+   * `dayItemRepository.migrateCategoryToSpace` encontró en la categoría (su `taskIds`). */
+  async migrateForTasks(taskIds: string[], spaceId: string): Promise<string[]> {
+    if (taskIds.length === 0) return [];
+    const rows = await db.select({ id: taskCompletions.id }).from(taskCompletions).where(inArray(taskCompletions.taskId, taskIds));
+    const ids = rows.map((r) => r.id);
+    if (ids.length > 0) {
+      await db
+        .update(taskCompletions)
+        .set({ spaceId, updatedAt: new Date().toISOString(), syncState: 'pending' })
+        .where(inArray(taskCompletions.id, ids));
+      emitLocalChange();
+    }
+    return ids;
   },
 };

@@ -81,4 +81,7 @@ export type IconName =
   | 'cart'
   | 'music'
   | 'plane'
-  | 'log-out';
+  | 'log-out'
+  // Categorías compartidas (SYNC_ROADMAP.md, Fase 4)
+  | 'share'
+  | 'users';

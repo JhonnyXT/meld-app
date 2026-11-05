@@ -330,12 +330,49 @@ emulador, sin tocar los datos locales.
 en modo avión aparece en la nube al volver la conexión.
 
 ### Fase 4 — Categorías compartidas · L
-- [ ] "Compartir" en `CategoriesManagerSheet`: crea `spaces/{id}` + código (con rol) y lo manda
-  con la hoja del sistema. Solo Pro.
+- [x] **"Compartir" en `CategoriesManagerSheet`** (2026-11-05): ícono de compartir en cada fila
+  (antes del chevron) — `share` si la categoría es personal, `users` en acento si ya está
+  compartida y soy editor; oculto si soy lector de un espacio ajeno (no puedo invitar con más
+  permiso del que tengo, ver `firestore.rules`). Abre `ShareCategorySheet.tsx` (mismo patrón
+  visual que `CategoryFormModal`): gatea sesión iniciada y plan Pro ANTES de intentar nada (T3/T9
+  — solo quien comparte necesita Pro, quien se una no); con los dos, elige rol ("Puede editar"/
+  "Solo ver") y "Generar código y compartir" → `src/sync/engine.ts` → `shareCategory(categoryId)`
+  (solo la primera vez; si ya está compartida, salta directo a generar otro código) +
+  `createCategoryInviteCode(spaceId, role)`, código mostrado grande en pantalla + botón que abre
+  la hoja de compartir del sistema (`Share.share`, sin pedir nada nuevo: `Share` es parte de
+  React Native). `domain/inviteCode.ts` → `generateInviteCode()` (6 caracteres sin 0/O/1/I, ver
+  "Reglas de seguridad"); `createCategoryInviteCode` reintenta con otro código al azar si el
+  generado ya existe (colisión rarísima — `firestore.rules` rechaza un `create` sobre un id ya
+  usado, eso nunca es un `update`).
+  - `shareCategory(categoryId)`: crea `spaces/{categoryId}` (mismo id que la categoría, ver el
+    comentario largo en `data/local/schema.ts` → `categories.spaceId`) + `config/category`, liga
+    la categoría local (`categoryRepository.setSpaceLink`) y migra sus ítems/completados YA
+    EXISTENTES al espacio — `dayItemRepository.migrateCategoryToSpace(categoryId)` (nuevo: marca
+    `spaceId`/`pending` a todo lo que tenga esa `categoryId`, sin tocar su `id` — a diferencia de
+    D5 de My Wallet, acá el ítem no cambia de categoría, es la categoría la que pasa de personal a
+    compartida) + `habitCompletionSyncRepository.migrateForHabits`/
+    `taskCompletionSyncRepository.migrateForTasks` (mismo criterio, para los completados de los
+    hábitos/tasks que esa migración encontró). Lo que ya se había subido como personal
+    (`users/{uid}/items`/`.../categories`) se tombstona de verdad con el nuevo
+    `remote.ts` → `deletePersonalDocs(uid, kind, ids)` — de ahí en más esa categoría y su
+    contenido viven solo en `spaces/{id}/...`. Nuevo `remote.ts` → `createSpaceDoc`,
+    `createInviteCode` (`expiresAt` como `Timestamp` real — `firestore.rules` exige
+    `is timestamp`, vence a los 7 días).
+  - **Verificado en dispositivo** (2026-11-05, S24 Ultra, contra el emulador): compartir "Casa"
+    generó el código correcto en pantalla; confirmado por REST que `spaces/{id}` quedó con
+    exactamente los campos que exige `allow create` de las reglas, `config/category` con el
+    label/ícono/color de la categoría, `inviteCodes/{code}` con `expiresAt` como `Timestamp` a 7
+    días; un ítem que ya vivía en esa categoría (creado antes de compartirla, ya subido como
+    personal) se migró solo a `spaces/{id}/items` con el mismo id y SIN quedar duplicado en
+    `users/{uid}/items` (confirmado por REST, la query a personal volvió vacía). `npx tsc
+    --noEmit` limpio, 24 tests en verde — íconos `share`/`users` nuevos en
+    `domain/iconNames.ts`/`components/Icon.tsx` (Lucide `Share2`/`Users`).
+  - **Pendiente, documentado a propósito**: sin paywall real todavía (gatea con
+    `settingsStore.plan`, igual que el resto de "Roadmap Pro"); `getSpaceMember`/`setSpaceMember`
+    de `remote.ts` (listos desde el paso del modelo de datos) todavía sin usar — la fila
+    `members/{uid}` se escribe recién en el paso de "Unirme con un código" que sigue.
 - [ ] "Unirme con un código" (en Categorías): se une y baja la categoría como una más. Invitados
   Free permitidos hasta el límite T10.
-- [ ] Ítems de esa categoría viajan al espacio (no al respaldo personal); mover un ítem de una
-  categoría compartida a otra le da un id nuevo + tombstone del viejo (D5 de My Wallet).
 - [ ] Roles: el dueño elige "Puede editar / Solo ver" por persona; un lector no puede crear,
   editar, completar ni borrar en esa categoría (deshabilitar en Quick Add, detalle, swipe,
   checkbox y widgets).

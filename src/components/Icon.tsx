@@ -28,6 +28,8 @@ import {
   Bell,
   Pause,
   Camera,
+  Share2,
+  Users,
   Images,
   Play,
   Repeat,
@@ -150,6 +152,8 @@ const ICON_MAP: Record<IconName, LucideIcon> = {
   music: Music,
   plane: Plane,
   'log-out': LogOut,
+  share: Share2,
+  users: Users,
 };
 
 interface IconProps {

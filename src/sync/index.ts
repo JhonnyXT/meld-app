@@ -4,9 +4,11 @@ export { signInWithGoogle, signOut, type SessionUser } from './session';
 export { useSession } from './useSession';
 export { AuthError, authErrorMessage, classifyAuthError, type AuthErrorKind } from './errors';
 export {
+  createCategoryInviteCode,
   deleteAccountAndCloudData,
   pendingChanges,
   requestSync,
+  shareCategory,
   signOutAndWipeLocalData,
   signOutKeepingLocalData,
   startSync,
