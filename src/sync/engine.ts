@@ -58,13 +58,16 @@ import {
   deleteAllUserData,
   deletePersonalDocs,
   discoverSpaces,
+  getInviteCode,
   getSpaceConfig,
   getUserSettingsDoc,
+  joinSpace,
   pullCollection,
   pullSpaceCollection,
   pushBatch,
   pushSpaceBatch,
   setSpaceConfig,
+  setSpaceMember,
   setUserSettingsDoc,
   type PushOp,
 } from './remote';
@@ -491,6 +494,70 @@ export async function createCategoryInviteCode(spaceId: string, role: 'editor' |
     }
   }
   throw new Error('createCategoryInviteCode: no se pudo generar un código');
+}
+
+// ─── Unirme con un código (SYNC_ROADMAP.md, Fase 4) ──────────────────────────────
+
+/** Motivo por el que `joinCategoryWithCode` no pudo unirse — la UI elige el mensaje (vía `t()`,
+ * ver `ShareCategorySheet.tsx` para el patrón equivalente del lado de compartir). `denied` es el
+ * fallback de cualquier motivo que solo el servidor puede rechazar: ya soy miembro, el espacio ya
+ * llegó al límite (T10), o se eliminó — `spaces/{id}` no se puede leer de antemano para
+ * distinguirlos acá (`allow get` exige ya ser miembro, ver el comentario de `joinSpace` en
+ * `remote.ts`), así que todos caen en el mismo mensaje genérico. */
+export type JoinCodeErrorKind = 'no-session' | 'invalid-code' | 'expired-code' | 'free-limit' | 'denied';
+
+export class JoinCodeError extends Error {
+  constructor(readonly kind: JoinCodeErrorKind) {
+    super(`joinCategoryWithCode:${kind}`);
+  }
+}
+
+/** Cuántas categorías tengo como INVITADO (compartidas por otra persona, no las que yo comparto)
+ * — T10: un Free puede estar en como máximo 2 así. Sin Cloud Functions no hay forma de que el
+ * servidor lo haga cumplir (ver el comentario de T10 en el roadmap); esto es solo el chequeo de
+ * la app, antes de intentar unirse. */
+const FREE_INVITEE_LIMIT = 2;
+
+async function invitedCategoryCount(uid: string): Promise<number> {
+  const linked = await categoryRepository.listSpaceLinked();
+  return linked.filter((c) => c.space!.ownerUid !== uid).length;
+}
+
+/**
+ * Me uno a una categoría compartida con un código (T9: un invitado Free participa igual, no
+ * necesita Pro — solo quien la compartió lo necesitaba). Valida lo que se puede localmente ANTES
+ * de tocar Firestore (sesión, código vigente, límite T10) para dar un mensaje preciso; el resto —
+ * ya soy miembro, el espacio ya llegó al límite de miembros, o se eliminó — solo lo sabe el
+ * servidor al intentar el `update` (ver el comentario de `joinSpace` en `remote.ts`: no se puede
+ * leer `spaces/{id}` de antemano sin ya ser miembro), así que cae en `denied`. Al unirme con
+ * éxito, pido una traída (`requestSync({ pull: true })`): el próximo ciclo de `pullSpaces`
+ * descubre el espacio nuevo y crea la categoría local sola, mismo camino ya probado para
+ * cualquier espacio del que soy miembro.
+ */
+export async function joinCategoryWithCode(rawCode: string): Promise<void> {
+  const uid = currentUid();
+  if (!uid) throw new JoinCodeError('no-session');
+
+  if ((await invitedCategoryCount(uid)) >= FREE_INVITEE_LIMIT && useSettingsStore.getState().plan !== 'pro') {
+    throw new JoinCodeError('free-limit');
+  }
+
+  const code = rawCode.trim().toUpperCase();
+  const invite = await withTimeout(getInviteCode(code)).catch(() => null);
+  if (!invite) throw new JoinCodeError('invalid-code');
+  if (invite.expiresAtMs <= Date.now()) throw new JoinCodeError('expired-code');
+
+  try {
+    await withTimeout(joinSpace(invite.spaceId, uid, { joinCode: code, asEditor: invite.role === 'editor' }));
+  } catch {
+    throw new JoinCodeError('denied');
+  }
+
+  const displayName = getAuth().currentUser?.displayName ?? '';
+  const now = new Date().toISOString();
+  await withTimeout(setSpaceMember(invite.spaceId, uid, { name: displayName, joinedAt: now, updatedAt: now })).catch(() => undefined);
+
+  requestSync({ pull: true });
 }
 
 // ─── Ajustes visuales — un solo documento, LWW (SYNC_ROADMAP.md, Fase 3) ──────────

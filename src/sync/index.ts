@@ -6,6 +6,9 @@ export { AuthError, authErrorMessage, classifyAuthError, type AuthErrorKind } fr
 export {
   createCategoryInviteCode,
   deleteAccountAndCloudData,
+  JoinCodeError,
+  joinCategoryWithCode,
+  type JoinCodeErrorKind,
   pendingChanges,
   requestSync,
   shareCategory,

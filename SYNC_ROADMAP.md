@@ -371,8 +371,43 @@ en modo avión aparece en la nube al volver la conexión.
     `settingsStore.plan`, igual que el resto de "Roadmap Pro"); `getSpaceMember`/`setSpaceMember`
     de `remote.ts` (listos desde el paso del modelo de datos) todavía sin usar — la fila
     `members/{uid}` se escribe recién en el paso de "Unirme con un código" que sigue.
-- [ ] "Unirme con un código" (en Categorías): se une y baja la categoría como una más. Invitados
-  Free permitidos hasta el límite T10.
+- [x] **"Unirme con un código"** (2026-11-05): botón ícono `link` en el header de
+  `CategoriesManagerSheet` (junto a "+"/"✕") abre `JoinCategorySheet.tsx` (mismo patrón visual):
+  input de 6 caracteres (auto-mayúsculas) + "Unirme" → `src/sync/engine.ts` →
+  `joinCategoryWithCode(code)`. Sin gate de plan en el render (a diferencia de
+  `ShareCategorySheet`: T9, un invitado Free participa igual) — valida lo que se puede
+  localmente ANTES de tocar Firestore (sesión iniciada, límite T10 vía nuevo
+  `invitedCategoryCount(uid)` — cuenta `categoryRepository.listSpaceLinked()` con
+  `ownerUid !== uid`, máx. 2 para Free) para un mensaje preciso; lo demás —código inválido/
+  vencido (`remote.ts` → `getInviteCode`, sí legible sin ser miembro: `allow get: if
+  signedIn()`), ya ser miembro, espacio lleno o eliminado— cae en un error genérico `denied`
+  (`JoinCodeErrorKind`, mapeado a texto por `JoinCategorySheet.tsx`). Al unirme, pide una traída
+  (`requestSync({ pull: true })`): el próximo `pullSpaces` descubre el espacio nuevo y crea la
+  categoría local sola, mismo camino ya probado en el paso del motor de sync — este sheet no
+  espera a verla, solo confirma "listo".
+  - **Bug real encontrado (y corregido) probando con un segundo usuario de verdad**: el primer
+    diseño de `joinSpace` leía `spaces/{id}` primero (`getSpaceDoc`) para construir
+    `memberUids`/`editorUids` a mano (anterior + mi uid) antes del `update` — pero
+    `firestore.rules` exige YA SER MIEMBRO para `allow get` de un espacio, así que ese `getDoc`
+    revienta con `PERMISSION_DENIED` para cualquiera que todavía no se unió, rompiendo el flujo
+    completo. Corregido con `arrayUnion()` (`remote.ts` → `joinSpace`): las reglas evalúan
+    `request.resource.data` ya resuelto (con el `arrayUnion` aplicado), así que
+    `memberUids.size() == resource.data.memberUids.size() + 1` sigue funcionando sin que el
+    cliente conozca el arreglo anterior — nunca hace falta leer el espacio antes de unirme.
+    `getSpaceDoc` se quitó de `remote.ts` (quedaba sin uso real).
+  - **Verificado contra las reglas reales con un segundo usuario** (2026-11-05, emulador): se creó
+    una cuenta de prueba en el emulador de Auth (`accounts:signUp`, distinta de la cuenta dueña) y
+    se repitió EXACTAMENTE lo que hace `joinSpace` (transform `appendMissingElements`, el
+    equivalente REST de `arrayUnion`) con el `idToken` de esa cuenta — confirmado: un `GET` de
+    `spaces/{id}` sin ser miembro da `PERMISSION_DENIED` (reproduce el bug de arriba tal cual se
+    habría visto en producción); el `update` con `arrayUnion` fue aceptado y el documento quedó
+    con el segundo uid en `memberUids`/`editorUids`, sin que el cliente leyera nada antes; con la
+    membresía ya puesta, esa cuenta SÍ pudo leer `spaces/{id}` y crear su propia fila en
+    `members/{uid}`. `npx tsc --noEmit` limpio, 24 tests en verde.
+  - **Pendiente, documentado a propósito**: todavía no se probó el camino completo con la app de
+    verdad en dos teléfonos con cuentas de Google reales (solo REST contra el emulador) — eso es
+    la tarea de abajo ("Pruebas con dos teléfonos y dos cuentas"), que a esta altura es lo único
+    que falta para considerar el flujo "Compartir"/"Unirme" end-to-end terminado.
 - [ ] Roles: el dueño elige "Puede editar / Solo ver" por persona; un lector no puede crear,
   editar, completar ni borrar en esa categoría (deshabilitar en Quick Add, detalle, swipe,
   checkbox y widgets).

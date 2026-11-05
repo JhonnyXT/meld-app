@@ -10,6 +10,7 @@ import { useCategoriesSheetStore } from '@/store/categoriesSheetStore';
 import { useCategoriesStore } from '@/store/categoriesStore';
 import { CategoryFormModal } from './CategoryFormModal';
 import { ShareCategorySheet } from './ShareCategorySheet';
+import { JoinCategorySheet } from './JoinCategorySheet';
 import type { Category } from '@/domain/category';
 import type { IconName } from '@/domain/iconNames';
 
@@ -36,6 +37,7 @@ export function CategoriesManagerSheet() {
   const [editing, setEditing] = useState<Category | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
   const [sharing, setSharing] = useState<Category | null>(null);
+  const [joinVisible, setJoinVisible] = useState(false);
 
   useEffect(() => {
     if (visible) load();
@@ -93,6 +95,14 @@ export function CategoriesManagerSheet() {
               {t('categoriesScreenSubtitle')}
             </Text>
           </View>
+          <Pressable
+            onPress={() => setJoinVisible(true)}
+            style={[styles.roundButton, { backgroundColor: palette.surfaceLow }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('a11yJoinCategory')}
+          >
+            <Icon name="link" size={18} color={palette.textDim} />
+          </Pressable>
           <Pressable
             onPress={openCreate}
             style={[styles.roundButton, { backgroundColor: palette.accent }]}
@@ -184,6 +194,8 @@ export function CategoriesManagerSheet() {
       />
 
       <ShareCategorySheet visible={!!sharing} category={sharing} onClose={() => setSharing(null)} />
+
+      <JoinCategorySheet visible={joinVisible} onClose={() => setJoinVisible(false)} />
     </Modal>
   );
 }

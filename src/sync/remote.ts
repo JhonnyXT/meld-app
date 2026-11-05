@@ -8,6 +8,7 @@
  * atrasado).
  */
 import {
+  arrayUnion,
   collection,
   doc,
   getDocFromServer,
@@ -20,6 +21,7 @@ import {
   setDoc,
   startAfter,
   Timestamp,
+  updateDoc,
   where,
   writeBatch,
   type CollectionReference,
@@ -245,4 +247,46 @@ export async function createInviteCode(
     role: data.role,
     expiresAt: Timestamp.fromMillis(data.expiresAtMs),
   });
+}
+
+/** Lo que hace falta de un código para unirse ("Unirme con un código", SYNC_ROADMAP.md Fase 4) —
+ * `expiresAtMs` ya convertido de `Timestamp` a epoch ms (mismo criterio que `millis()` en todo
+ * este archivo), para comparar con `Date.now()` sin tocar Firestore de nuevo. `null` = el código
+ * no existe (ya se usó un vencido y se borró, se tipeó mal, o nunca existió). */
+export interface ResolvedInviteCode {
+  spaceId: string;
+  createdBy: string;
+  role: 'editor' | 'viewer';
+  expiresAtMs: number;
+}
+
+export async function getInviteCode(code: string): Promise<ResolvedInviteCode | null> {
+  const snap = await getDocFromServer(doc(db(), 'inviteCodes', code));
+  if (!snap.exists()) return null;
+  const data = snap.data() as { spaceId: string; createdBy: string; role?: 'editor' | 'viewer'; expiresAt: unknown };
+  return { spaceId: data.spaceId, createdBy: data.createdBy, role: data.role ?? 'editor', expiresAtMs: millis(data.expiresAt) };
+}
+
+/** Me uno a un espacio con un código vigente (rama "unirse" de `allow update` en
+ * `firestore.rules`) — `joinCode` viaja en el mismo `update` para que la regla pueda validarlo
+ * (`exists(...)`/`spaceId`/`expiresAt`) sin una Cloud Function; queda guardado en el documento
+ * (las reglas no lo limpian después, ni falta — es solo un rastro de qué código se usó).
+ *
+ * `arrayUnion` en vez de leer el espacio primero y mandar el arreglo completo a mano: **no se
+ * puede leer `spaces/{id}` antes de unirme** (`allow get` exige ya ser miembro — probado contra
+ * las reglas reales con un segundo usuario: un `getDoc` previo revienta con `PERMISSION_DENIED`,
+ * encontrado en este mismo paso antes de que llegara a producción). Las reglas sí ven
+ * `request.resource.data` ya resuelto (con el `arrayUnion` aplicado), así que
+ * `memberUids.size() == resource.data.memberUids.size() + 1` sigue funcionando sin que el
+ * cliente conozca el tamaño anterior. Pasar `editorUids` únicamente cuando el código es de
+ * editor: la regla exige que SOLO esas claves cambien (`changedOnly`), y para un código de
+ * lector ni siquiera se toca ese arreglo. */
+export async function joinSpace(spaceId: string, uid: string, data: { joinCode: string; asEditor: boolean }): Promise<void> {
+  const update: Record<string, unknown> = {
+    memberUids: arrayUnion(uid),
+    joinCode: data.joinCode,
+    serverUpdatedAt: serverTimestamp(),
+  };
+  if (data.asEditor) update.editorUids = arrayUnion(uid);
+  await updateDoc(doc(db(), 'spaces', spaceId), update);
 }

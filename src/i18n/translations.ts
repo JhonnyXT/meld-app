@@ -459,6 +459,17 @@ export const es = {
   shareCategorySignInMessage: 'Compartir una categoría necesita una cuenta. Inicia sesión desde Ajustes.',
   shareCategoryError: 'No se pudo compartir la categoría. Intenta de nuevo.',
   shareCategoryAlreadyShared: 'Categoría compartida',
+  a11yJoinCategory: 'Unirme con un código',
+  joinCategoryTitle: 'Unirme con un código',
+  joinCategoryIntro: 'Ingresa el código de 6 caracteres que te compartieron.',
+  joinCategoryPlaceholder: 'CÓDIGO',
+  joinCategoryButton: 'Unirme',
+  joinCategorySuccess: '¡Listo! La categoría va a aparecer en un momento.',
+  joinCategoryErrorNoSession: 'Inicia sesión primero para unirte a una categoría compartida.',
+  joinCategoryErrorInvalidCode: 'Ese código no existe o ya no es válido.',
+  joinCategoryErrorExpiredCode: 'Ese código venció. Pide uno nuevo.',
+  joinCategoryErrorFreeLimit: 'Con el plan Free puedes unirte a 2 categorías compartidas. Suscríbete a Pro para unirte a más.',
+  joinCategoryErrorDenied: 'No se pudo unir — puede que ya formes parte de esta categoría o que ya esté llena.',
 } as const;
 
 export const en: Record<keyof typeof es, string> = {
@@ -876,6 +887,17 @@ export const en: Record<keyof typeof es, string> = {
   shareCategorySignInMessage: 'Sharing a category needs an account. Sign in from Settings.',
   shareCategoryError: "Couldn't share the category. Try again.",
   shareCategoryAlreadyShared: 'Shared category',
+  a11yJoinCategory: 'Join with a code',
+  joinCategoryTitle: 'Join with a code',
+  joinCategoryIntro: 'Enter the 6-character code someone shared with you.',
+  joinCategoryPlaceholder: 'CODE',
+  joinCategoryButton: 'Join',
+  joinCategorySuccess: "You're in! The category will show up in a moment.",
+  joinCategoryErrorNoSession: 'Sign in first to join a shared category.',
+  joinCategoryErrorInvalidCode: "That code doesn't exist or isn't valid anymore.",
+  joinCategoryErrorExpiredCode: 'That code expired. Ask for a new one.',
+  joinCategoryErrorFreeLimit: 'On the Free plan you can join 2 shared categories. Subscribe to Pro to join more.',
+  joinCategoryErrorDenied: "Couldn't join — you might already be part of this category, or it's full.",
 };
 
 export const WEEKDAY_SHORT: Record<Language, string[]> = {
