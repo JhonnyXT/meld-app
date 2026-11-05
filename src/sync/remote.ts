@@ -28,7 +28,16 @@ import {
   type QuerySnapshot,
 } from '@react-native-firebase/firestore';
 import { ensureFirebase } from './firebase';
-import { COLLECTION_PATH, type AppSettingsDoc, type ItemCollection, type RemoteDoc, type VersionedDoc } from './mappers';
+import {
+  COLLECTION_PATH,
+  type AppSettingsDoc,
+  type ItemCollection,
+  type RemoteDoc,
+  type SpaceCategoryDoc,
+  type SpaceDoc,
+  type SpaceMemberDoc,
+  type VersionedDoc,
+} from './mappers';
 
 const PAGE_SIZE = 300;
 /** Firestore admite 500 operaciones por lote; se deja margen. */
@@ -53,6 +62,16 @@ export async function pullCollection<T extends object>(
   cursor: number,
 ): Promise<RemoteDoc<T>[]> {
   return pullPaged<T>(collection(db(), 'users', uid, COLLECTION_PATH[kind]), cursor);
+}
+
+/** Lo mismo que `pullCollection`, para una categoría compartida en vez del respaldo personal
+ * (SYNC_ROADMAP.md, Fase 4) — `spaces/{spaceId}/{kind}` en vez de `users/{uid}/{kind}`. */
+export async function pullSpaceCollection<T extends object>(
+  spaceId: string,
+  kind: ItemCollection,
+  cursor: number,
+): Promise<RemoteDoc<T>[]> {
+  return pullPaged<T>(collection(db(), 'spaces', spaceId, COLLECTION_PATH[kind]), cursor);
 }
 
 /** Traída por páginas, en orden de `serverUpdatedAt`, de cualquier colección. */
@@ -89,11 +108,24 @@ export interface PushOp {
  * (mismo id y contenido: no duplica).
  */
 export async function pushBatch(uid: string, ops: PushOp[]): Promise<void> {
+  await pushBatchTo(['users', uid], ops);
+}
+
+/** Lo mismo que `pushBatch`, a `spaces/{spaceId}/{kind}` en vez de `users/{uid}/{kind}`
+ * (SYNC_ROADMAP.md, Fase 4). Las reglas (`firestore.rules`) exigen ser editor del espacio —
+ * si un lector llega a tener algo pendiente (todavía no hay gating de UI que lo impida, ver
+ * roadmap), el `commit()` de acá rechaza y la fila queda `pending` para reintentar, igual que
+ * cualquier otro error de permisos. */
+export async function pushSpaceBatch(spaceId: string, ops: PushOp[]): Promise<void> {
+  await pushBatchTo(['spaces', spaceId], ops);
+}
+
+async function pushBatchTo(basePath: [string, string], ops: PushOp[]): Promise<void> {
   const firestore = db();
   for (let i = 0; i < ops.length; i += BATCH_SIZE) {
     const batch = writeBatch(firestore);
     for (const op of ops.slice(i, i + BATCH_SIZE)) {
-      const path = doc(firestore, 'users', uid, COLLECTION_PATH[op.kind], op.id);
+      const path = doc(firestore, ...basePath, COLLECTION_PATH[op.kind], op.id);
       batch.set(path, { ...op.data, serverUpdatedAt: serverTimestamp() });
     }
     await batch.commit();
@@ -129,4 +161,46 @@ export async function getUserSettingsDoc(uid: string): Promise<RemoteDoc<AppSett
 
 export async function setUserSettingsDoc(uid: string, data: AppSettingsDoc): Promise<void> {
   await setDoc(doc(db(), 'users', uid, 'settings', 'app'), { ...data, serverUpdatedAt: serverTimestamp() });
+}
+
+// ─── Espacios compartidos (SYNC_ROADMAP.md, Fase 4) ────────────────────────────
+
+/** Los espacios de los que soy miembro ahora mismo (`memberUids array-contains uid`, ver
+ * `firestore.rules`) — incluye los marcados `deletedAt` (así el motor de sync se entera y
+ * desconecta la categoría local; `firestore.rules` deja leer un espacio eliminado solo para
+ * eso). No usa `serverUpdatedAt`/cursor: a diferencia de `items`/`habitCompletions`/etc., un
+ * espacio no tiene muchos documentos que paginar — son pocos (T10: máximo 6 miembros cada uno,
+ * y un Free está en pocos como invitado), así que se listan enteros en cada corrida. */
+export async function discoverSpaces(uid: string): Promise<RemoteDoc<SpaceDoc>[]> {
+  const q = query(collection(db(), 'spaces'), where('memberUids', 'array-contains', uid));
+  const snap = await getDocsFromServer(q);
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return { id: d.id, data: data as SpaceDoc & VersionedDoc, serverUpdatedAt: millis(data.serverUpdatedAt) };
+  });
+}
+
+export async function getSpaceConfig(spaceId: string): Promise<RemoteDoc<SpaceCategoryDoc> | null> {
+  const snap = await getDocFromServer(doc(db(), 'spaces', spaceId, 'config', 'category'));
+  if (!snap.exists()) return null;
+  const data = snap.data() as SpaceCategoryDoc & { serverUpdatedAt: unknown };
+  return { id: snap.id, data, serverUpdatedAt: millis(data.serverUpdatedAt) };
+}
+
+export async function setSpaceConfig(spaceId: string, data: SpaceCategoryDoc): Promise<void> {
+  await setDoc(doc(db(), 'spaces', spaceId, 'config', 'category'), { ...data, serverUpdatedAt: serverTimestamp() });
+}
+
+/** Mi propia fila en `spaces/{id}/members/{uid}` (ver `firestore.rules` — cada quien solo puede
+ * escribir la suya). `uid` es siempre el de la sesión actual: no hay forma de leer/escribir la
+ * de otro miembro desde acá (ver el indicador "quién hizo esto", todavía sin UI). */
+export async function getSpaceMember(spaceId: string, uid: string): Promise<RemoteDoc<SpaceMemberDoc> | null> {
+  const snap = await getDocFromServer(doc(db(), 'spaces', spaceId, 'members', uid));
+  if (!snap.exists()) return null;
+  const data = snap.data() as SpaceMemberDoc & { serverUpdatedAt: unknown };
+  return { id: snap.id, data, serverUpdatedAt: millis(data.serverUpdatedAt) };
+}
+
+export async function setSpaceMember(spaceId: string, uid: string, data: SpaceMemberDoc): Promise<void> {
+  await setDoc(doc(db(), 'spaces', spaceId, 'members', uid), { ...data, serverUpdatedAt: serverTimestamp() });
 }

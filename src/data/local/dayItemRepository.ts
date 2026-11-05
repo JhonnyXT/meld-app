@@ -457,15 +457,27 @@ export const dayItemRepository = {
 
   /** Escribe un ítem bajado de la nube (ya ganó `pickWinner`) como `synced` — a diferencia de
    * `upsert()`, que siempre deja `pending` (sería subirlo de vuelta sin necesidad). Siempre del
-   * respaldo PERSONAL (`users/{uid}/items`, nunca `spaces/{id}/items` — eso necesita su propio
-   * "apply" cuando exista el motor de sync de espacios): `spaceId` queda `null` a propósito. */
+   * respaldo PERSONAL (`users/{uid}/items`) — para uno de `spaces/{id}/items` usar
+   * `applySpaceRemoteUpsert`. `spaceId` queda `null` a propósito. */
   async applyRemoteUpsert(item: DayItem, categoryId: string | null): Promise<void> {
     const row = { ...toRow(item, categoryId, null), syncState: 'synced' as const };
     await db.insert(dayItems).values(row).onConflictDoUpdate({ target: dayItems.id, set: row });
   },
 
+  /** Lo mismo que `applyRemoteUpsert`, para un ítem bajado de `spaces/{spaceId}/items` en vez del
+   * respaldo personal (SYNC_ROADMAP.md, Fase 4). `categoryId` = `spaceId` directo, sin lookup: la
+   * categoría local de un espacio SIEMPRE tiene ese mismo id (ver el comentario largo en
+   * `schema.ts` → `categories.spaceId`), así que no hace falta resolverlo por nombre como
+   * `resolveCategoryId` hace con los ítems personales. */
+  async applySpaceRemoteUpsert(item: DayItem, spaceId: string): Promise<void> {
+    const row = { ...toRow(item, spaceId, spaceId), syncState: 'synced' as const };
+    await db.insert(dayItems).values(row).onConflictDoUpdate({ target: dayItems.id, set: row });
+  },
+
   /** Tombstone bajado de la nube (ya ganó `pickWinner`) para un id que puede no existir todavía
-   * en este teléfono — a diferencia de `remove()`, no asume que la fila ya está. */
+   * en este teléfono — a diferencia de `remove()`, no asume que la fila ya está. Sirve igual para
+   * un ítem personal o de un espacio: no toca `categoryId`/`spaceId`, que ya quedaron bien puestos
+   * cuando se creó la fila (acá solo se marca el borrado). */
   async applyRemoteDelete(id: string, deletedAt: string): Promise<void> {
     const existing = await db.select({ id: dayItems.id }).from(dayItems).where(eq(dayItems.id, id)).limit(1);
     if (existing.length > 0) {
@@ -474,6 +486,18 @@ export const dayItemRepository = {
     // Si nunca existió acá, no hay nada que borrar — un tombstone de un ítem que este teléfono
     // nunca tuvo no necesita fila propia (a diferencia de users/{uid} en Firestore, que sí la
     // necesita para que otros dispositivos se enteren).
+  },
+
+  /** Desliga del espacio los ítems que apuntaban a él (salí/me sacaron/se eliminó, Fase 4) — los
+   * conserva (igual que `categoryRepository.unlinkSpace` con la categoría), pero deja de
+   * intentar subirlos a `spaces/{spaceId}/items`: de ahí en más suben al respaldo personal como
+   * cualquier otro ítem de una categoría ya no compartida. */
+  async unlinkSpace(spaceId: string): Promise<void> {
+    await db
+      .update(dayItems)
+      .set({ spaceId: null, updatedAt: new Date().toISOString(), syncState: 'pending' })
+      .where(eq(dayItems.spaceId, spaceId));
+    emitLocalChange();
   },
 };
 
@@ -524,13 +548,30 @@ export const habitCompletionSyncRepository = {
   // con un `id` distinto para el MISMO par (datos de antes de esa convención, o — bug real visto
   // en dispositivo al probar T8 — un re-seed con un esquema de id distinto) tiraba abajo el pull
   // entero con "UNIQUE constraint failed" en vez de simplemente fusionarse con la fila local.
+  // `spaceId: null` explícito en el `set` del conflicto, no solo en el insert: corrige una fila
+  // vieja que haya quedado con el espacio equivocado (no debería pasar, pero este `apply` es del
+  // respaldo PERSONAL — si algo la trae por acá, es porque es personal de verdad).
   async applyRemoteUpsert(id: string, habitId: string, date: string, updatedAt: string): Promise<void> {
     await db
       .insert(habitCompletions)
-      .values({ id, habitId, date, updatedAt, deletedAt: null, syncState: 'synced' })
+      .values({ id, habitId, date, updatedAt, deletedAt: null, syncState: 'synced', spaceId: null })
       .onConflictDoUpdate({
         target: [habitCompletions.habitId, habitCompletions.date],
-        set: { updatedAt, deletedAt: null, syncState: 'synced' },
+        set: { updatedAt, deletedAt: null, syncState: 'synced', spaceId: null },
+      });
+  },
+  /** Lo mismo que `applyRemoteUpsert`, para un completado bajado de `spaces/{spaceId}/
+   * habitCompletions` (Fase 4) — hace falta su propio `apply` (no basta pasar `spaceId` como
+   * parámetro extra del de arriba) porque CORRIGE el `space_id` local en el `set` del conflicto,
+   * algo que el personal explícitamente NO debe hacer (si una fila ya existe ahí como personal, no
+   * hay que empezar a tratarla como de un espacio solo porque también llegó por ese camino). */
+  async applySpaceRemoteUpsert(id: string, habitId: string, date: string, updatedAt: string, spaceId: string): Promise<void> {
+    await db
+      .insert(habitCompletions)
+      .values({ id, habitId, date, updatedAt, deletedAt: null, syncState: 'synced', spaceId })
+      .onConflictDoUpdate({
+        target: [habitCompletions.habitId, habitCompletions.date],
+        set: { updatedAt, deletedAt: null, syncState: 'synced', spaceId },
       });
   },
   async applyRemoteDelete(id: string, habitId: string, date: string, deletedAt: string): Promise<void> {
@@ -541,6 +582,14 @@ export const habitCompletionSyncRepository = {
         target: [habitCompletions.habitId, habitCompletions.date],
         set: { updatedAt: deletedAt, deletedAt, syncState: 'synced' },
       });
+  },
+  /** Mismo criterio que `dayItemRepository.unlinkSpace`. */
+  async unlinkSpace(spaceId: string): Promise<void> {
+    await db
+      .update(habitCompletions)
+      .set({ spaceId: null, updatedAt: new Date().toISOString(), syncState: 'pending' })
+      .where(eq(habitCompletions.spaceId, spaceId));
+    emitLocalChange();
   },
 };
 
@@ -576,10 +625,20 @@ export const taskCompletionSyncRepository = {
   async applyRemoteUpsert(id: string, taskId: string, date: string, updatedAt: string): Promise<void> {
     await db
       .insert(taskCompletions)
-      .values({ id, taskId, date, updatedAt, deletedAt: null, syncState: 'synced' })
+      .values({ id, taskId, date, updatedAt, deletedAt: null, syncState: 'synced', spaceId: null })
       .onConflictDoUpdate({
         target: [taskCompletions.taskId, taskCompletions.date],
-        set: { updatedAt, deletedAt: null, syncState: 'synced' },
+        set: { updatedAt, deletedAt: null, syncState: 'synced', spaceId: null },
+      });
+  },
+  /** Mismo criterio que `habitCompletionSyncRepository.applySpaceRemoteUpsert`. */
+  async applySpaceRemoteUpsert(id: string, taskId: string, date: string, updatedAt: string, spaceId: string): Promise<void> {
+    await db
+      .insert(taskCompletions)
+      .values({ id, taskId, date, updatedAt, deletedAt: null, syncState: 'synced', spaceId })
+      .onConflictDoUpdate({
+        target: [taskCompletions.taskId, taskCompletions.date],
+        set: { updatedAt, deletedAt: null, syncState: 'synced', spaceId },
       });
   },
   async applyRemoteDelete(id: string, taskId: string, date: string, deletedAt: string): Promise<void> {
@@ -590,5 +649,13 @@ export const taskCompletionSyncRepository = {
         target: [taskCompletions.taskId, taskCompletions.date],
         set: { updatedAt: deletedAt, deletedAt, syncState: 'synced' },
       });
+  },
+  /** Mismo criterio que `dayItemRepository.unlinkSpace`. */
+  async unlinkSpace(spaceId: string): Promise<void> {
+    await db
+      .update(taskCompletions)
+      .set({ spaceId: null, updatedAt: new Date().toISOString(), syncState: 'pending' })
+      .where(eq(taskCompletions.spaceId, spaceId));
+    emitLocalChange();
   },
 };

@@ -15,9 +15,13 @@ import {
   dayItemRepository,
   habitCompletionSyncRepository,
   taskCompletionSyncRepository,
+  type PendingCompletion,
+  type PendingDayItem,
 } from '@/data/local/dayItemRepository';
 import { onLocalChange } from '@/data/local/localChanges';
 import { wipeLocalData } from '@/data/local/wipeLocalData';
+import type { IconName } from '@/domain/iconNames';
+import type { SpaceRole } from '@/domain/category';
 import { useCategoriesStore } from '@/store/categoriesStore';
 import { useDayItemsStore } from '@/store/dayItemsStore';
 import { useInboxStore } from '@/store/inboxStore';
@@ -30,8 +34,10 @@ import { pickWinner } from './merge';
 import {
   categoryToDoc,
   dayItemToDoc,
+  dayItemToSpaceDoc,
   docToCategory,
   docToDayItem,
+  docToDayItemFromSpace,
   habitCompletionToDoc,
   taskCompletionToDoc,
   tombstoneDoc,
@@ -39,15 +45,22 @@ import {
   type CategoryDoc,
   type DayItemDoc,
   type HabitCompletionDoc,
+  type SpaceDoc,
+  type SpaceItemDoc,
   type TaskCompletionDoc,
 } from './mappers';
-import { advanceCursor, type SyncMeta } from './meta';
+import { advanceCursor, forgetSpace, spaceCursorKey, type SyncMeta } from './meta';
 import { clearMeta, loadMeta, saveMeta } from './metaStore';
 import {
   deleteAllUserData,
+  discoverSpaces,
+  getSpaceConfig,
   getUserSettingsDoc,
   pullCollection,
+  pullSpaceCollection,
   pushBatch,
+  pushSpaceBatch,
+  setSpaceConfig,
   setUserSettingsDoc,
   type PushOp,
 } from './remote';
@@ -160,8 +173,13 @@ async function pull(uid: string, meta: SyncMeta): Promise<SyncMeta> {
 
 // ─── Subir ───────────────────────────────────────────────────────────────────
 
+// Fase 4: `listPendingSync()` de las 4 tablas trae TODO lo pendiente, personal y de espacios
+// mezclado (ver `PendingDayItem.spaceId`/`PendingCompletion.spaceId`/`PendingCategory.spaceId`).
+// Acá solo sube lo personal (`spaceId == null`) a `users/{uid}/...`; `pushSpaces()` más abajo
+// agrupa y sube lo demás a `spaces/{spaceId}/...` en su lugar.
+
 async function pushItems(uid: string): Promise<void> {
-  const pending = await dayItemRepository.listPendingSync();
+  const pending = (await dayItemRepository.listPendingSync()).filter((p) => p.spaceId == null);
   if (pending.length === 0) return;
   const ops: PushOp[] = pending.map((p) => ({
     kind: 'items',
@@ -173,7 +191,7 @@ async function pushItems(uid: string): Promise<void> {
 }
 
 async function pushHabitCompletions(uid: string): Promise<void> {
-  const pending = await habitCompletionSyncRepository.listPendingSync();
+  const pending = (await habitCompletionSyncRepository.listPendingSync()).filter((p) => p.spaceId == null);
   if (pending.length === 0) return;
   const ops: PushOp[] = pending.map((p) => ({
     kind: 'habitCompletions',
@@ -187,7 +205,7 @@ async function pushHabitCompletions(uid: string): Promise<void> {
 }
 
 async function pushTaskCompletions(uid: string): Promise<void> {
-  const pending = await taskCompletionSyncRepository.listPendingSync();
+  const pending = (await taskCompletionSyncRepository.listPendingSync()).filter((p) => p.spaceId == null);
   if (pending.length === 0) return;
   const ops: PushOp[] = pending.map((p) => ({
     kind: 'taskCompletions',
@@ -201,7 +219,7 @@ async function pushTaskCompletions(uid: string): Promise<void> {
 }
 
 async function pushCategories(uid: string): Promise<void> {
-  const pending = await categoryRepository.listPendingSync();
+  const pending = (await categoryRepository.listPendingSync()).filter((p) => p.spaceId == null);
   if (pending.length === 0) return;
   const ops: PushOp[] = pending.map((p) => ({
     kind: 'categories',
@@ -217,6 +235,194 @@ async function push(uid: string): Promise<void> {
   await pushHabitCompletions(uid);
   await pushTaskCompletions(uid);
   await pushCategories(uid);
+}
+
+// ─── Espacios compartidos — traer y subir (SYNC_ROADMAP.md, Fase 4) ───────────────
+
+/** Mi rol en un espacio — `editorUids` ausente = legado, todos editores (mismo fallback que
+ * `firestore.rules` → `isEditor()`). */
+function myRole(data: SpaceDoc, uid: string): SpaceRole {
+  return (data.editorUids ?? data.memberUids).includes(uid) ? 'editor' : 'viewer';
+}
+
+async function pullSpaceItems(spaceId: string, meta: SyncMeta): Promise<{ meta: SyncMeta; changed: boolean }> {
+  const key = spaceCursorKey(spaceId, 'items');
+  const docs = await withTimeout(pullSpaceCollection<SpaceItemDoc>(spaceId, 'items', meta.cursors[key] ?? 0));
+  let changed = false;
+  for (const d of docs) {
+    const local = await dayItemRepository.getSyncVersion(d.id);
+    if (local && pickWinner(local, d.data) !== 'remote') continue;
+    changed = true;
+    if (d.data.deletedAt != null) {
+      await dayItemRepository.applyRemoteDelete(d.id, d.data.deletedAt);
+      await cancelReminderNotification(d.id).catch(() => undefined);
+    } else {
+      const item = docToDayItemFromSpace(d.id, d.data);
+      await dayItemRepository.applySpaceRemoteUpsert(item, spaceId);
+      await syncReminderNotification(item).catch(() => undefined);
+    }
+  }
+  if (docs.length > 0) meta = advanceCursor(meta, key, Math.max(...docs.map((d) => d.serverUpdatedAt)));
+  return { meta, changed };
+}
+
+async function pullSpaceHabitCompletions(spaceId: string, meta: SyncMeta): Promise<SyncMeta> {
+  const key = spaceCursorKey(spaceId, 'habitCompletions');
+  const docs = await withTimeout(pullSpaceCollection<HabitCompletionDoc>(spaceId, 'habitCompletions', meta.cursors[key] ?? 0));
+  for (const d of docs) {
+    const local = await habitCompletionSyncRepository.getSyncVersion(d.id);
+    if (local && pickWinner(local, d.data) !== 'remote') continue;
+    if (d.data.deletedAt != null) {
+      await habitCompletionSyncRepository.applyRemoteDelete(d.id, d.data.habitId, d.data.date, d.data.deletedAt);
+    } else {
+      await habitCompletionSyncRepository.applySpaceRemoteUpsert(d.id, d.data.habitId, d.data.date, d.data.updatedAt, spaceId);
+    }
+  }
+  if (docs.length > 0) meta = advanceCursor(meta, key, Math.max(...docs.map((d) => d.serverUpdatedAt)));
+  return meta;
+}
+
+async function pullSpaceTaskCompletions(spaceId: string, meta: SyncMeta): Promise<SyncMeta> {
+  const key = spaceCursorKey(spaceId, 'taskCompletions');
+  const docs = await withTimeout(pullSpaceCollection<TaskCompletionDoc>(spaceId, 'taskCompletions', meta.cursors[key] ?? 0));
+  for (const d of docs) {
+    const local = await taskCompletionSyncRepository.getSyncVersion(d.id);
+    if (local && pickWinner(local, d.data) !== 'remote') continue;
+    if (d.data.deletedAt != null) {
+      await taskCompletionSyncRepository.applyRemoteDelete(d.id, d.data.taskId, d.data.date, d.data.deletedAt);
+    } else {
+      await taskCompletionSyncRepository.applySpaceRemoteUpsert(d.id, d.data.taskId, d.data.date, d.data.updatedAt, spaceId);
+    }
+  }
+  if (docs.length > 0) meta = advanceCursor(meta, key, Math.max(...docs.map((d) => d.serverUpdatedAt)));
+  return meta;
+}
+
+/**
+ * Descubre los espacios de los que soy miembro, desliga los que ya no (salí/me sacaron/se
+ * eliminó — "quien pierde el acceso conserva la categoría como propia", ver
+ * `categoryRepository.unlinkSpace`) y trae config + ítems + completados de los que siguen vivos.
+ * A diferencia de `pull()` (personal), no sube nada — eso es `pushSpaces()`, llamado aparte y sin
+ * el gate de plan Pro (T9: solo el dueño necesita Pro, un invitado Free participa igual).
+ */
+async function pullSpaces(uid: string, meta: SyncMeta): Promise<{ meta: SyncMeta; changed: boolean }> {
+  const remote = await withTimeout(discoverSpaces(uid));
+  const alive = remote.filter((s) => s.data.deletedAt == null);
+  const aliveIds = new Set(alive.map((s) => s.id));
+  let changed = false;
+
+  const linked = await categoryRepository.listSpaceLinked();
+  for (const cat of linked) {
+    const spaceId = cat.space!.spaceId;
+    if (aliveIds.has(spaceId)) continue;
+    await categoryRepository.unlinkSpace(spaceId);
+    await dayItemRepository.unlinkSpace(spaceId);
+    await habitCompletionSyncRepository.unlinkSpace(spaceId);
+    await taskCompletionSyncRepository.unlinkSpace(spaceId);
+    meta = forgetSpace(meta, spaceId);
+    changed = true;
+  }
+
+  for (const s of alive) {
+    const role = myRole(s.data, uid);
+    const config = await withTimeout(getSpaceConfig(s.id));
+    await categoryRepository.applySpaceUpsert(
+      s.id,
+      role,
+      s.data.ownerUid,
+      config ? { label: config.data.label, icon: config.data.icon as IconName, color: config.data.color } : null,
+    );
+    if (config) changed = true;
+
+    const items = await pullSpaceItems(s.id, meta);
+    meta = items.meta;
+    meta = await pullSpaceHabitCompletions(s.id, meta);
+    meta = await pullSpaceTaskCompletions(s.id, meta);
+    if (items.changed) changed = true;
+  }
+
+  return { meta, changed };
+}
+
+interface SpacePushGroup {
+  items: PendingDayItem[];
+  habits: PendingCompletion[];
+  tasks: PendingCompletion[];
+}
+
+function spaceGroup(map: Map<string, SpacePushGroup>, spaceId: string): SpacePushGroup {
+  let g = map.get(spaceId);
+  if (!g) {
+    g = { items: [], habits: [], tasks: [] };
+    map.set(spaceId, g);
+  }
+  return g;
+}
+
+/** Sube lo pendiente de cada espacio (items/habitCompletions/taskCompletions a
+ * `spaces/{spaceId}/...`, la categoría a `config/category` en vez de `users/{uid}/categories`).
+ * Nunca gateado por plan (T9) — a diferencia de `push()`, que sí lo está. Si algo pendiente es de
+ * un lector (sin gating de UI todavía, ver roadmap), `firestore.rules` lo rechaza y queda
+ * `pending` para reintentar, como cualquier otro error. */
+async function pushSpaces(): Promise<void> {
+  const [items, habits, tasks, cats] = await Promise.all([
+    dayItemRepository.listPendingSync(),
+    habitCompletionSyncRepository.listPendingSync(),
+    taskCompletionSyncRepository.listPendingSync(),
+    categoryRepository.listPendingSync(),
+  ]);
+
+  const bySpace = new Map<string, SpacePushGroup>();
+  for (const p of items) if (p.spaceId) spaceGroup(bySpace, p.spaceId).items.push(p);
+  for (const p of habits) if (p.spaceId) spaceGroup(bySpace, p.spaceId).habits.push(p);
+  for (const p of tasks) if (p.spaceId) spaceGroup(bySpace, p.spaceId).tasks.push(p);
+
+  for (const [spaceId, group] of bySpace) {
+    const ops: PushOp[] = [
+      ...group.items.map((p) => ({
+        kind: 'items' as const,
+        id: p.id,
+        data: p.item ? dayItemToSpaceDoc(p.item) : tombstoneDoc(p.deletedAt!),
+      })),
+      ...group.habits.map((p) => ({
+        kind: 'habitCompletions' as const,
+        id: p.id,
+        data: p.deletedAt
+          ? tombstoneDoc(p.deletedAt)
+          : habitCompletionToDoc({ habitId: p.habitId!, date: p.date, updatedAt: p.updatedAt, deletedAt: null }),
+      })),
+      ...group.tasks.map((p) => ({
+        kind: 'taskCompletions' as const,
+        id: p.id,
+        data: p.deletedAt
+          ? tombstoneDoc(p.deletedAt)
+          : taskCompletionToDoc({ taskId: p.taskId!, date: p.date, updatedAt: p.updatedAt, deletedAt: null }),
+      })),
+    ];
+    if (ops.length > 0) await withTimeout(pushSpaceBatch(spaceId, ops));
+    if (group.items.length > 0) await dayItemRepository.markSynced(group.items.map((p) => p.id));
+    if (group.habits.length > 0) await habitCompletionSyncRepository.markSynced(group.habits.map((p) => p.id));
+    if (group.tasks.length > 0) await taskCompletionSyncRepository.markSynced(group.tasks.map((p) => p.id));
+  }
+
+  // Categoría ligada a un espacio: config/category, no `users/{uid}/categories`. Un tombstone acá
+  // no debería pasar en flujo normal (desligar usa `unlinkSpace`, no `remove()`, ver roadmap) —
+  // si pasa igual, no hay nada que tombstonear en `config/category` (no tiene ese concepto), así
+  // que solo se marca subida para no reintentarlo en vano.
+  for (const p of cats) {
+    if (!p.spaceId) continue;
+    if (p.category) {
+      await withTimeout(
+        setSpaceConfig(p.spaceId, {
+          label: p.category.label,
+          icon: p.category.icon,
+          color: p.category.color,
+          updatedAt: p.updatedAt,
+        }),
+      );
+    }
+    await categoryRepository.markSynced([p.id]);
+  }
 }
 
 // ─── Ajustes visuales — un solo documento, LWW (SYNC_ROADMAP.md, Fase 3) ──────────
@@ -284,9 +490,21 @@ async function syncOnce(uid: string, opts: { pull: boolean }): Promise<void> {
   const canBackup = hasBackupPlan();
   status.set({ phase: 'syncing' });
   try {
-    if (opts.pull) meta = await pull(uid, meta);
+    if (opts.pull) {
+      meta = await pull(uid, meta);
+      const spaces = await pullSpaces(uid, meta);
+      meta = spaces.meta;
+      if (spaces.changed) {
+        await refreshWidgets().catch(() => undefined);
+        await useDayItemsStore.getState().reload();
+        await useCategoriesStore.getState().load();
+      }
+    }
     await syncSettings(uid, canBackup);
     if (canBackup) await push(uid);
+    // Sin gate de plan (T9): un invitado Free sigue participando de un espacio aunque no tenga
+    // Pro — solo el dueño necesitaba Pro para compartirlo.
+    await pushSpaces();
     meta = { ...meta, lastSyncAt: Date.now() };
     await saveMeta(meta);
     status.set({ phase: canBackup ? 'idle' : 'paused', lastSyncAt: meta.lastSyncAt, pending: await pendingChanges() });

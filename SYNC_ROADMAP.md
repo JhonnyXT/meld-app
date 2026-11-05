@@ -389,6 +389,55 @@ en modo avión aparece en la nube al volver la conexión.
   Plus, instalación con 25 ítems reales de sesiones anteriores): la migración corrió limpio, sin
   errores de SQLite; Today cargó los mismos 25 ítems de siempre y la sync siguió sincronizando
   ("Respaldado Ahora mismo" en Ajustes → Cuenta) — las columnas nuevas no rompieron nada.
+- [x] **Motor de sync (traer y subir)** (2026-11-04): `src/sync/remote.ts` generaliza
+  `pullCollection`/`pushBatch` (ya no hardcodean `users/{uid}`) y agrega `discoverSpaces`
+  (`memberUids array-contains uid`, incluye espacios eliminados — así el motor se entera y
+  desconecta), `pullSpaceCollection`/`pushSpaceBatch` (mismo `pullPaged`/`pushBatchTo` que lo
+  personal, apuntando a `spaces/{spaceId}/...`), `getSpaceConfig`/`setSpaceConfig`,
+  `getSpaceMember`/`setSpaceMember` (estos dos últimos sin usar todavía — para el paso de UI).
+  `src/sync/meta.ts` → `CursorKey` ahora admite `space:{id}:{kind}` además de la clave personal
+  simple, más `forgetSpace()` (limpia los cursores de un espacio al desconectarlo, para una
+  traída completa si se vuelve a unir). `src/sync/engine.ts`:
+  - `pullSpaces(uid, meta)`: descubre mis espacios, desconecta localmente los que ya no viven
+    (`categoryRepository.unlinkSpace` + el mismo método en `dayItemRepository`/
+    `habitCompletionSyncRepository`/`taskCompletionSyncRepository` + `forgetSpace`), y para cada
+    espacio vivo trae `config/category` (`categoryRepository.applySpaceUpsert` — crea la
+    categoría local la primera vez, `id = spaceId`) + items/habitCompletions/taskCompletions
+    (mismo `pickWinner` que lo personal, `applySpaceRemoteUpsert` en vez de `applyRemoteUpsert`).
+    Corre siempre que `pull()` corre (junto al personal), nunca gateado por plan.
+  - `pushSpaces()`: agrupa lo pendiente (`listPendingSync()` de las 4 tablas) por `spaceId`,
+    sube cada grupo a `spaces/{spaceId}/...` (`dayItemToSpaceDoc`, sin `categoryId`) y la
+    categoría a `config/category` en vez de `users/{uid}/categories`. Sin gate de plan (T9: un
+    invitado Free participa igual, solo el dueño necesitaba Pro para compartir) — a diferencia
+    de `push()` (personal), que sí sigue gateado.
+  - `pushItems`/`pushHabitCompletions`/`pushTaskCompletions`/`pushCategories` (personales) ahora
+    filtran `spaceId == null` — antes de este cambio subían TODO lo pendiente mezclado, lo que
+    habría duplicado/corrompido cualquier fila ligada a un espacio subiéndola también a
+    `users/{uid}/...` (bug encontrado leyendo el código antes de que llegara a pasar en
+    dispositivo, no en producción).
+  - `src/domain/category.ts`/`CursorKey` tests nuevos en `meta.test.ts` (independencia de
+    cursores entre espacios y de lo personal, `forgetSpace`). 24 tests en verde.
+  **Verificado en dispositivo** (2026-11-04, Moto E7 Plus, espacio sembrado a mano por REST
+  contra el emulador — sin UI de compartir/unirse todavía): `discoverSpaces` encontró el espacio
+  sembrado; `pullSpaces` creó la categoría local "Casa" con el ícono/color de `config/category`;
+  trajo el ítem sembrado ("Comprar leche") y apareció en Today/búsqueda; al borrar el espacio en
+  Firestore y reabrir la app, "Casa" se desligó sola y se subió como categoría PERSONAL nueva a
+  `users/{uid}/categories` (confirmado por REST) — exactamente "quien pierde el acceso conserva
+  la categoría como propia". **Bug real encontrado y corregido en el camino**: la semilla manual
+  por REST no traía `serverUpdatedAt` (campo que en producción pone `pushBatch`/`pushSpaceBatch`
+  automático vía `serverTimestamp()`) — sin él, la query `where('serverUpdatedAt' >= cursor)` de
+  `pullPaged` nunca encuentra el documento (Firestore excluye de un filtro de rango lo que no
+  tiene el campo), así que el ítem sembrado no bajaba aunque el espacio sí se descubriera bien;
+  no es un bug del motor, es una nota para la próxima vez que se sembren datos a mano por REST.
+  **No verificado todavía con una prueba real de punta a punta**: edité el ítem sembrado desde
+  el detalle para marcarlo hecho y confirmar que `pushSpaces()` lo sube de vuelta a
+  `spaces/{id}/items` — en cambio se subió a `users/{uid}/items` (personal). Causa: la semilla
+  manual no traía el campo `category` (texto copiado, lo que usa `dayItemRepository.upsert()` →
+  `resolveCategoryId()`/`resolveSpaceId()` para re-resolver el vínculo con el espacio al guardar
+  una edición) — un ítem CREADO de verdad en la app siempre lleva ese texto copiado (igual que
+  cualquier ítem personal, ver Fase 1), así que este round-trip debería sostenerse en uso real;
+  queda pendiente confirmarlo con un ítem creado por la UI en vez de sembrado a mano, en el
+  siguiente paso (UI de compartir), que sí va a poder crear uno de punta a punta.
 - [ ] Pruebas con dos teléfonos y dos cuentas (Moto e7 plus + S24 Ultra), en `dev` + emulador y
   en `test` contra la nube real.
 
