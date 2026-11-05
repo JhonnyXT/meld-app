@@ -470,6 +470,7 @@ export const es = {
   joinCategoryErrorExpiredCode: 'Ese código venció. Pide uno nuevo.',
   joinCategoryErrorFreeLimit: 'Con el plan Free puedes unirte a 2 categorías compartidas. Suscríbete a Pro para unirte a más.',
   joinCategoryErrorDenied: 'No se pudo unir — puede que ya formes parte de esta categoría o que ya esté llena.',
+  itemDetailReadOnlyBanner: 'Solo puedes ver este ítem — eres lector de esta categoría compartida.',
 } as const;
 
 export const en: Record<keyof typeof es, string> = {
@@ -898,6 +899,7 @@ export const en: Record<keyof typeof es, string> = {
   joinCategoryErrorExpiredCode: 'That code expired. Ask for a new one.',
   joinCategoryErrorFreeLimit: 'On the Free plan you can join 2 shared categories. Subscribe to Pro to join more.',
   joinCategoryErrorDenied: "Couldn't join — you might already be part of this category, or it's full.",
+  itemDetailReadOnlyBanner: "You can only view this item — you're a viewer of this shared category.",
 };
 
 export const WEEKDAY_SHORT: Record<Language, string[]> = {

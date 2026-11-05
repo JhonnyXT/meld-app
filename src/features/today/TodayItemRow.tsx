@@ -5,6 +5,7 @@ import { useVoiceMemoPlayer } from '@/hooks/useVoiceMemoPlayer';
 import { useTimeDragStore } from '@/store/timeDragStore';
 import { useItemDetailStore } from '@/store/itemDetailStore';
 import { useDayItemsStore } from '@/store/dayItemsStore';
+import { useCategoriesStore } from '@/store/categoriesStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { nowMinutes, minutesTo12h } from '@/domain/time';
 import { useTranslation } from '@/i18n';
@@ -46,6 +47,11 @@ export function TodayItemRow({
   const isDraggingThis = useTimeDragStore((s) => s.active && s.itemId === item.id);
   const draggingMinutes = useTimeDragStore((s) => s.currentMinutes);
   const coolHabitsEnabled = useSettingsStore((s) => s.coolHabitsEnabled);
+  const readOnlyLabels = useCategoriesStore((s) => s.readOnlyLabels);
+  // Lector de una categoría compartida (SYNC_ROADMAP.md, Fase 4) — no puede completar, reagendar
+  // ni borrar acá; `onPress` sigue abriendo el detalle para VER (`ItemDetailSheet` bloquea el
+  // resto del formulario si corresponde).
+  const readOnly = !!item.category && readOnlyLabels.has(item.category);
   const row = toRowViewModel(item, habitCompletedToday, coolHabitsEnabled, taskCompletedToday);
 
   if (isDraggingThis) {
@@ -97,13 +103,13 @@ export function TodayItemRow({
       completed={row.completed}
       playbackExpanded={playbackExpanded}
       onPress={() => useItemDetailStore.getState().open(item.id)}
-      onToggleComplete={row.leading.kind === 'checkbox' ? () => onToggleComplete(item.id) : undefined}
+      onToggleComplete={row.leading.kind === 'checkbox' && !readOnly ? () => onToggleComplete(item.id) : undefined}
       onToggleHabitComplete={
-        row.leading.kind === 'habitIcon' && onToggleHabitComplete ? () => onToggleHabitComplete(item.id) : undefined
+        row.leading.kind === 'habitIcon' && onToggleHabitComplete && !readOnly ? () => onToggleHabitComplete(item.id) : undefined
       }
       onLinkPress={linkUrl ? () => Linking.openURL(linkUrl) : undefined}
-      onDashPress={() => useTimeDragStore.getState().start(item.id, initialDragMinutes(item, nowMinutes()))}
-      onDelete={() => (onDelete ? onDelete(item.id) : useDayItemsStore.getState().remove(item.id))}
+      onDashPress={readOnly ? undefined : () => useTimeDragStore.getState().start(item.id, initialDragMinutes(item, nowMinutes()))}
+      onDelete={readOnly ? undefined : () => (onDelete ? onDelete(item.id) : useDayItemsStore.getState().remove(item.id))}
     />
   );
 }

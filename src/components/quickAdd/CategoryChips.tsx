@@ -33,11 +33,17 @@ export function CategoryChips({ value, onChange, showBorder }: CategoryChipsProp
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const categoryList = useCategoriesStore((s) => s.categories);
+  const readOnlyLabels = useCategoriesStore((s) => s.readOnlyLabels);
   const loaded = useCategoriesStore((s) => s.loaded);
   const selected = categoryList.find((cat) => cat.label === value);
-  const scrollable = categoryList.length > MAX_WRAPPED_CATEGORIES;
+  // Nunca ofrecer para elegir una categoría donde soy lector (SYNC_ROADMAP.md, Fase 4) — ni para
+  // crear un ítem nuevo ahí, ni para reclasificar uno existente. Si el ítem en edición YA
+  // pertenece a una, `selected` la sigue mostrando en el header (vía `categoryList` completa);
+  // `ItemDetailSheet` es quien bloquea el resto del formulario en ese caso.
+  const selectableCategories = categoryList.filter((cat) => !readOnlyLabels.has(cat.label));
+  const scrollable = selectableCategories.length > MAX_WRAPPED_CATEGORIES;
 
-  const chips = categoryList.map((cat) => {
+  const chips = selectableCategories.map((cat) => {
     const active = cat.label === value;
     return (
       <Pressable
@@ -101,7 +107,7 @@ export function CategoryChips({ value, onChange, showBorder }: CategoryChipsProp
             </ScrollView>
           ) : (
             <View style={styles.row}>
-              {categoryList.length === 0 ? (
+              {selectableCategories.length === 0 ? (
                 <Text style={{ fontFamily: font.regular, fontSize: 13, color: palette.textDim }}>
                   {t('categoriesEmptyMessage')}
                 </Text>

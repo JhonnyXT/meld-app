@@ -1,6 +1,16 @@
 import { dayItemRepository } from '@/data/local/dayItemRepository';
+import { categoryRepository } from '@/data/local/categoryRepository';
 import { toDateKey } from '@/domain/date';
 import { refreshWidgets } from '@/widget/refreshWidgets';
+
+/** Mismo criterio que `widget/widgetActions.ts` → `isReadOnlyCategory` — este camino también
+ * bypasa la UI (bandeja de notificaciones, a veces con la app cerrada), así que un lector de
+ * categoría compartida (SYNC_ROADMAP.md, Fase 4) no puede completar por acá tampoco. */
+async function isReadOnlyCategory(label: string | null): Promise<boolean> {
+  if (!label) return false;
+  const categories = await categoryRepository.list();
+  return categories.find((c) => c.label === label)?.space?.role === 'viewer';
+}
 
 /** Identificador del botón "Marcar hecho" de la categoría `completable` —
  * vive acá (y no en `notifications.ts`) para que la tarea en segundo plano
@@ -27,7 +37,7 @@ export const MARK_DONE_ACTION = 'mark-done';
  */
 export async function completeItemFromNotification(itemId: string): Promise<void> {
   const item = await dayItemRepository.getById(itemId);
-  if (!item) return;
+  if (!item || (await isReadOnlyCategory(item.category))) return;
   const today = toDateKey(new Date());
 
   if (item.type === 'task') {

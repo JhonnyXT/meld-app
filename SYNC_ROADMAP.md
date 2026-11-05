@@ -408,9 +408,43 @@ en modo avión aparece en la nube al volver la conexión.
     verdad en dos teléfonos con cuentas de Google reales (solo REST contra el emulador) — eso es
     la tarea de abajo ("Pruebas con dos teléfonos y dos cuentas"), que a esta altura es lo único
     que falta para considerar el flujo "Compartir"/"Unirme" end-to-end terminado.
-- [ ] Roles: el dueño elige "Puede editar / Solo ver" por persona; un lector no puede crear,
-  editar, completar ni borrar en esa categoría (deshabilitar en Quick Add, detalle, swipe,
-  checkbox y widgets).
+- [x] **Gating de un lector** (2026-11-05): `categoriesStore.readOnlyLabels` (`Set<string>`,
+  recalculado en `load()`) — labels de categorías compartidas donde mi rol es `'viewer'`. Por
+  `label`, no `id`: mismo criterio que `DayItem.category` (texto copiado, ver CLAUDE.md →
+  "Categorías configurables"), consistente con cómo toda la app ya resuelve a qué categoría
+  pertenece un ítem.
+  - `CategoryChips.tsx`: nunca ofrece una de solo lectura para elegir (filtra
+    `selectableCategories`) — cubre crear (`QuickAddSheet`) y reclasificar
+    (`ItemDetailSheet`) a la vez. `QuickAddSheet` además bloquea "Agregar" si la categoría ya
+    viene así por un prefill de Agregar por voz (`voiceParser.ts` matchea por texto libre,
+    podría colarse un nombre que coincide).
+  - `TodayItemRow.tsx` (Today + agenda Semana, que la reusa): si `item.category` es de solo
+    lectura, no pasa `onDelete`/`onToggleComplete`/`onToggleHabitComplete`/`onDashPress` —
+    sin swipe, sin completar, sin reagendar hora. `onPress` sigue abriendo el detalle, para VER.
+  - `ItemDetailSheet.tsx`: con un ítem de solo lectura, banner arriba ("Solo puedes ver este
+    ítem...") + todo el formulario editable envuelto en `pointerEvents="none"` + opacidad (más
+    simple y robusto que agregarle `disabled` a cada `FieldRow`/`TimeFieldRow`/etc. sueltos, que
+    hoy no lo tienen) + `confirmDisabled` siempre `true` — ningún cambio local llega a
+    persistirse aunque el formulario "se vea" tocable.
+  - **Dos caminos que bypasan la UI por completo, encontrados al auditar** (no estaban en la
+    lista original del roadmap, pero son el mismo hueco que widgets): `widget/widgetActions.ts`
+    (`toggleTaskCompleteFromWidget`/`toggleHabitCompleteFromWidget`) y
+    `services/notificationActions.ts` (`completeItemFromNotification`, el botón "Marcar hecho"
+    de la bandeja de notificaciones) mutan la DB directo, sin stores — ambos ahora consultan
+    `categoryRepository.list()` (sin store, corren headless) y no hacen nada si la categoría del
+    ítem es de solo lectura.
+  - **Verificado en dispositivo** (2026-11-05, S24 Ultra): se simuló ser lector de una categoría
+    AJENA (espacio sembrado por REST con `ownerUid` de un segundo usuario de prueba, mi cuenta
+    agregada a `memberUids` pero NO a `editorUids` vía `arrayUnion`, mismo mecanismo ya probado
+    en "Unirme con un código") — confirmado: tocar el checkbox de su ítem en Today no cambia el
+    contador; deslizar la fila no revela el botón de eliminar; el detalle muestra el banner y
+    "Actualizar tarea" atenuado/deshabilitado; Quick Add no ofrece esa categoría entre las
+    opciones para elegir. `npx tsc --noEmit` limpio, 24 tests en verde.
+  - **Pendiente, documentado a propósito**: sin UI todavía para que el dueño elija el rol de
+    cada MIEMBRO existente uno por uno (solo se elige el rol al generar un código nuevo, ver
+    `ShareCategorySheet`) — cambiar el rol de alguien que ya se unió (T11) no tiene pantalla
+    propia; tampoco hay indicador de "quién creó/completó esto" en la fila (ver el ítem de abajo,
+    "por definir" desde el modelo de datos).
 - [ ] Salir, quitar a alguien, eliminar para todos; quien pierde el acceso conserva la categoría
   como propia (desconectada).
 - [ ] Indicador en la fila de quién creó o completó un ítem compartido (por definir).

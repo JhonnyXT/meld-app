@@ -20,6 +20,7 @@ import { useTranslation } from '@/i18n';
 import { useQuickAddStore } from '@/store/quickAddStore';
 import { useDayItemsStore } from '@/store/dayItemsStore';
 import { useInboxStore } from '@/store/inboxStore';
+import { useCategoriesStore } from '@/store/categoriesStore';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
 import { syncReminderNotification } from '@/services/notifications';
 import { toDateKey, addDays } from '@/domain/date';
@@ -296,9 +297,13 @@ export function QuickAddSheet() {
   };
 
   const meta = QUICK_ADD_META[type];
+  const readOnlyLabels = useCategoriesStore((s) => s.readOnlyLabels);
   // Deshabilitado hasta que haya al menos un título (y, para nota de voz,
-  // también una grabación) — antes se podía guardar un ítem vacío.
-  const saveDisabled = !title.trim() || (type === 'voiceMemo' && !recordedUri);
+  // también una grabación) — antes se podía guardar un ítem vacío. `CategoryChips` ya no ofrece
+  // categorías de solo lectura para elegir (SYNC_ROADMAP.md, Fase 4), pero un prefill de Agregar
+  // por voz podría igual asignar una por nombre (`voiceParser.ts` matchea texto libre) — este
+  // chequeo extra es la defensa real contra ESE camino.
+  const saveDisabled = !title.trim() || (type === 'voiceMemo' && !recordedUri) || (!!category && readOnlyLabels.has(category.label));
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>

@@ -15,6 +15,12 @@ export interface CategoryUsage {
 interface CategoriesState {
   categories: Category[];
   usage: Record<string, CategoryUsage>;
+  /** Labels de categorías compartidas donde mi rol es `'viewer'` (SYNC_ROADMAP.md, Fase 4) — un
+   * lector no puede crear/editar/completar/borrar ahí (gating en `QuickAddSheet`/
+   * `ItemDetailSheet`/`TodayItemRow`/widgets). Por `label`, no `id`: es el mismo criterio que
+   * `DayItem.category` (texto copiado), consistente con cómo toda la app ya resuelve "a qué
+   * categoría pertenece este ítem" (ver CLAUDE.md → "Categorías configurables"). */
+  readOnlyLabels: Set<string>;
   loading: boolean;
   loaded: boolean;
   load: () => Promise<void>;
@@ -37,13 +43,15 @@ function buildUsage(rows: { category: string; status: 'inbox' | 'scheduled' | 'd
 export const useCategoriesStore = create<CategoriesState>((set, get) => ({
   categories: [],
   usage: {},
+  readOnlyLabels: new Set(),
   loading: false,
   loaded: false,
 
   load: async () => {
     set({ loading: true });
     const [categories, usageRows] = await Promise.all([categoryRepository.list(), dayItemRepository.listCategoryUsage()]);
-    set({ categories, usage: buildUsage(usageRows), loading: false, loaded: true });
+    const readOnlyLabels = new Set(categories.filter((c) => c.space?.role === 'viewer').map((c) => c.label));
+    set({ categories, usage: buildUsage(usageRows), readOnlyLabels, loading: false, loaded: true });
   },
 
   add: async (input) => {

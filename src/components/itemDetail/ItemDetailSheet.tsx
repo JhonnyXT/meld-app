@@ -20,6 +20,7 @@ import { useTranslation } from '@/i18n';
 import { useItemDetailStore } from '@/store/itemDetailStore';
 import { useDayItemsStore } from '@/store/dayItemsStore';
 import { useInboxStore } from '@/store/inboxStore';
+import { useCategoriesStore } from '@/store/categoriesStore';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
 import { syncReminderNotification } from '@/services/notifications';
 import { toDateKey } from '@/domain/date';
@@ -211,6 +212,14 @@ export function ItemDetailSheet() {
     });
   }, [itemId]);
 
+  const readOnlyLabels = useCategoriesStore((s) => s.readOnlyLabels);
+  // Lector de una categoría compartida (SYNC_ROADMAP.md, Fase 4) — puede VER el ítem (esta hoja
+  // se sigue abriendo), pero no editar/completar/reclasificar nada. En vez de deshabilitar cada
+  // campo suelto (TimeFieldRow/DateFieldRow/etc. no tienen una prop `disabled` hoy), se envuelve
+  // todo el formulario editable en un `pointerEvents="none"` + opacidad — ningún cambio local
+  // importa de todos modos porque `confirmDisabled` bloquea "Actualizar" más abajo.
+  const readOnly = !!item?.category && readOnlyLabels.has(item.category);
+
   if (!item) return <Modal visible={!!itemId} transparent animationType="fade" />;
 
   const handleSave = async () => {
@@ -314,8 +323,9 @@ export function ItemDetailSheet() {
   const meta = QUICK_ADD_META[type];
   const typeLabel = t(meta.tabLabelKey);
   // Mismo criterio que QuickAddSheet: sin título (o sin grabación en nota de
-  // voz nueva) no se puede guardar.
-  const saveDisabled = !title.trim() || (type === 'voiceMemo' && !recordedUri);
+  // voz nueva) no se puede guardar. Un lector de categoría compartida (`readOnly`) nunca puede
+  // guardar, sin importar el resto.
+  const saveDisabled = readOnly || !title.trim() || (type === 'voiceMemo' && !recordedUri);
 
   return (
     <Modal visible={!!itemId} animationType="slide" transparent onRequestClose={close}>
@@ -343,6 +353,16 @@ export function ItemDetailSheet() {
             </Pressable>
           </View>
 
+          {readOnly ? (
+            <View style={[styles.readOnlyBanner, { backgroundColor: `${palette.textDim}1A` }]}>
+              <Icon name="users" size={16} color={palette.textDim} />
+              <Text style={{ fontFamily: font.medium, fontSize: 13, color: palette.textDim, flex: 1 }}>
+                {t('itemDetailReadOnlyBanner')}
+              </Text>
+            </View>
+          ) : null}
+
+          <View pointerEvents={readOnly ? 'none' : 'auto'} style={readOnly ? styles.readOnlyForm : undefined}>
           {item.type !== 'moment' ? <TypeTabs value={type} onChange={handleTypeChange} /> : null}
 
           <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -479,6 +499,7 @@ export function ItemDetailSheet() {
               <PriorityTabs value={priority} onChange={setPriority} />
             </FieldSection>
           </ScrollView>
+          </View>
 
           <SheetActions onCancel={close} onConfirm={handleSave} confirmLabel={t(meta.ctaUpdateKey)} confirmDisabled={saveDisabled} />
         </Animated.View>
@@ -542,4 +563,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
   },
+  readOnlyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  readOnlyForm: { opacity: 0.55 },
 });
