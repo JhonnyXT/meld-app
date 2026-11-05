@@ -429,15 +429,19 @@ en modo avión aparece en la nube al volver la conexión.
   `pullPaged` nunca encuentra el documento (Firestore excluye de un filtro de rango lo que no
   tiene el campo), así que el ítem sembrado no bajaba aunque el espacio sí se descubriera bien;
   no es un bug del motor, es una nota para la próxima vez que se sembren datos a mano por REST.
-  **No verificado todavía con una prueba real de punta a punta**: edité el ítem sembrado desde
-  el detalle para marcarlo hecho y confirmar que `pushSpaces()` lo sube de vuelta a
-  `spaces/{id}/items` — en cambio se subió a `users/{uid}/items` (personal). Causa: la semilla
-  manual no traía el campo `category` (texto copiado, lo que usa `dayItemRepository.upsert()` →
-  `resolveCategoryId()`/`resolveSpaceId()` para re-resolver el vínculo con el espacio al guardar
-  una edición) — un ítem CREADO de verdad en la app siempre lleva ese texto copiado (igual que
-  cualquier ítem personal, ver Fase 1), así que este round-trip debería sostenerse en uso real;
-  queda pendiente confirmarlo con un ítem creado por la UI en vez de sembrado a mano, en el
-  siguiente paso (UI de compartir), que sí va a poder crear uno de punta a punta.
+  **Push de un ítem creado por la UI, confirmado** (2026-11-05, S24 Ultra, mismo espacio
+  sembrado por REST pero el ítem esta vez creado de verdad desde Quick Add en la categoría
+  "Casa", no sembrado a mano): la primera prueba (editar el ítem SEMBRADO por REST para
+  marcarlo hecho) subió por error a `users/{uid}/items` (personal) en vez de a
+  `spaces/{id}/items` — causa: esa semilla manual no traía el campo `category` (texto copiado)
+  que `dayItemRepository.upsert()` usa para re-resolver `categoryId`/`spaceId` al guardar una
+  edición, así que al guardar perdía el vínculo con el espacio. Confirmado que es un hueco de la
+  semilla y no del motor: un ítem creado "Prueba espacio real" directo en Quick Add eligiendo la
+  categoría "Casa" (con `category: 'Casa'` copiado como cualquier ítem, igual que en Fase 1) se
+  subió correctamente a `spaces/s1/items` (verificado por REST, nunca apareció en
+  `users/{uid}/items`), y al marcarlo hecho desde la app la actualización (`status: 'done'`)
+  también llegó a `spaces/s1/items` — el round-trip categoría→espacio se sostiene con datos
+  reales. Con esto el motor de sync (traer y subir) queda verificado de punta a punta.
 - [ ] Pruebas con dos teléfonos y dos cuentas (Moto e7 plus + S24 Ultra), en `dev` + emulador y
   en `test` contra la nube real.
 
