@@ -49,7 +49,7 @@ export function CategoryFormModal({ visible, initial, onClose, onSave, onDelete 
       <GestureHandlerRootView style={{ flex: 1 }}>
       <Pressable style={styles.backdrop} onPress={onClose} />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.sheetWrap}
         pointerEvents="box-none"
       >

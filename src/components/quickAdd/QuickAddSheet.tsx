@@ -305,7 +305,7 @@ export function QuickAddSheet() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Pressable style={styles.backdrop} onPress={close} />
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.sheetWrap}
           pointerEvents="box-none"
         >
