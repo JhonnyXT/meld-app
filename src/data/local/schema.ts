@@ -60,6 +60,14 @@ export const dayItems = sqliteTable('day_items', {
   categoryId: text('category_id'),
   deletedAt: text('deleted_at'),
   syncState: text('sync_state', { enum: ['synced', 'pending'] }).notNull().default('pending'),
+  // Categorías compartidas (Fase 4) — ver el comentario largo en `categories.spaceId`. NULL =
+  // va al respaldo personal (`users/{uid}/items`, el caso de siempre); si no, a
+  // `spaces/{spaceId}/items` en vez de ahí. Denormalizado (copiado de `categories.spaceId` al
+  // crear el ítem) para que el motor de sync nunca necesite un JOIN contra `categories` en su
+  // ruta caliente — y porque es seguro: mover un ítem a otra categoría (D5 de My Wallet, ver
+  // roadmap) le da SIEMPRE un id nuevo + tombstone del viejo, nunca reasigna `spaceId` en el
+  // mismo id, así que este valor es inmutable durante toda la vida de una fila.
+  spaceId: text('space_id'),
 });
 
 /** Un registro por día que un hábito se marcó como hecho. Es la fuente real
@@ -76,6 +84,10 @@ export const habitCompletions = sqliteTable('habit_completions', {
   updatedAt: text('updated_at'),
   deletedAt: text('deleted_at'),
   syncState: text('sync_state', { enum: ['synced', 'pending'] }),
+  // Fase 4 — copiado de `dayItems.spaceId` del hábito dueño al marcar/desmarcar (ver el
+  // comentario largo en `dayItems.spaceId`): un hábito compartido nunca cambia de espacio en el
+  // mismo id, así que esto es estable una vez escrito.
+  spaceId: text('space_id'),
 });
 
 /** Un registro por día que una task QUE REPITE (`repeatRule` no null) se
@@ -90,6 +102,8 @@ export const taskCompletions = sqliteTable('task_completions', {
   updatedAt: text('updated_at'),
   deletedAt: text('deleted_at'),
   syncState: text('sync_state', { enum: ['synced', 'pending'] }),
+  // Fase 4 — mismo criterio que `habitCompletions.spaceId`.
+  spaceId: text('space_id'),
 });
 
 /** Catálogo de categorías configurable por el usuario (Ajustes > Categorías,
@@ -107,4 +121,18 @@ export const categories = sqliteTable('categories', {
   updatedAt: text('updated_at'),
   deletedAt: text('deleted_at'),
   syncState: text('sync_state', { enum: ['synced', 'pending'] }),
+  // Categorías compartidas (SYNC_ROADMAP.md, Fase 4). `spaceId` null = categoría personal (el
+  // caso de siempre); si no, el id del espacio en `spaces/{spaceId}` — SIEMPRE igual a `id` de
+  // esta misma fila ("Quien se une crea la categoría local con ese mismo id", ver "Modelo en
+  // Firestore" del roadmap): columna aparte igual, por simetría con `space_id` en `day_items`/
+  // `habit_completions`/`task_completions` (mismo nombre de columna en todas, mismo criterio de
+  // query) y para no tener que tratar las categorías distinto si ese invariante cambia. `spaceRole`
+  // es MI rol en este espacio ('editor'/'viewer', cacheado acá para no leer `spaces/{id}` en cada
+  // chequeo de permiso de la UI — Quick Add/detalle/swipe/widgets con un lector). `spaceOwnerUid`
+  // es quién es el dueño (compararlo con el uid de la sesión decide "puedo cambiar roles/
+  // eliminar el espacio entero"). Los tres quedan NULL hasta que el paso de UI (compartir/unirse)
+  // los empiece a llenar — esta migración solo prepara las columnas, sin flujo todavía.
+  spaceId: text('space_id'),
+  spaceRole: text('space_role', { enum: ['editor', 'viewer'] }),
+  spaceOwnerUid: text('space_owner_uid'),
 });

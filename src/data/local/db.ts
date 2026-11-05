@@ -51,7 +51,8 @@ export function initDb() {
       week_of_year INTEGER,
       category_id TEXT,
       deleted_at TEXT,
-      sync_state TEXT NOT NULL DEFAULT 'pending'
+      sync_state TEXT NOT NULL DEFAULT 'pending',
+      space_id TEXT
     );
   `);
   sqlite.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_date ON day_items(date);');
@@ -71,6 +72,10 @@ export function initDb() {
   addColumnIfMissing('day_items', 'deleted_at TEXT');
   addColumnIfMissing('day_items', "sync_state TEXT NOT NULL DEFAULT 'pending'");
   sqlite.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_category_id ON day_items(category_id);');
+  // Categorías compartidas (Fase 4) — ver el comentario largo en `schema.ts` →
+  // `dayItems.spaceId`/`categories.spaceId`.
+  addColumnIfMissing('day_items', 'space_id TEXT');
+  sqlite.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_space_id ON day_items(space_id);');
 
   sqlite.execSync(`
     CREATE TABLE IF NOT EXISTS habit_completions (
@@ -79,7 +84,8 @@ export function initDb() {
       date TEXT NOT NULL,
       updated_at TEXT,
       deleted_at TEXT,
-      sync_state TEXT
+      sync_state TEXT,
+      space_id TEXT
     );
   `);
   sqlite.execSync(
@@ -88,6 +94,7 @@ export function initDb() {
   addColumnIfMissing('habit_completions', 'updated_at TEXT');
   addColumnIfMissing('habit_completions', 'deleted_at TEXT');
   addColumnIfMissing('habit_completions', 'sync_state TEXT');
+  addColumnIfMissing('habit_completions', 'space_id TEXT');
 
   sqlite.execSync(`
     CREATE TABLE IF NOT EXISTS task_completions (
@@ -96,7 +103,8 @@ export function initDb() {
       date TEXT NOT NULL,
       updated_at TEXT,
       deleted_at TEXT,
-      sync_state TEXT
+      sync_state TEXT,
+      space_id TEXT
     );
   `);
   sqlite.execSync(
@@ -105,6 +113,7 @@ export function initDb() {
   addColumnIfMissing('task_completions', 'updated_at TEXT');
   addColumnIfMissing('task_completions', 'deleted_at TEXT');
   addColumnIfMissing('task_completions', 'sync_state TEXT');
+  addColumnIfMissing('task_completions', 'space_id TEXT');
 
   sqlite.execSync(`
     CREATE TABLE IF NOT EXISTS categories (
@@ -115,12 +124,18 @@ export function initDb() {
       sort_order INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT,
       deleted_at TEXT,
-      sync_state TEXT
+      sync_state TEXT,
+      space_id TEXT,
+      space_role TEXT,
+      space_owner_uid TEXT
     );
   `);
   addColumnIfMissing('categories', 'updated_at TEXT');
   addColumnIfMissing('categories', 'deleted_at TEXT');
   addColumnIfMissing('categories', 'sync_state TEXT');
+  addColumnIfMissing('categories', 'space_id TEXT');
+  addColumnIfMissing('categories', 'space_role TEXT');
+  addColumnIfMissing('categories', 'space_owner_uid TEXT');
 
   // 3 categorías por default, una sola vez (tabla vacía = primer arranque o
   // instalación nueva) — a partir de ahí son filas normales, el usuario

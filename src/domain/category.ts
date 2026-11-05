@@ -9,10 +9,26 @@ import type { IconName } from './iconNames';
  * ítem, mismo patrón que el título de un hábito): renombrar/recolorear una
  * categoría NO actualiza retroactivamente los ítems que ya la usan, y
  * borrarla los deja con ese texto "huérfano" en vez de reasignarlos. */
+/** Mi rol en una categoría compartida (SYNC_ROADMAP.md, Fase 4) — un lector no puede crear,
+ * editar, completar ni borrar ítems de esa categoría (Quick Add, detalle, swipe, checkbox,
+ * widgets la deshabilitan). `undefined` en `Category.space` = categoría personal, el caso de
+ * siempre. */
+export type SpaceRole = 'editor' | 'viewer';
+
+/** Presente solo si esta categoría es una categoría compartida (vive también en
+ * `spaces/{spaceId}`, con `spaceId` siempre igual a `Category.id` — ver el comentario largo en
+ * `data/local/schema.ts` → `categories.spaceId`). */
+export interface CategorySpaceLink {
+  spaceId: string;
+  role: SpaceRole;
+  ownerUid: string;
+}
+
 export interface Category {
   id: string;
   label: string;
   icon: IconName;
   color: string;
   sortOrder: number;
+  space?: CategorySpaceLink;
 }

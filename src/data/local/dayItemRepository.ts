@@ -17,6 +17,9 @@ export interface PendingDayItem {
   updatedAt: string;
   deletedAt: string | null;
   categoryId: string | null;
+  /** Fase 4 — a qué colección sube este ítem: `null` = `users/{uid}/items` (personal, el caso de
+   * siempre); si no, `spaces/{spaceId}/items` en vez de ahí. Ver `schema.ts` → `dayItems.spaceId`. */
+  spaceId: string | null;
   item: DayItem | null;
 }
 
@@ -73,13 +76,35 @@ function toDomain(row: Row): DayItem {
  * el nombre no matchea ninguna categoría viva (se borró, o el ítem nunca
  * tuvo una), queda `null` — `category`/`categoryColor` siguen siendo la
  * fuente de lectura real hasta que algo (Fase 4) empiece a resolver por id. */
+/** El espacio del hábito/task dueño de un completado (Fase 4) — leído una sola vez, al crear el
+ * registro de completado por primera vez (ver el comentario de `resolveSpaceId`: estable de ahí
+ * en más, nunca hace falta releerlo en un re-toggle). */
+async function getItemSpaceId(itemId: string): Promise<string | null> {
+  const rows = await db.select({ spaceId: dayItems.spaceId }).from(dayItems).where(eq(dayItems.id, itemId)).limit(1);
+  return rows[0]?.spaceId ?? null;
+}
+
 async function resolveCategoryId(label: string | null): Promise<string | null> {
   if (!label) return null;
   const rows = await db.select({ id: categories.id }).from(categories).where(eq(categories.label, label)).limit(1);
   return rows[0]?.id ?? null;
 }
 
-function toRow(item: DayItem, categoryId: string | null): NewRow {
+/** El espacio al que viaja este ítem, a partir de su categoría (Fase 4 — ver el comentario largo
+ * en `schema.ts` → `dayItems.spaceId`). `null` = categoría personal (o sin categoría): el ítem
+ * sigue yendo al respaldo personal, el caso de siempre. Nota sobre D5 (My Wallet): mover un ítem
+ * EXISTENTE de una categoría personal a una compartida (o viceversa, o entre dos espacios) tiene
+ * que crear un id nuevo + tombstone del viejo, nunca reasignar `spaceId` en el mismo id — esa
+ * migración todavía no tiene flujo de UI (Quick Add/detalle hoy dejan elegir cualquier categoría
+ * sin distinguir), así que por ahora esto solo garantiza que un ítem NUEVO creado directo en una
+ * categoría compartida quede bien etiquetado desde el principio. */
+async function resolveSpaceId(categoryId: string | null): Promise<string | null> {
+  if (!categoryId) return null;
+  const rows = await db.select({ spaceId: categories.spaceId }).from(categories).where(eq(categories.id, categoryId)).limit(1);
+  return rows[0]?.spaceId ?? null;
+}
+
+function toRow(item: DayItem, categoryId: string | null, spaceId: string | null): NewRow {
   const base = {
     id: item.id,
     createdAt: item.createdAt,
@@ -93,6 +118,7 @@ function toRow(item: DayItem, categoryId: string | null): NewRow {
     type: item.type,
     priority: item.priority,
     categoryId,
+    spaceId,
     deletedAt: null,
     syncState: 'pending' as const,
   };
@@ -212,7 +238,8 @@ export const dayItemRepository = {
 
   async upsert(item: DayItem): Promise<void> {
     const categoryId = await resolveCategoryId(item.category);
-    const row = toRow(item, categoryId);
+    const spaceId = await resolveSpaceId(categoryId);
+    const row = toRow(item, categoryId, spaceId);
     await db
       .insert(dayItems)
       .values(row)
@@ -280,7 +307,8 @@ export const dayItemRepository = {
         .set({ deletedAt: null, updatedAt: now, syncState: 'pending' })
         .where(eq(habitCompletions.id, id));
     } else {
-      await db.insert(habitCompletions).values({ id, habitId, date, updatedAt: now, syncState: 'pending' });
+      const spaceId = await getItemSpaceId(habitId);
+      await db.insert(habitCompletions).values({ id, habitId, date, updatedAt: now, syncState: 'pending', spaceId });
     }
     emitLocalChange();
     return true;
@@ -354,7 +382,8 @@ export const dayItemRepository = {
         .set({ deletedAt: null, updatedAt: now, syncState: 'pending' })
         .where(eq(taskCompletions.id, id));
     } else {
-      await db.insert(taskCompletions).values({ id, taskId, date, updatedAt: now, syncState: 'pending' });
+      const spaceId = await getItemSpaceId(taskId);
+      await db.insert(taskCompletions).values({ id, taskId, date, updatedAt: now, syncState: 'pending', spaceId });
     }
     emitLocalChange();
     return true;
@@ -404,6 +433,7 @@ export const dayItemRepository = {
       updatedAt: row.updatedAt,
       deletedAt: row.deletedAt,
       categoryId: row.categoryId,
+      spaceId: row.spaceId,
       item: row.deletedAt ? null : toDomain(row),
     }));
   },
@@ -426,9 +456,11 @@ export const dayItemRepository = {
   },
 
   /** Escribe un ítem bajado de la nube (ya ganó `pickWinner`) como `synced` — a diferencia de
-   * `upsert()`, que siempre deja `pending` (sería subirlo de vuelta sin necesidad). */
+   * `upsert()`, que siempre deja `pending` (sería subirlo de vuelta sin necesidad). Siempre del
+   * respaldo PERSONAL (`users/{uid}/items`, nunca `spaces/{id}/items` — eso necesita su propio
+   * "apply" cuando exista el motor de sync de espacios): `spaceId` queda `null` a propósito. */
   async applyRemoteUpsert(item: DayItem, categoryId: string | null): Promise<void> {
-    const row = { ...toRow(item, categoryId), syncState: 'synced' as const };
+    const row = { ...toRow(item, categoryId, null), syncState: 'synced' as const };
     await db.insert(dayItems).values(row).onConflictDoUpdate({ target: dayItems.id, set: row });
   },
 
@@ -453,6 +485,9 @@ export interface PendingCompletion {
   habitId?: string;
   taskId?: string;
   date: string;
+  /** Fase 4 — mismo criterio que `PendingDayItem.spaceId`: `null` = `users/{uid}/habitCompletions`
+   * (o `taskCompletions`) personal; si no, `spaces/{spaceId}/...` en vez de ahí. */
+  spaceId: string | null;
 }
 
 export const habitCompletionSyncRepository = {
@@ -463,7 +498,14 @@ export const habitCompletionSyncRepository = {
       .select()
       .from(habitCompletions)
       .where(or(eq(habitCompletions.syncState, 'pending'), isNull(habitCompletions.syncState)));
-    return rows.map((r) => ({ id: r.id, updatedAt: r.updatedAt ?? EPOCH, deletedAt: r.deletedAt, habitId: r.habitId, date: r.date }));
+    return rows.map((r) => ({
+      id: r.id,
+      updatedAt: r.updatedAt ?? EPOCH,
+      deletedAt: r.deletedAt,
+      habitId: r.habitId,
+      date: r.date,
+      spaceId: r.spaceId,
+    }));
   },
   async markSynced(ids: string[]): Promise<void> {
     if (ids.length === 0) return;
@@ -509,7 +551,14 @@ export const taskCompletionSyncRepository = {
       .select()
       .from(taskCompletions)
       .where(or(eq(taskCompletions.syncState, 'pending'), isNull(taskCompletions.syncState)));
-    return rows.map((r) => ({ id: r.id, updatedAt: r.updatedAt ?? EPOCH, deletedAt: r.deletedAt, taskId: r.taskId, date: r.date }));
+    return rows.map((r) => ({
+      id: r.id,
+      updatedAt: r.updatedAt ?? EPOCH,
+      deletedAt: r.deletedAt,
+      taskId: r.taskId,
+      date: r.date,
+      spaceId: r.spaceId,
+    }));
   },
   async markSynced(ids: string[]): Promise<void> {
     if (ids.length === 0) return;

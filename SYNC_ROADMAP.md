@@ -362,6 +362,32 @@ en modo avión aparece en la nube al volver la conexión.
   como lector), mi propio miembro (nadie edita la fila de otro salvo el dueño), salir/quitar/
   eliminar (salir en lote, el dueño quita pero no se autoagrega/autoquita, eliminar marca +
   permite borrar todo + los demás dejan de leer).
+- [x] **Datos locales (SQLite)** (2026-11-04): columnas nuevas, todas opcionales/`NULL` por
+  default (ver el comentario largo en `data/local/schema.ts` → `categories.spaceId`) —
+  `categories.space_id`/`space_role`/`space_owner_uid` (vínculo con el espacio + mi rol +
+  quién es el dueño, cacheados localmente); `day_items.space_id`,
+  `habit_completions.space_id`, `task_completions.space_id` (a qué colección sube cada fila:
+  `null` = personal como siempre, si no `spaces/{spaceId}/...`). Migradas con
+  `addColumnIfMissing` en `db.ts` para instalaciones existentes, incluidas en el `CREATE TABLE`
+  para instalaciones nuevas. `domain/category.ts` → `Category.space?: CategorySpaceLink`
+  (`{ spaceId, role, ownerUid }`, `undefined` = categoría personal).
+  `categoryRepository.setSpaceLink()` (nuevo) liga/desliga una categoría a un espacio — todavía
+  sin flujo de UI que lo llame, lo usan los pasos de "Compartir"/"Unirme"/"Salir" que siguen.
+  `dayItemRepository`: `upsert()` resuelve `space_id` desde la categoría del ítem al guardar
+  (así un ítem NUEVO creado directo en una categoría compartida ya queda bien etiquetado, aunque
+  Quick Add todavía no distingue categorías compartidas de personales);
+  `toggleHabitCompletion`/`toggleTaskCompletion` copian el `space_id` del hábito/task dueño al
+  crear el primer completado (estable de ahí en más — ver el porqué en el comentario de
+  `resolveSpaceId`). `listPendingSync()` de ítems y completados ahora exponen `spaceId`, para que
+  el motor de sync (próximo paso) pueda enrutar cada fila a `users/{uid}/...` o
+  `spaces/{spaceId}/...` sin un JOIN extra. **Pendiente, documentado a propósito**: D5 (mover un
+  ítem existente entre categoría personal/compartida = id nuevo + tombstone del viejo, nunca
+  reasignar `space_id` en el mismo id) todavía no tiene flujo — hoy nada en Quick Add/detalle
+  distingue categorías compartidas, así que ese cruce de límite ni se puede intentar desde la UI
+  todavía. 21 tests (`npm test`) siguen en verde, incluye 1 nuevo para
+  `dayItemToSpaceDoc`/`docToDayItemFromSpace`. Sin probar en dispositivo real todavía (ningún
+  teléfono conectado en esta sesión) — confirmar que la migración corre limpio en una instalación
+  con datos antes de seguir con el motor de sync.
 - [ ] Pruebas con dos teléfonos y dos cuentas (Moto e7 plus + S24 Ultra), en `dev` + emulador y
   en `test` contra la nube real.
 

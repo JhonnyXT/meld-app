@@ -3,8 +3,10 @@ import type { Category } from '@/domain/category';
 import {
   categoryToDoc,
   dayItemToDoc,
+  dayItemToSpaceDoc,
   docToCategory,
   docToDayItem,
+  docToDayItemFromSpace,
   habitCompletionToDoc,
   stripUndefined,
   taskCompletionToDoc,
@@ -99,6 +101,15 @@ describe('completions', () => {
         deletedAt: null,
       }),
     ).toEqual({ taskId: 'tk1', date: '2026-01-02', updatedAt: '2026-01-02T08:00:00.000Z', deletedAt: null });
+  });
+});
+
+describe('dayItemToSpaceDoc / docToDayItemFromSpace (Fase 4)', () => {
+  it('ida y vuelta conserva el ítem, sin categoryId (la categoría es el espacio entero)', () => {
+    const doc = dayItemToSpaceDoc(TASK);
+    expect('categoryId' in doc).toBe(false);
+    expect(doc.deletedAt).toBeNull();
+    expect(docToDayItemFromSpace(TASK.id, doc)).toEqual(TASK);
   });
 });
 

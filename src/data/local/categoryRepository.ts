@@ -1,7 +1,7 @@
 import { eq, asc, isNull, inArray, or } from 'drizzle-orm';
 import { db } from './db';
 import { categories } from './schema';
-import type { Category } from '@/domain/category';
+import type { Category, CategorySpaceLink } from '@/domain/category';
 import type { IconName } from '@/domain/iconNames';
 import { newId } from '@/domain/id';
 import { emitLocalChange } from './localChanges';
@@ -23,12 +23,17 @@ export interface PendingCategory {
 }
 
 function toDomain(row: typeof categories.$inferSelect): Category {
+  const space: CategorySpaceLink | undefined =
+    row.spaceId && row.spaceRole && row.spaceOwnerUid
+      ? { spaceId: row.spaceId, role: row.spaceRole, ownerUid: row.spaceOwnerUid }
+      : undefined;
   return {
     id: row.id,
     label: row.label,
     icon: row.icon as IconName,
     color: row.color,
     sortOrder: row.sortOrder,
+    ...(space ? { space } : {}),
   };
 }
 
@@ -76,6 +81,25 @@ export const categoryRepository = {
     await db
       .update(categories)
       .set({ deletedAt: now, updatedAt: now, syncState: 'pending' })
+      .where(eq(categories.id, id));
+    emitLocalChange();
+  },
+
+  /** Liga/desliga esta categoría a un espacio compartido (SYNC_ROADMAP.md, Fase 4) — usado por
+   * los flujos de "Compartir"/"Unirme con un código"/"Salir" (todavía sin construir; esto solo
+   * prepara el dato local). `link: null` = desconectar (la categoría queda personal de nuevo,
+   * conserva sus ítems — "quien pierde el acceso conserva la categoría como propia"). No toca
+   * `sync_state`: el vínculo con el espacio no es algo que suba a `users/{uid}/categories/*`
+   * (vive en `spaces/{id}` mismo, ver `firestore.rules`), así que cambiarlo nunca debe disparar
+   * una subida de la categoría al respaldo personal. */
+  async setSpaceLink(id: string, link: CategorySpaceLink | null): Promise<void> {
+    await db
+      .update(categories)
+      .set({
+        spaceId: link?.spaceId ?? null,
+        spaceRole: link?.role ?? null,
+        spaceOwnerUid: link?.ownerUid ?? null,
+      })
       .where(eq(categories.id, id));
     emitLocalChange();
   },
