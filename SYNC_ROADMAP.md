@@ -6,8 +6,12 @@ rama `feature/pro-sync`; `main` sigue 100% local y es lo que va a los testers de
 Adaptado del diseño ya probado en `my-wallet-app` (`SYNC_ROADMAP.md` de ese repo). Decisiones de
 producto en `docs/decisions.md` (2026-10-27).
 
-**Estado:** Fase 2 completa (2026-11-03) — login con Google funcionando de punta a punta contra
-el emulador de `dev`. Sigue la Fase 3 (respaldo en la nube).
+**Estado:** Fase 3 completa. Fase 4 (categorías compartidas) sustancialmente completa
+(2026-11-06) — modelo de datos, motor de sync, "Compartir"/"Unirme con un código" y el gating de
+lector, verificados de punta a punta con dos cuentas de Google reales en dos teléfonos. Quedan
+sin construir: UI de roles por miembro existente / salir / quitar a alguien / eliminar el espacio,
+el indicador de "quién creó/completó esto", y probar en variant `test` contra la nube real (hoy
+solo verificado en `dev` contra el emulador).
 
 ---
 
@@ -548,11 +552,26 @@ en modo avión aparece en la nube al volver la conexión.
   `users/{uid}/items`), y al marcarlo hecho desde la app la actualización (`status: 'done'`)
   también llegó a `spaces/s1/items` — el round-trip categoría→espacio se sostiene con datos
   reales. Con esto el motor de sync (traer y subir) queda verificado de punta a punta.
-- [ ] Pruebas con dos teléfonos y dos cuentas (Moto e7 plus + S24 Ultra), en `dev` + emulador y
-  en `test` contra la nube real.
+- [x] **Pruebas con dos teléfonos y dos cuentas reales** (2026-11-06, Moto E7 Plus + S24 Ultra,
+  variant `dev` contra el emulador): cada teléfono con su propia cuenta de Google real (no
+  simuladas por REST, a diferencia de las verificaciones anteriores de esta fase). El dueño
+  compartió "Work" desde `ShareCategorySheet` y generó un código; el invitado se unió desde
+  `JoinCategorySheet` con ese código — sin ninguna intervención manual por REST, solo las dos
+  pantallas ya construidas. Confirmado por REST que `spaces/cat-work` quedó con las dos cuentas
+  reales en `memberUids`/`editorUids`. El dueño creó "Prueba cruzada" en esa categoría desde
+  Quick Add → apareció en el teléfono invitado; el invitado la marcó hecha → el dueño la vio
+  hecha también (confirmado `status: 'done'` en `spaces/cat-work/items` por REST en ambos
+  sentidos). Push, pull y el gating de UI ya verificados en pasos anteriores quedan así
+  confirmados también con el flujo 100% real de punta a punta.
+  - **Pendiente, documentado a propósito**: no se probó todavía en variant `test` contra la nube
+    real (solo `dev` contra el emulador) — mismo código, infraestructura distinta; se deja para
+    antes de publicar. Tampoco se probó el camino offline (crear/completar sin internet y que
+    sincronice al volver la conexión) ni el de un LECTOR real en dos cuentas (el gating de lector
+    se verificó por separado, simulando el rol — ver el ítem de arriba).
 
-**Hecho cuando:** dos teléfonos con cuentas distintas comparten "Casa", los dos agregan y
-completan tareas (con y sin internet) y ven lo mismo; un lector ve pero no puede editar.
+**Hecho cuando:** dos teléfonos con cuentas distintas comparten "Casa" (o cualquier categoría),
+los dos agregan y completan tareas y ven lo mismo — **confirmado 2026-11-06**. Queda para después
+de esta fase: probar con y sin internet, y en `test` contra la nube real (ver el punto de arriba).
 
 ### Fase 5 — Cobro real (RevenueCat) · M
 - [ ] RevenueCat + productos en Play Console (US$7.99/mes, US$59.99/año, prueba de 14 días).
