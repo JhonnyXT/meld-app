@@ -449,8 +449,38 @@ en modo avión aparece en la nube al volver la conexión.
     `ShareCategorySheet`) — cambiar el rol de alguien que ya se unió (T11) no tiene pantalla
     propia; tampoco hay indicador de "quién creó/completó esto" en la fila (ver el ítem de abajo,
     "por definir" desde el modelo de datos).
-- [ ] Salir, quitar a alguien, eliminar para todos; quien pierde el acceso conserva la categoría
-  como propia (desconectada).
+- [x] **Roles por miembro / salir / quitar / eliminar** (2026-11-06): `ShareCategorySheet.tsx` se
+  amplía con una sección "Miembros" cuando la categoría ya está compartida — nombre y rol de cada
+  quien, vía nuevo `engine.ts` → `listCategoryMembers(spaceId)` (combina `getSpaceDoc` +
+  `listSpaceMembers`, el rol vive en `editorUids`/`memberUids` del espacio, no en `members/{uid}`).
+  El dueño puede tocar el chip de rol de cualquier miembro (`changeMemberRole` — reconstruye
+  `editorUids` entero; la regla de Firestore para esto exige el arreglo completo con el dueño
+  siempre adentro, no admite `arrayUnion`/`arrayRemove` de un elemento) y quitarlo
+  (`removeMemberFromCategory`). Al final del sheet: el dueño ve "Eliminar categoría compartida"
+  (`deleteCategorySpace`, marca `deletedAt`); un invitado ve "Salir de esta categoría"
+  (`leaveCategorySpace`) — ambos desvinculan la categoría LOCALMENTE al instante
+  (`unlinkSpaceLocally`, el mismo trío de llamadas que ya hacía `pullSpaces` al descubrir un
+  espacio muerto, factorizado y llamado aparte para no esperar al próximo ciclo de sync); los
+  demás miembros se enteran en su propio próximo `pullSpaces` (mismo mecanismo ya probado:
+  `discoverSpaces` deja de traer el espacio en cuanto el uid sale de `memberUids`, o lo trae con
+  `deletedAt` si el dueño lo eliminó).
+  - **Dos bugs reales encontrados probando con las dos cuentas reales**: (1) el gate de plan Pro
+    bloqueaba TODO el contenido del sheet sin mirar si la categoría ya estaba compartida, así que
+    un invitado Free (que según T9 nunca necesita Pro) ni siquiera podía ver la lista de miembros
+    o salir — corregido: el gate de Pro solo aplica a compartir una categoría NUEVA
+    (`!alreadyShared`). (2) `shareCategory()` nunca creaba la fila `members/{uid}` del DUEÑO
+    (solo `joinCategoryWithCode` la creaba, para quien se une) — el invitado veía el uid crudo
+    del dueño en vez de su nombre; corregido hacia adelante (ahora también crea su fila) y con un
+    autofix retroactivo (`ensureMyMemberRow`, llamado desde `loadMembers()` cuando el dueño
+    detecta que su propia fila falta — solo puede arreglar la suya, las reglas no dejan escribir
+    la de otro, pero cada quien se autocura al abrir el sheet).
+  - **Verificado en dispositivo** (2026-11-06, Moto E7 Plus + S24 Ultra, dos cuentas reales,
+    mismo par de la verificación de "Compartir"/"Unirme"): lista de miembros con nombres
+    correctos en ambos lados tras el autofix; botón "Eliminar"/"Salir" correcto según quién mira.
+    `npx tsc --noEmit` limpio, 24 tests en verde.
+  - **Pendiente, documentado a propósito**: no se probó el camino de cambiar rol/quitar/salir/
+    eliminar de punta a punta en dispositivo (solo se verificó que la lista de miembros se ve
+    bien) — queda para una próxima pasada.
 - [ ] Indicador en la fila de quién creó o completó un ítem compartido (por definir).
 - [x] **Modelo de datos + reglas de `spaces/**` e `inviteCodes` + tests** (2026-11-04): diseño
   adaptado de `my-wallet-app/firestore.rules` (mismo patrón de roles/límites — funciones
