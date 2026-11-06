@@ -478,9 +478,27 @@ en modo avión aparece en la nube al volver la conexión.
     mismo par de la verificación de "Compartir"/"Unirme"): lista de miembros con nombres
     correctos en ambos lados tras el autofix; botón "Eliminar"/"Salir" correcto según quién mira.
     `npx tsc --noEmit` limpio, 24 tests en verde.
-  - **Pendiente, documentado a propósito**: no se probó el camino de cambiar rol/quitar/salir/
-    eliminar de punta a punta en dispositivo (solo se verificó que la lista de miembros se ve
-    bien) — queda para una próxima pasada.
+  - **Los 4 flujos verificados de punta a punta en dispositivo** (2026-11-06, mismo par de
+    teléfonos y cuentas reales), cada uno confirmado por REST contra Firestore además de en
+    pantalla:
+    - **Cambiar rol** (dueño pasa al invitado a lector): `editorUids` quedó sin su uid
+      (`memberUids` intacto); en el Moto, sin recargar más que reabrir la app, el checkbox dejó
+      de reaccionar y el detalle mostró el banner de solo lectura — el gating de lector ya
+      verificado en un paso anterior reacciona también a un cambio de rol EN VIVO, no solo al
+      unirse ya como lector.
+    - **Quitar a alguien** (dueño quita al invitado): `memberUids` quedó solo con el dueño, la
+      fila `members/{invitado}` se borró; tras reabrir la app en el Moto, "Work" pasó a verse
+      como categoría personal (mismo ícono `share` que una categoría nunca compartida).
+    - **Salir** (el invitado sale por su cuenta, re-unido con un código nuevo para esta prueba):
+      `memberUids` quedó sin su uid (`editorUids` conservó el rastro inerte, tal como lo exige la
+      regla — ver el comentario de `leaveSpace` en `remote.ts`); en el Moto, SIN recargar nada
+      (la desvinculación es local e instantánea, `unlinkSpaceLocally`), "Work" ya se veía
+      personal apenas se confirmó el diálogo.
+    - **Eliminar el espacio** (dueño elimina, invitado re-unido de nuevo para esta prueba):
+      `deletedAt` quedó seteado; en el S24 (quien ejecutó la acción) la desvinculación fue
+      instantánea igual que "Salir"; en el Moto (quien no la ejecutó) hizo falta reabrir la app
+      para que su propio `pullSpaces` descubriera el `deletedAt` y desvinculara — confirmando que
+      **el dueño también pierde el vínculo al eliminar**, no solo los invitados.
 - [ ] Indicador en la fila de quién creó o completó un ítem compartido (por definir).
 - [x] **Modelo de datos + reglas de `spaces/**` e `inviteCodes` + tests** (2026-11-04): diseño
   adaptado de `my-wallet-app/firestore.rules` (mismo patrón de roles/límites — funciones
