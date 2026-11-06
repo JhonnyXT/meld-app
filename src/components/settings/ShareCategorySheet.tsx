@@ -158,7 +158,7 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
                                 },
                               ]}
                             >
-                              <Text style={{ fontFamily: font.semibold, fontSize: 14, color: active ? '#fff' : palette.text }}>
+                              <Text style={{ fontFamily: font.semibold, fontSize: 14, color: active ? '#fff' : palette.text, textAlign: 'center' }}>
                                 {opt === 'editor' ? t('shareCategoryRoleEditor') : t('shareCategoryRoleViewer')}
                               </Text>
                             </Pressable>

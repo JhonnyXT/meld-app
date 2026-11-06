@@ -62,10 +62,10 @@ export function ConfirmDialog({
           <Text style={[styles.message, { fontFamily: font.regular, color: palette.textDim }]}>{message}</Text>
           <View style={styles.buttons}>
             <Pressable onPress={onCancel} style={[styles.btn, { backgroundColor: palette.surfaceLow }]}>
-              <Text style={{ fontFamily: font.semibold, fontSize: 15, color: palette.text }}>{cancelLabel}</Text>
+              <Text style={[styles.btnText, { fontFamily: font.semibold, color: palette.text }]}>{cancelLabel}</Text>
             </Pressable>
             <Pressable onPress={onConfirm} style={[styles.btn, { backgroundColor: toneColor }]}>
-              <Text style={{ fontFamily: font.semibold, fontSize: 15, color: '#fff' }}>{confirmLabel}</Text>
+              <Text style={[styles.btnText, { fontFamily: font.semibold, color: '#fff' }]}>{confirmLabel}</Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -109,4 +109,8 @@ const styles = StyleSheet.create({
   message: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 22 },
   buttons: { flexDirection: 'row', gap: 10, width: '100%' },
   btn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: 'center' },
+  // Un label largo ("Mantener en el teléfono"/"Borrar de este teléfono") envuelve a 2 líneas en
+  // un botón angosto — sin `textAlign: 'center'` la 2a línea queda pegada a la izquierda en vez
+  // de centrada bajo la 1a (bug real reportado por el usuario, 2026-11-06).
+  btnText: { fontSize: 15, textAlign: 'center' },
 });

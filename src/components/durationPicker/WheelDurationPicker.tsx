@@ -43,10 +43,10 @@ export function WheelDurationPicker({ valueMinutes, onCancel, onConfirm }: Wheel
 
       <View style={styles.actions}>
         <Pressable onPress={onCancel} style={[styles.actionBtn, { backgroundColor: palette.surfaceLow }]}>
-          <Text style={{ fontFamily: font.semibold, fontSize: 15, color: palette.text }}>{t('cancel')}</Text>
+          <Text style={{ fontFamily: font.semibold, fontSize: 15, color: palette.text, textAlign: 'center' }}>{t('cancel')}</Text>
         </Pressable>
         <Pressable onPress={handleConfirm} style={[styles.actionBtn, { backgroundColor: palette.accent }]}>
-          <Text style={{ fontFamily: font.semibold, fontSize: 15, color: '#fff' }}>{t('confirm')}</Text>
+          <Text style={{ fontFamily: font.semibold, fontSize: 15, color: '#fff', textAlign: 'center' }}>{t('confirm')}</Text>
         </Pressable>
       </View>
     </View>
