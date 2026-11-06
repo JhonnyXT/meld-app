@@ -1,14 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Modal, View, Text, Pressable, ScrollView, Share, StyleSheet } from 'react-native';
 import { GestureHandlerRootView, GestureDetector } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useTranslation } from '@/i18n';
 import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss';
 import { useSettingsStore } from '@/store/settingsStore';
-import { createCategoryInviteCode, shareCategory, useSession } from '@/sync';
+import {
+  changeMemberRole,
+  createCategoryInviteCode,
+  deleteCategorySpace,
+  leaveCategorySpace,
+  listCategoryMembers,
+  removeMemberFromCategory,
+  shareCategory,
+  useSession,
+  type SpaceMemberInfo,
+} from '@/sync';
 import type { Category } from '@/domain/category';
 import type { SpaceRole } from '@/domain/category';
 
@@ -36,20 +47,79 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
+  const [members, setMembers] = useState<SpaceMemberInfo[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState<SpaceMemberInfo | null>(null);
+  const [leaveConfirmVisible, setLeaveConfirmVisible] = useState(false);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+
   useEffect(() => {
     if (!visible) return;
     setRole('editor');
     setCode(null);
     setError(false);
     setBusy(false);
+    setMembers([]);
+    setPendingRemove(null);
+    setLeaveConfirmVisible(false);
+    setDeleteConfirmVisible(false);
   }, [visible, category?.id]);
+
+  const spaceId = category?.space?.spaceId ?? null;
+  const loadMembers = useCallback(async () => {
+    if (!spaceId) return;
+    setMembersLoading(true);
+    try {
+      setMembers(await listCategoryMembers(spaceId));
+    } catch {
+      setMembers([]);
+    } finally {
+      setMembersLoading(false);
+    }
+  }, [spaceId]);
+
+  useEffect(() => {
+    if (visible && spaceId) loadMembers();
+  }, [visible, spaceId, loadMembers]);
 
   const { gesture: dragGesture, animatedStyle: dragStyle } = useSheetDragDismiss(visible, onClose);
 
   if (!category) return null;
 
-  const canShare = !!sessionUser && plan === 'pro';
   const alreadyShared = !!category.space;
+  const isOwner = !!category.space && category.space.ownerUid === sessionUser?.uid;
+
+  const handleRoleChange = async (member: SpaceMemberInfo, nextRole: SpaceRole) => {
+    if (!spaceId || nextRole === member.role) return;
+    setMembers((prev) => prev.map((m) => (m.uid === member.uid ? { ...m, role: nextRole } : m)));
+    try {
+      await changeMemberRole(spaceId, member.uid, nextRole);
+    } catch {
+      loadMembers();
+    }
+  };
+
+  const confirmRemoveMember = async () => {
+    if (!spaceId || !pendingRemove) return;
+    const removedUid = pendingRemove.uid;
+    setPendingRemove(null);
+    setMembers((prev) => prev.filter((m) => m.uid !== removedUid));
+    await removeMemberFromCategory(spaceId, removedUid).catch(() => loadMembers());
+  };
+
+  const confirmLeave = async () => {
+    if (!spaceId) return;
+    setLeaveConfirmVisible(false);
+    await leaveCategorySpace(spaceId).catch(() => undefined);
+    onClose();
+  };
+
+  const confirmDeleteSpace = async () => {
+    if (!spaceId) return;
+    setDeleteConfirmVisible(false);
+    await deleteCategorySpace(spaceId).catch(() => undefined);
+    onClose();
+  };
 
   const handleGenerate = async () => {
     setBusy(true);
@@ -117,7 +187,12 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
                   title={t('shareCategorySignInTitle')}
                   message={t('shareCategorySignInMessage')}
                 />
-              ) : plan !== 'pro' ? (
+              ) : !alreadyShared && plan !== 'pro' ? (
+                // T9: solo QUIEN COMPARTE (convierte una categoría personal en espacio) necesita
+                // Pro — un invitado, sea editor o lector, participa igual sin pagar nada. Antes
+                // este gate bloqueaba por plan sin mirar `alreadyShared`, así que un invitado
+                // Free ni siquiera podía VER la lista de miembros o salir de la categoría (bug
+                // real reportado por el usuario, 2026-11-06, probando con dos cuentas de verdad).
                 <EmptyNotice
                   icon="sparkles"
                   title={t('shareCategoryProOnlyTitle')}
@@ -135,6 +210,56 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
                       <Text style={{ fontFamily: font.semibold, fontSize: 13, color: palette.accent }}>
                         {t('shareCategoryAlreadyShared')}
                       </Text>
+                    </View>
+                  ) : null}
+
+                  {alreadyShared && !membersLoading && members.length > 0 ? (
+                    <View style={styles.membersSection}>
+                      <Text style={{ fontFamily: font.semibold, fontSize: 13, color: palette.textDim, marginBottom: 10 }}>
+                        {t('shareCategoryMembersTitle')}
+                      </Text>
+                      {members.map((member) => {
+                        const isMe = member.uid === sessionUser?.uid;
+                        return (
+                          <View key={member.uid} style={[styles.memberRow, { borderBottomColor: palette.border }]}>
+                            <Text
+                              numberOfLines={1}
+                              style={{ fontFamily: font.medium, fontSize: 14, color: palette.text, flex: 1 }}
+                            >
+                              {isMe ? t('shareCategoryMemberYou') : member.name}
+                            </Text>
+                            {member.isOwner ? (
+                              <Text style={{ fontFamily: font.regular, fontSize: 13, color: palette.textDim }}>
+                                {t('shareCategoryMemberOwner')}
+                              </Text>
+                            ) : isOwner ? (
+                              <>
+                                <Pressable
+                                  onPress={() => handleRoleChange(member, member.role === 'editor' ? 'viewer' : 'editor')}
+                                  style={[styles.memberRolePill, { backgroundColor: palette.surfaceLow }]}
+                                >
+                                  <Text style={{ fontFamily: font.semibold, fontSize: 12, color: palette.text }}>
+                                    {member.role === 'editor' ? t('shareCategoryRoleEditorShort') : t('shareCategoryRoleViewerShort')}
+                                  </Text>
+                                </Pressable>
+                                <Pressable
+                                  onPress={() => setPendingRemove(member)}
+                                  hitSlop={8}
+                                  style={styles.memberRemoveBtn}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={t('a11yRemoveMember')}
+                                >
+                                  <Icon name="delete-outline" size={16} color={palette.danger} />
+                                </Pressable>
+                              </>
+                            ) : (
+                              <Text style={{ fontFamily: font.regular, fontSize: 13, color: palette.textDim }}>
+                                {member.role === 'editor' ? t('shareCategoryRoleEditorShort') : t('shareCategoryRoleViewerShort')}
+                              </Text>
+                            )}
+                          </View>
+                        );
+                      })}
                     </View>
                   ) : null}
 
@@ -205,12 +330,58 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
                       </Pressable>
                     </>
                   )}
+
+                  {alreadyShared ? (
+                    isOwner ? (
+                      <Pressable onPress={() => setDeleteConfirmVisible(true)} style={styles.dangerRow}>
+                        <Icon name="delete-outline" size={18} color={palette.danger} />
+                        <Text style={{ fontFamily: font.semibold, fontSize: 15, color: palette.danger }}>
+                          {t('shareCategoryDeleteButton')}
+                        </Text>
+                      </Pressable>
+                    ) : (
+                      <Pressable onPress={() => setLeaveConfirmVisible(true)} style={styles.dangerRow}>
+                        <Icon name="log-out" size={18} color={palette.danger} />
+                        <Text style={{ fontFamily: font.semibold, fontSize: 15, color: palette.danger }}>
+                          {t('shareCategoryLeaveButton')}
+                        </Text>
+                      </Pressable>
+                    )
+                  ) : null}
                 </>
               )}
             </ScrollView>
           </Animated.View>
         </Animated.View>
       </GestureHandlerRootView>
+
+      <ConfirmDialog
+        visible={!!pendingRemove}
+        title={t('shareCategoryRemoveMemberConfirmTitle')}
+        message={t('shareCategoryRemoveMemberConfirmMessage', { label: category.label })}
+        confirmLabel={t('a11yRemoveMember')}
+        cancelLabel={t('cancel')}
+        onConfirm={confirmRemoveMember}
+        onCancel={() => setPendingRemove(null)}
+      />
+      <ConfirmDialog
+        visible={leaveConfirmVisible}
+        title={t('shareCategoryLeaveConfirmTitle')}
+        message={t('shareCategoryLeaveConfirmMessage', { label: category.label })}
+        confirmLabel={t('shareCategoryLeaveButton')}
+        cancelLabel={t('cancel')}
+        onConfirm={confirmLeave}
+        onCancel={() => setLeaveConfirmVisible(false)}
+      />
+      <ConfirmDialog
+        visible={deleteConfirmVisible}
+        title={t('shareCategoryDeleteConfirmTitle')}
+        message={t('shareCategoryDeleteConfirmMessage')}
+        confirmLabel={t('shareCategoryDeleteButton')}
+        cancelLabel={t('cancel')}
+        onConfirm={confirmDeleteSpace}
+        onCancel={() => setDeleteConfirmVisible(false)}
+      />
     </Modal>
   );
 }
@@ -268,4 +439,22 @@ const styles = StyleSheet.create({
     marginTop: 28,
   },
   notice: { borderRadius: 18, borderWidth: 1, padding: 20, alignItems: 'center', marginBottom: 8 },
+  membersSection: { marginBottom: 20 },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  memberRolePill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  memberRemoveBtn: { padding: 4 },
+  dangerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    marginTop: 12,
+  },
 });
