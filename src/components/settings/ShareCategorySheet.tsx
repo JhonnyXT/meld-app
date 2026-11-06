@@ -13,6 +13,7 @@ import {
   changeMemberRole,
   createCategoryInviteCode,
   deleteCategorySpace,
+  ensureMyMemberRow,
   leaveCategorySpace,
   listCategoryMembers,
   removeMemberFromCategory,
@@ -66,17 +67,26 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
   }, [visible, category?.id]);
 
   const spaceId = category?.space?.spaceId ?? null;
+  const isOwnerUid = !!category?.space && category.space.ownerUid === sessionUser?.uid;
   const loadMembers = useCallback(async () => {
     if (!spaceId) return;
     setMembersLoading(true);
     try {
-      setMembers(await listCategoryMembers(spaceId));
+      let list = await listCategoryMembers(spaceId);
+      // Autocura un espacio compartido de antes de que `shareCategory` empezara a crear la fila
+      // del dueño en `members/{uid}` (bug real: sin ella se mostraba el uid crudo en vez del
+      // nombre) — solo arregla la MÍA (ver el comentario de `ensureMyMemberRow`).
+      if (isOwnerUid && !list.some((m) => m.uid === sessionUser?.uid && m.name !== m.uid)) {
+        await ensureMyMemberRow(spaceId);
+        list = await listCategoryMembers(spaceId);
+      }
+      setMembers(list);
     } catch {
       setMembers([]);
     } finally {
       setMembersLoading(false);
     }
-  }, [spaceId]);
+  }, [spaceId, isOwnerUid, sessionUser?.uid]);
 
   useEffect(() => {
     if (visible && spaceId) loadMembers();
@@ -87,7 +97,7 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
   if (!category) return null;
 
   const alreadyShared = !!category.space;
-  const isOwner = !!category.space && category.space.ownerUid === sessionUser?.uid;
+  const isOwner = isOwnerUid;
 
   const handleRoleChange = async (member: SpaceMemberInfo, nextRole: SpaceRole) => {
     if (!spaceId || nextRole === member.role) return;

@@ -57,16 +57,22 @@ import {
   createSpaceDoc,
   deleteAllUserData,
   deletePersonalDocs,
+  deleteSpace,
   discoverSpaces,
   getInviteCode,
   getSpaceConfig,
+  getSpaceDoc,
   getUserSettingsDoc,
   joinSpace,
+  leaveSpace,
+  listSpaceMembers,
   pullCollection,
   pullSpaceCollection,
   pushBatch,
   pushSpaceBatch,
+  removeSpaceMember,
   setSpaceConfig,
+  setSpaceEditorUids,
   setSpaceMember,
   setUserSettingsDoc,
   type PushOp,
@@ -459,6 +465,11 @@ export async function shareCategory(categoryId: string): Promise<void> {
   const now = new Date().toISOString();
   await withTimeout(createSpaceDoc(categoryId, { ownerUid: uid, memberUids: [uid], editorUids: [uid], createdAt: now, deletedAt: null }));
   await withTimeout(setSpaceConfig(categoryId, { label: cat.label, icon: cat.icon, color: cat.color, updatedAt: now }));
+  // Bug real encontrado probando con dos cuentas reales: sin esto, el dueño nunca tenía su
+  // propia fila en members/{uid} (solo joinCategoryWithCode la creaba, para quien se UNE) — la
+  // lista de miembros mostraba su uid crudo en vez de su nombre.
+  const displayName = getAuth().currentUser?.displayName ?? '';
+  await withTimeout(setSpaceMember(categoryId, uid, { name: displayName, joinedAt: now, updatedAt: now })).catch(() => undefined);
   // Si esta categoría ya se había subido como personal antes de compartirla, esa fila queda
   // huérfana (de ahora en más vive en spaces/{id}/config/category, no en users/{uid}/categories).
   await withTimeout(deletePersonalDocs(uid, 'categories', [categoryId])).catch(() => undefined);
@@ -558,6 +569,98 @@ export async function joinCategoryWithCode(rawCode: string): Promise<void> {
   await withTimeout(setSpaceMember(invite.spaceId, uid, { name: displayName, joinedAt: now, updatedAt: now })).catch(() => undefined);
 
   requestSync({ pull: true });
+}
+
+// ─── Gestión de miembros (SYNC_ROADMAP.md, Fase 4) ───────────────────────────────
+
+export interface SpaceMemberInfo {
+  uid: string;
+  name: string;
+  role: SpaceRole;
+  isOwner: boolean;
+}
+
+/** Crea/actualiza MI PROPIA fila en `members/{uid}` si falta (autocura un espacio compartido
+ * antes de que `shareCategory` empezara a crearla para el dueño — ver su comentario). Solo
+ * puedo escribir la mía (`firestore.rules`: `allow create: if canWrite(id) && uid ==
+ * request.auth.uid`), así que esto únicamente arregla mi propia fila, nunca la de otro miembro
+ * viejo sin nombre — cada quien la autocura al abrir `ShareCategorySheet`. */
+export async function ensureMyMemberRow(spaceId: string): Promise<void> {
+  const uid = currentUid();
+  if (!uid) return;
+  const now = new Date().toISOString();
+  const displayName = getAuth().currentUser?.displayName ?? '';
+  await withTimeout(setSpaceMember(spaceId, uid, { name: displayName, joinedAt: now, updatedAt: now })).catch(() => undefined);
+}
+
+/** Miembros de un espacio con su nombre (`members/{uid}`) y rol (`editorUids`/`memberUids` del
+ * espacio mismo — `members/{uid}` no guarda el rol, ver `mappers.ts` → `SpaceMemberDoc`). Un
+ * nombre vacío (cuenta que nunca puso `displayName`, o se unió antes de que
+ * `joinCategoryWithCode` empezara a guardarlo) cae al propio `uid` — mejor que una fila en
+ * blanco. */
+export async function listCategoryMembers(spaceId: string): Promise<SpaceMemberInfo[]> {
+  const [space, members] = await Promise.all([withTimeout(getSpaceDoc(spaceId)), withTimeout(listSpaceMembers(spaceId))]);
+  if (!space) return [];
+  const nameByUid = new Map(members.map((m) => [m.id, m.data.name]));
+  const editorSet = new Set(space.editorUids ?? space.memberUids);
+  return space.memberUids.map((uid) => ({
+    uid,
+    name: nameByUid.get(uid) || uid,
+    role: editorSet.has(uid) ? 'editor' : 'viewer',
+    isOwner: uid === space.ownerUid,
+  }));
+}
+
+/** El dueño cambia el rol de alguien (T11) — lee el espacio primero (quien llama ya es miembro,
+ * a diferencia de `joinCategoryWithCode`, ver el comentario de `getSpaceDoc`) para reconstruir
+ * `editorUids` entero; el dueño siempre queda adentro, nunca se autodegrada por accidente. */
+export async function changeMemberRole(spaceId: string, memberUid: string, role: SpaceRole): Promise<void> {
+  const space = await withTimeout(getSpaceDoc(spaceId));
+  if (!space) throw new Error('changeMemberRole: espacio no encontrado');
+  const next = new Set(space.editorUids ?? space.memberUids);
+  if (role === 'editor') next.add(memberUid);
+  else next.delete(memberUid);
+  next.add(space.ownerUid);
+  await withTimeout(setSpaceEditorUids(spaceId, Array.from(next)));
+}
+
+/** El dueño quita a alguien más del espacio. Nada que hacer localmente acá (a diferencia de
+ * `leaveCategorySpace`/`deleteCategorySpace`): el afectado se desvincula solo en SU propio
+ * próximo `pullSpaces` — `discoverSpaces(suUid)` ya no va a traer este espacio en absoluto en
+ * cuanto deje de estar en `memberUids`. */
+export async function removeMemberFromCategory(spaceId: string, memberUid: string): Promise<void> {
+  await withTimeout(removeSpaceMember(spaceId, memberUid));
+}
+
+/** Desliga localmente una categoría de su espacio ya eliminado/abandonado — mismo trío de
+ * llamadas que ya hace `pullSpaces` al descubrir que un espacio dejó de estar vivo, factorizado
+ * acá para que `leaveCategorySpace`/`deleteCategorySpace` no esperen al próximo ciclo de sync
+ * para que la UI se entere (se llama justo después de la escritura remota, no en su lugar). */
+async function unlinkSpaceLocally(spaceId: string): Promise<void> {
+  await categoryRepository.unlinkSpace(spaceId);
+  await dayItemRepository.unlinkSpace(spaceId);
+  await habitCompletionSyncRepository.unlinkSpace(spaceId);
+  await taskCompletionSyncRepository.unlinkSpace(spaceId);
+  const meta = await loadMeta();
+  await saveMeta(forgetSpace(meta, spaceId));
+  await useCategoriesStore.getState().load();
+}
+
+/** Un miembro (no el dueño) sale por su cuenta — "quien pierde el acceso conserva la categoría
+ * como propia" (ver roadmap): queda personal y pending para resubir, en vez de desaparecer. */
+export async function leaveCategorySpace(spaceId: string): Promise<void> {
+  const uid = currentUid();
+  if (!uid) throw new Error('leaveCategorySpace: sin sesión');
+  await withTimeout(leaveSpace(spaceId, uid));
+  await unlinkSpaceLocally(spaceId);
+}
+
+/** El dueño elimina el espacio entero (`deletedAt`, nunca un delete real — ver el comentario de
+ * `remote.ts` → `deleteSpace`). El dueño también pierde el vínculo localmente (mismo trato que
+ * cualquier otro miembro); los demás se enteran en su propio próximo `pullSpaces`. */
+export async function deleteCategorySpace(spaceId: string): Promise<void> {
+  await withTimeout(deleteSpace(spaceId));
+  await unlinkSpaceLocally(spaceId);
 }
 
 // ─── Ajustes visuales — un solo documento, LWW (SYNC_ROADMAP.md, Fase 3) ──────────
