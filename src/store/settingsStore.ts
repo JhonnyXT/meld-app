@@ -19,31 +19,12 @@ interface SettingsState {
   listSpacing: ListSpacing;
   completedItemStyle: CompletedItemStyle;
   coolHabitsEnabled: boolean;
-  /** Preferencia LOCAL de la app, independiente del permiso real del SO — la
-   * app no puede revocar el permiso de notificaciones del sistema, así que
-   * apagar esto no toca el SO en absoluto, solo deja de programar
-   * recordatorios (ver `services/notifications.ts` → `syncReminderNotification`
-   * y CLAUDE.md → "Notificaciones: preferencia local vs. permiso del SO").
-   * Mismo patrón que `notificationsEnabled` en my-wallet-app. */
   notificationsEnabled: boolean;
   habitsInTodayEnabled: boolean;
-  /** Se muestra una sola vez, la primera vez que se abre la app (ver
-   * `OnboardingScreen`/`app/_layout.tsx`) — nunca se resetea automáticamente. */
   onboardingCompleted: boolean;
-  /** Plan del usuario. HOY es un flag 100% local elegido en la pantalla de
-   * Planes del onboarding — todavía no hay RevenueCat ni gating real de
-   * features (ver CLAUDE.md → "## Roadmap Pro"). */
   plan: PlanTier;
-  /** ISO de cuándo empezó la prueba de Pro (simulada, ver `domain/trial.ts`).
-   * `null` con `plan: 'pro'` = Pro "pagado" (también simulado). */
   trialStartedAt: string | null;
-  /** La prueba venció y todavía no se mostró el aviso (`TrialEndedDialog`). */
   trialEndedNotice: boolean;
-  /** Última edición de un ajuste SINCRONIZABLE (SYNC_ROADMAP.md, Fase 3 — "Ajustes visuales"):
-   * tema/acento/idioma/espaciado/estilo de completado/hábitos en Hoy/hábitos "cool"/onboarding.
-   * `null` = nunca se tocó en este teléfono (instalación nueva con los defaults de arriba) — en
-   * ese caso `src/sync/engine.ts` nunca sube nada, solo trae si hay un respaldo en la nube.
-   * `notificationsEnabled` y `plan`/prueba quedan afuera a propósito (ver `AppSettingsDoc`). */
   settingsUpdatedAt: string | null;
   setThemePreference: (value: ThemePreference) => void;
   setLanguage: (value: Language) => void;
@@ -59,17 +40,11 @@ interface SettingsState {
   setOnboardingCompleted: (value: boolean) => void;
   setPlan: (value: PlanTier) => void;
   startProTrial: () => void;
-  /** Si la prueba venció: vuelve a Free y deja el aviso pendiente. Se llama al
-   * abrir la app y cada vez que vuelve a primer plano. */
   expireTrialIfDue: () => void;
   subscribePro: () => void;
   dismissTrialEndedNotice: () => void;
-  /** Solo dev/test: deja la prueba vencida para ver el aviso al reabrir. */
   simulateTrialExpired: () => void;
   cycleThemePreference: () => void;
-  /** Solo para `src/sync/engine.ts`: aplica un `AppSettingsDoc` ya ganador (`pickWinner`) traído
-   * de la nube. A diferencia de los setters de arriba, no llama `emitLocalChange()` — aplicar lo
-   * que ya bajó no debe disparar una subida inmediata de vuelta. */
   applyRemoteSettings: (doc: AppSettingsDoc) => void;
 }
 
@@ -77,9 +52,6 @@ const THEME_CYCLE: ThemePreference[] = ['system', 'light', 'dark'];
 const LIST_SPACING_CYCLE: ListSpacing[] = ['comfortable', 'compact'];
 const COMPLETED_STYLE_CYCLE: CompletedItemStyle[] = ['strikethrough', 'fade', 'checkmarkOnly'];
 
-/** Aplica un cambio a un ajuste SINCRONIZABLE: marca `settingsUpdatedAt` (para que
- * `pickWinner` lo compare al bajar/subir) y avisa a `src/sync/` por el mismo pub-sub que ya usan
- * los repositorios de SQLite (`emitLocalChange`), con el mismo debounce de 3s para agrupar. */
 function touch(set: (patch: Partial<SettingsState>) => void, patch: Partial<SettingsState>): void {
   set({ ...patch, settingsUpdatedAt: new Date().toISOString() });
   emitLocalChange();

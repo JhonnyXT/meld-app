@@ -14,23 +14,14 @@ interface InboxState {
   loading: boolean;
   reload: () => Promise<void>;
   remove: (id: string) => Promise<void>;
-  /** Captura rápida: crea una tarea directo en el Inbox con solo el título
-   * (sin abrir Quick Add), como el campo "What's on your mind?" del header. */
   create: (title: string) => Promise<void>;
-  /** Swipe hacia la derecha en una fila: agenda el ítem para hoy y lo saca
-   * del Inbox (deja de ser status:'inbox'). */
   scheduleToday: (id: string) => Promise<void>;
-  /** Selección múltiple: elimina varios ítems a la vez con un solo snackbar
-   * "Deshacer" que restaura todos juntos. */
   bulkRemove: (ids: string[]) => Promise<void>;
-  /** Selección múltiple: agenda varios ítems para hoy a la vez. */
   bulkScheduleToday: (ids: string[]) => Promise<void>;
 }
 
 export const useInboxStore = create<InboxState>((set, get) => ({
   items: [],
-  // Arranca en `true` para pintar el skeleton desde el primer frame en vez
-  // del estado vacío, hasta que el primer `reload()` traiga los ítems.
   loading: true,
 
   reload: async () => {

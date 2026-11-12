@@ -2,16 +2,11 @@ import { create } from 'zustand';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
 import type { DayItem } from '@/domain/dayItem';
 
-/** Mínimo de caracteres para disparar la búsqueda mientras se tipea; con menos
- * hay que presionar Enter (ver `submit`). */
 const MIN_LIVE_QUERY_LENGTH = 3;
 
 interface SearchState {
   active: boolean;
   query: string;
-  /** `null` = todavía no se ejecutó una búsqueda real (la lista de Hoy debe
-   * seguir visible sin filtrar); un array (incluso vacío) = resultados de la
-   * última búsqueda ejecutada. */
   results: DayItem[] | null;
   loading: boolean;
   open: () => void;
@@ -20,8 +15,6 @@ interface SearchState {
   submit: () => void;
 }
 
-/** Descarta resultados de búsquedas anteriores que resuelven tarde (el usuario
- * ya siguió tipeando), sin necesitar una librería de debounce. */
 let searchToken = 0;
 
 function runSearch(query: string, set: (partial: Partial<SearchState>) => void) {
