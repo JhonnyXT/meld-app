@@ -13,7 +13,10 @@ hasta que se renombró a `meld-app`.
 Este archivo contiene solo las reglas vigentes y su razón. El historial de
 decisiones (qué se probó, qué se descartó, cuándo y a pedido de quién) está en
 `docs/decisions.md` — consultarlo antes de revertir una decisión cuyo porqué no
-esté claro acá.
+esté claro acá. Las decisiones NUEVAS (desde 2026-11-12) se documentan como ADR
+corto en `docs/adr/` en vez de agregarse a `decisions.md` — un archivo por
+decisión no obvia (bug real, por qué se eligió tal enfoque), referenciado desde
+un comentario corto en el código en vez de repetir la explicación completa ahí.
 
 ## Stack
 

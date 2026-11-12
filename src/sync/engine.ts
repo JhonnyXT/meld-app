@@ -516,11 +516,7 @@ export async function shareCategory(categoryId: string): Promise<void> {
   if (cat.space) throw new Error('shareCategory: ya está compartida');
 
   const now = new Date().toISOString();
-  // Esta categoría pudo haber sido un espacio antes (se compartió, se eliminó, y ahora se
-  // comparte de nuevo — mismo `spaceId` siempre, ver el comentario largo en `schema.ts` →
-  // `categories.spaceId`): el documento viejo sigue existiendo en Firestore, solo marcado
-  // `deletedAt` (nunca se borra de verdad), así que hay que REVIVIRLO en vez de crear uno nuevo
-  // encima (ver el comentario de `reviveSpaceDoc` — un `setDoc` ahí fallaría contra las reglas).
+  // Puede haber sido un espacio antes — ver docs/adr/0003-revivir-espacio-eliminado.md.
   const existing = await withTimeout(getSpaceDoc(categoryId)).catch(() => null);
   if (existing && existing.ownerUid === uid) {
     await withTimeout(reviveSpaceDoc(categoryId, uid));

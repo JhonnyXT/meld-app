@@ -219,17 +219,7 @@ export async function createSpaceDoc(spaceId: string, data: SpaceDoc): Promise<v
   await setDoc(doc(db(), 'spaces', spaceId), { ...data, serverUpdatedAt: serverTimestamp() });
 }
 
-/** Revive un espacio PROPIO ya eliminado (`deletedAt` != null) — compartir de nuevo la MISMA
- * categoría después de haberla "eliminado" antes no puede usar `createSpaceDoc`: el documento ya
- * existe en Firestore (solo marcado `deletedAt`, nunca se borra de verdad), así que un `setDoc`
- * ahí es un `update` para las reglas, no un `create`, y ninguna rama de `allow update` admite
- * reescribir TODO el documento de una — bug real encontrado probando este camino (2026-11-11).
- * En dos pasos porque las reglas no dejan tocar `memberUids` y `editorUids` en el mismo `update`
- * (son ramas distintas de `allow update`, cada una con su propio `changedOnly`): primero
- * `memberUids: [uid]` + `deletedAt: null` (rama del dueño: quitar gente + reactivar), después
- * `editorUids: [uid]` (rama de cambiar rol) — reinicia limpio con solo el dueño adentro, en vez
- * de arrastrar a quien ya estaba antes de eliminarlo (que de todos modos ya se desvinculó
- * localmente al ver `deletedAt`, y sorprendería verse re-agregado sin haber hecho nada). */
+/** Revive un espacio PROPIO ya eliminado — ver docs/adr/0003-revivir-espacio-eliminado.md. */
 export async function reviveSpaceDoc(spaceId: string, uid: string): Promise<void> {
   await updateDoc(doc(db(), 'spaces', spaceId), { memberUids: [uid], deletedAt: null, serverUpdatedAt: serverTimestamp() });
   await updateDoc(doc(db(), 'spaces', spaceId), { editorUids: [uid], serverUpdatedAt: serverTimestamp() });
@@ -285,20 +275,7 @@ export async function getInviteCode(code: string): Promise<ResolvedInviteCode | 
   return { spaceId: data.spaceId, createdBy: data.createdBy, role: data.role ?? 'editor', expiresAtMs: millis(data.expiresAt) };
 }
 
-/** Me uno a un espacio con un código vigente (rama "unirse" de `allow update` en
- * `firestore.rules`) — `joinCode` viaja en el mismo `update` para que la regla pueda validarlo
- * (`exists(...)`/`spaceId`/`expiresAt`) sin una Cloud Function; queda guardado en el documento
- * (las reglas no lo limpian después, ni falta — es solo un rastro de qué código se usó).
- *
- * `arrayUnion` en vez de leer el espacio primero y mandar el arreglo completo a mano: **no se
- * puede leer `spaces/{id}` antes de unirme** (`allow get` exige ya ser miembro — probado contra
- * las reglas reales con un segundo usuario: un `getDoc` previo revienta con `PERMISSION_DENIED`,
- * encontrado en este mismo paso antes de que llegara a producción). Las reglas sí ven
- * `request.resource.data` ya resuelto (con el `arrayUnion` aplicado), así que
- * `memberUids.size() == resource.data.memberUids.size() + 1` sigue funcionando sin que el
- * cliente conozca el tamaño anterior. Pasar `editorUids` únicamente cuando el código es de
- * editor: la regla exige que SOLO esas claves cambien (`changedOnly`), y para un código de
- * lector ni siquiera se toca ese arreglo. */
+/** Me uno a un espacio con un código vigente — ver docs/adr/0004-unirse-sin-leer-antes.md. */
 export async function joinSpace(spaceId: string, uid: string, data: { joinCode: string; asEditor: boolean }): Promise<void> {
   const update: Record<string, unknown> = {
     memberUids: arrayUnion(uid),

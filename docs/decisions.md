@@ -5,6 +5,9 @@
 > actuales viven en `CLAUDE.md`; consultar esto solo cuando haga falta entender
 > el porqué de una decisión antes de revertirla. Snapshot del `CLAUDE.md` del
 > 2026-09-24, antes del refactor que lo dejó solo con reglas vigentes.
+>
+> **Desde 2026-11-12, las decisiones nuevas van a `docs/adr/`** (un archivo
+> corto por decisión), no se agregan más acá.
 
 # Meld
 
