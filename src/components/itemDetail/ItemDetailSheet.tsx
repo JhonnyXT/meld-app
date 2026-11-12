@@ -1,32 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import {
-  Modal,
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import React from 'react';
+import { Modal, View, Text, TextInput, Pressable, ScrollView, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { GestureHandlerRootView, GestureDetector } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 import { Icon } from '@/components/Icon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useTranslation } from '@/i18n';
-import { useItemDetailStore } from '@/store/itemDetailStore';
-import { useDayItemsStore } from '@/store/dayItemsStore';
-import { useInboxStore } from '@/store/inboxStore';
-import { useCategoriesStore } from '@/store/categoriesStore';
-import { dayItemRepository } from '@/data/local/dayItemRepository';
-import { syncReminderNotification } from '@/services/notifications';
-import { toDateKey } from '@/domain/date';
-import { minutesToHour24, hour24ToMinutes, ANY_TIME_HHMM, ANY_TIME_MINUTES } from '@/domain/time';
-import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
-import { useVoiceDictation } from '@/hooks/useVoiceDictation';
 import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss';
 import { FieldRow } from '@/components/quickAdd/FieldRow';
 import { PresetFieldRow } from '@/components/quickAdd/PresetFieldRow';
@@ -41,339 +20,26 @@ import { TypeTabs } from '@/components/quickAdd/TypeTabs';
 import { VoiceRecordRow } from '@/components/quickAdd/VoiceRecordRow';
 import { FieldSection } from '@/components/quickAdd/FieldSection';
 import { SheetActions } from '@/components/quickAdd/SheetActions';
-import {
-  QUICK_ADD_META,
-  type QuickAddType,
-  REPEAT_OPTIONS,
-  EARLY_ALERT_OPTIONS,
-  HABIT_SCHEDULE_OPTIONS,
-  HABIT_PREFERRED_TIME_OPTIONS,
-  labelToHour24,
-  addMinutesToHour24,
-  earlyAlertToMinutes,
-  frequencyTarget,
-} from '@/domain/quickAdd';
+import { REPEAT_OPTIONS, EARLY_ALERT_OPTIONS, HABIT_SCHEDULE_OPTIONS, HABIT_PREFERRED_TIME_OPTIONS } from '@/domain/quickAdd';
 import { formatDuration } from '@/features/today/mapDayItemToRow';
-import type { DayItem, PriorityLevel } from '@/domain/dayItem';
-
-/** `reminderAt` -> minutos desde medianoche (`null` = sin recordatorio,
- * `ANY_TIME_MINUTES` = con recordatorio pero sin hora puntual), para
- * pre-poblar el estado editable de `TimeFieldRow` desde un ítem existente. */
-function reminderMinutesOrNull(reminderAt: string | null): number | null {
-  if (!reminderAt) return null;
-  const hhmm = reminderAt.slice(11, 16);
-  if (hhmm === ANY_TIME_HHMM) return ANY_TIME_MINUTES;
-  return hour24ToMinutes(hhmm);
-}
-
-/** `minutes` (null = apagado, `ANY_TIME_MINUTES` = sin hora puntual, o
- * minutos reales) -> `reminderAt` para el `dateKey` dado. Sin fecha (ítem en
- * Inbox) no hay recordatorio posible. */
-function reminderAtFromMinutes(dateKey: string | null, minutes: number | null): string | null {
-  if (dateKey === null || minutes === null) return null;
-  const hhmm = minutes === ANY_TIME_MINUTES ? ANY_TIME_HHMM : minutesToHour24(minutes);
-  return `${dateKey}T${hhmm}:00.000Z`;
-}
+import { useItemDetailForm } from './useItemDetailForm';
 
 export function ItemDetailSheet() {
   const { palette, font } = useTheme();
   const { t, lang } = useTranslation();
   const insets = useSafeAreaInsets();
-  const itemId = useItemDetailStore((s) => s.itemId);
-  const close = useItemDetailStore((s) => s.close);
-  const { gesture: dragGesture, animatedStyle: dragStyle } = useSheetDragDismiss(!!itemId, close);
+  const form = useItemDetailForm();
+  const { gesture: dragGesture, animatedStyle: dragStyle } = useSheetDragDismiss(!!form.itemId, form.close);
 
-  const [item, setItem] = useState<DayItem | null>(null);
-  const [type, setType] = useState<QuickAddType>('task');
-  const [title, setTitle] = useState('');
-  const dictation = useVoiceDictation(lang, setTitle);
-  const [status, setStatus] = useState<'inbox' | 'scheduled' | 'done'>('scheduled');
-  const [category, setCategory] = useState<{ label: string; color: string } | null>(null);
-  const [priority, setPriority] = useState<PriorityLevel>('none');
-  const [dateKey, setDateKey] = useState<string | null>(toDateKey(new Date()));
+  if (!form.item) return <Modal visible={!!form.itemId} transparent animationType="fade" />;
+  const item = form.item;
 
-  const [taskReminderMinutes, setTaskReminderMinutes] = useState<number | null>(null);
-  const [taskRepeat, setTaskRepeat] = useState('Never');
-
-  // Link (task + event) — se conserva al alternar entre esos dos tipos.
-  const [link, setLink] = useState('');
-
-  const [eventStartMinutes, setEventStartMinutes] = useState(9 * 60);
-  const [eventDurationMinutes, setEventDurationMinutes] = useState(60);
-  const [eventEarlyAlert, setEventEarlyAlert] = useState('Off');
-
-  const [voiceReminderMinutes, setVoiceReminderMinutes] = useState<number | null>(null);
-  const [recordedUri, setRecordedUri] = useState<string | null>(null);
-  const [recordedSeconds, setRecordedSeconds] = useState(0);
-  const recorder = useVoiceRecorder();
-
-  const [noteReminderMinutes, setNoteReminderMinutes] = useState<number | null>(null);
-  const [richTextBody, setRichTextBody] = useState('');
-
-  const [habitSchedule, setHabitSchedule] = useState(HABIT_SCHEDULE_OPTIONS[0]);
-  const [habitPreferredTime, setHabitPreferredTime] = useState('Anytime');
-  const [habitHealthMetric, setHabitHealthMetric] = useState<string | null>(null);
-  const [habitHealthMetricTarget, setHabitHealthMetricTarget] = useState<number | null>(null);
-
-  // "Marcar completada/hecho" (footer) — a diferencia de `status` (que sirve para una task SIN
-  // `repeatRule`), un hábito o una task QUE REPITE se completa por DÍA vía su propia tabla de
-  // completions (mismo patrón que `dayItemsStore`), nunca tocando `status`. Acá el día relevante
-  // es siempre HOY (`todayKey`) — este sheet no sabe en qué ocurrencia/día se tocó la fila que lo
-  // abrió, y la inmensa mayoría de las veces se abre desde Today (que opera sobre el día actual).
-  const todayKey = toDateKey(new Date());
-  const [habitCompletedToday, setHabitCompletedToday] = useState(false);
-  const [taskCompletedToday, setTaskCompletedToday] = useState(false);
-
-  // Cambiar de tipo desde la hoja de detalle (p. ej. una task del Inbox que en
-  // realidad era un Event) resetea SOLO los campos específicos del tipo
-  // anterior a sus defaults — a diferencia de Quick Add, acá título/fecha/
-  // categoría/prioridad se conservan porque el usuario está editando algo que
-  // ya existe, no arrancando de cero.
-  const handleTypeChange = (nextType: QuickAddType) => {
-    if (nextType === type) return;
-    setType(nextType);
-    setTaskReminderMinutes(null);
-    setTaskRepeat('Never');
-    setEventStartMinutes(9 * 60);
-    setEventDurationMinutes(60);
-    setEventEarlyAlert('Off');
-    setVoiceReminderMinutes(null);
-    setRecordedUri(null);
-    setRecordedSeconds(0);
-    setNoteReminderMinutes(null);
-    setRichTextBody('');
-    setHabitSchedule(HABIT_SCHEDULE_OPTIONS[0]);
-    setHabitPreferredTime('Anytime');
-    setHabitHealthMetric(null);
-    setHabitHealthMetricTarget(null);
-  };
-
-  const handleVoiceRecorded = (uri: string, seconds: number) => {
-    setRecordedUri(uri);
-    setRecordedSeconds(seconds);
-  };
-  const handleVoiceDelete = () => {
-    setRecordedUri(null);
-    setRecordedSeconds(0);
-  };
-  const handleVoicePermissionDenied = () => {
-    Alert.alert(t('micPermissionDeniedTitle'), t('micPermissionDeniedMessage'));
-  };
-  const handleVoiceError = () => {
-    Alert.alert(t('recordingErrorTitle'), t('recordingErrorMessage'));
-  };
-
-  useEffect(() => {
-    if (!itemId) return;
-    dayItemRepository.getById(itemId).then((loaded) => {
-      if (!loaded) return;
-      setItem(loaded);
-      // Moments no se editan acá (nunca abren esta hoja, ver mapInboxItemToRow/
-      // ítems de Today) — el cast es seguro en la práctica.
-      setType(loaded.type === 'moment' ? 'task' : loaded.type);
-      setTitle(loaded.title);
-      setStatus(loaded.status);
-      setCategory(loaded.category && loaded.categoryColor ? { label: loaded.category, color: loaded.categoryColor } : null);
-      setPriority(loaded.priority);
-      setDateKey(loaded.date);
-      setLink(loaded.type === 'task' || loaded.type === 'event' ? (loaded.link ?? '') : '');
-
-      setTaskReminderMinutes(null);
-      setTaskRepeat('Never');
-      setEventStartMinutes(9 * 60);
-      setEventDurationMinutes(60);
-      setEventEarlyAlert('Off');
-      setVoiceReminderMinutes(null);
-      setRecordedUri(null);
-      setRecordedSeconds(0);
-      setNoteReminderMinutes(null);
-      setHabitSchedule(HABIT_SCHEDULE_OPTIONS[0]);
-      setHabitPreferredTime('Anytime');
-      setHabitHealthMetric(null);
-      setHabitHealthMetricTarget(null);
-      setHabitCompletedToday(false);
-      setTaskCompletedToday(false);
-
-      if (loaded.type === 'task') {
-        setTaskReminderMinutes(reminderMinutesOrNull(loaded.reminderAt));
-        setTaskRepeat(loaded.repeatRule ?? 'Never');
-        if (loaded.repeatRule) {
-          dayItemRepository.listTaskCompletionDates(loaded.id, toDateKey(new Date()), toDateKey(new Date())).then((dates) => {
-            setTaskCompletedToday(dates.length > 0);
-          });
-        }
-      } else if (loaded.type === 'event') {
-        setEventStartMinutes(hour24ToMinutes(loaded.startTime));
-        const minutes = hour24ToMinutes(loaded.endTime) - hour24ToMinutes(loaded.startTime);
-        setEventDurationMinutes(minutes > 0 ? minutes : 60);
-        if (loaded.reminderAt) {
-          const alertMin = hour24ToMinutes(loaded.startTime) - hour24ToMinutes(loaded.reminderAt.slice(11, 16));
-          setEventEarlyAlert(EARLY_ALERT_OPTIONS.find((o) => earlyAlertToMinutes(o) === alertMin) ?? 'Off');
-        } else {
-          setEventEarlyAlert('Off');
-        }
-      } else if (loaded.type === 'voiceMemo') {
-        setVoiceReminderMinutes(reminderMinutesOrNull(loaded.reminderAt));
-        setRecordedUri(loaded.audioFileUri || null);
-        setRecordedSeconds(loaded.durationSeconds);
-      } else if (loaded.type === 'note') {
-        setNoteReminderMinutes(reminderMinutesOrNull(loaded.reminderAt));
-        setRichTextBody(loaded.richTextBody ?? '');
-      } else if (loaded.type === 'habit') {
-        setHabitSchedule(loaded.targetFrequency);
-        setHabitPreferredTime('Anytime');
-        setHabitHealthMetric(loaded.healthMetric);
-        setHabitHealthMetricTarget(loaded.healthMetricTarget);
-        dayItemRepository.listHabitCompletionDates(loaded.id, toDateKey(new Date()), toDateKey(new Date())).then((dates) => {
-          setHabitCompletedToday(dates.length > 0);
-        });
-      }
-    });
-  }, [itemId]);
-
-  const readOnlyLabels = useCategoriesStore((s) => s.readOnlyLabels);
-  // Lector de una categoría compartida (SYNC_ROADMAP.md, Fase 4) — puede VER el ítem (esta hoja
-  // se sigue abriendo), pero no editar/completar/reclasificar nada. En vez de deshabilitar cada
-  // campo suelto (TimeFieldRow/DateFieldRow/etc. no tienen una prop `disabled` hoy), se envuelve
-  // todo el formulario editable en un `pointerEvents="none"` + opacidad — ningún cambio local
-  // importa de todos modos porque `confirmDisabled` bloquea "Actualizar" más abajo.
-  const readOnly = !!item?.category && readOnlyLabels.has(item.category);
-
-  if (!item) return <Modal visible={!!itemId} transparent animationType="fade" />;
-
-  // `statusOverride` lo usa `handleMarkToggle` para una Task SIN `repeatRule` — evita el desfasaje
-  // de un closure viejo que tendría `setStatus(...)` seguido de `handleSave()` en el mismo
-  // handler (el `status` del render actual todavía no reflejaría el cambio).
-  const handleSave = async (statusOverride?: 'inbox' | 'scheduled' | 'done') => {
-    if (item.type === 'moment') {
-      // Moments no se editan desde esta hoja.
-      close();
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const categoryLabel = category?.label ?? null;
-    const categoryColor = category?.color ?? null;
-    const effectiveStatus = statusOverride ?? status;
-    // Si se saca de Inbox asignándole fecha, pasa a agendado; si se manda a Inbox
-    // (sin fecha), vuelve a 'inbox'. Un task ya marcado "done" no se reabre por esto.
-    const finalStatus: 'inbox' | 'scheduled' | 'done' =
-      dateKey === null ? 'inbox' : effectiveStatus === 'inbox' ? 'scheduled' : effectiveStatus;
-    const base = {
-      id: item.id,
-      createdAt: item.createdAt,
-      updatedAt: now,
-      title: title.trim() || item.title,
-      date: dateKey,
-      status: finalStatus,
-      category: categoryLabel,
-      categoryColor,
-      priority,
-    };
-    let updated: DayItem;
-
-    // Los campos específicos de un tipo distinto al que tenía el ítem antes
-    // de cambiarlo (ver `handleTypeChange`) se preservan del original cuando
-    // existen (p. ej. volver de Event a Task conserva `link` si lo tenía) y
-    // usan un default sensato cuando no (mismo criterio que la creación en
-    // Quick Add).
-    if (type === 'task') {
-      const reminderAt = reminderAtFromMinutes(dateKey, taskReminderMinutes);
-      updated = {
-        ...base,
-        type: 'task',
-        reminderAt,
-        repeatRule: taskRepeat === 'Never' ? null : taskRepeat,
-        link: link.trim() || null,
-      };
-    } else if (type === 'event') {
-      const start24 = minutesToHour24(eventStartMinutes);
-      const end24 = addMinutesToHour24(start24, eventDurationMinutes);
-      const alertMinutes = earlyAlertToMinutes(eventEarlyAlert);
-      const reminderAt =
-        alertMinutes != null && dateKey !== null ? `${dateKey}T${addMinutesToHour24(start24, -alertMinutes)}:00.000Z` : null;
-      updated = {
-        ...base,
-        type: 'event',
-        reminderAt,
-        startTime: start24,
-        endTime: end24,
-        calendarSource: item.type === 'event' ? item.calendarSource : null,
-        link: link.trim() || null,
-      };
-    } else if (type === 'voiceMemo') {
-      const reminderAt = reminderAtFromMinutes(dateKey, voiceReminderMinutes);
-      updated = {
-        ...base,
-        type: 'voiceMemo',
-        reminderAt,
-        audioFileUri: recordedUri ?? (item.type === 'voiceMemo' ? item.audioFileUri : ''),
-        durationSeconds: recordedUri ? recordedSeconds : item.type === 'voiceMemo' ? item.durationSeconds : 0,
-      };
-    } else if (type === 'note') {
-      const reminderAt = reminderAtFromMinutes(dateKey, noteReminderMinutes);
-      updated = {
-        ...base,
-        type: 'note',
-        reminderAt,
-        richTextBody: richTextBody.trim(),
-      };
-    } else {
-      const hasTime = habitPreferredTime !== 'Anytime' && dateKey !== null;
-      const reminderAt = hasTime ? `${dateKey}T${labelToHour24(habitPreferredTime)}:00.000Z` : null;
-      const currentStreak = item.type === 'habit' ? item.currentStreak : 0;
-      updated = {
-        ...base,
-        type: 'habit',
-        reminderAt,
-        targetFrequency: habitSchedule,
-        currentStreak,
-        progress: `${currentStreak}/${frequencyTarget(habitSchedule)}`,
-        autoTrack: habitHealthMetric !== null,
-        healthMetric: habitHealthMetric,
-        healthMetricTarget: habitHealthMetricTarget,
-        colorStyle: habitHealthMetric !== null ? 'cool' : 'default',
-      };
-    }
-
-    await dayItemRepository.upsert(updated);
-    await syncReminderNotification(updated);
-    useDayItemsStore.getState().reload();
-    useInboxStore.getState().reload();
-    setItem(null);
-    close();
-  };
-
-  /** Botón "Marcar completada/hecho" del footer (solo Tarea/Hábito) — guarda también cualquier
-   * otro campo editado en el formulario (reusa `handleSave`), así nunca se pierde una edición en
-   * curso al marcar. */
-  const handleMarkToggle = async () => {
-    if (type === 'habit') {
-      await dayItemRepository.toggleHabitCompletion(item.id, todayKey);
-      await handleSave();
-      return;
-    }
-    if (type === 'task' && taskRepeat !== 'Never') {
-      await dayItemRepository.toggleTaskCompletion(item.id, todayKey);
-      await handleSave();
-      return;
-    }
-    await handleSave(status === 'done' ? 'scheduled' : 'done');
-  };
-
-  const isDoneToday = type === 'habit' ? habitCompletedToday : type === 'task' && taskRepeat !== 'Never' ? taskCompletedToday : status === 'done';
-
-  const meta = QUICK_ADD_META[type];
-  const typeLabel = t(meta.tabLabelKey);
-  // Mismo criterio que QuickAddSheet: sin título (o sin grabación en nota de
-  // voz nueva) no se puede guardar. Un lector de categoría compartida (`readOnly`) nunca puede
-  // guardar, sin importar el resto.
-  const saveDisabled = readOnly || !title.trim() || (type === 'voiceMemo' && !recordedUri);
+  const typeLabel = t(form.meta.tabLabelKey);
 
   return (
-    <Modal visible={!!itemId} animationType="slide" transparent onRequestClose={close}>
+    <Modal visible={!!form.itemId} animationType="slide" transparent onRequestClose={form.close}>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <Pressable style={styles.backdrop} onPress={close} />
+        <Pressable style={styles.backdrop} onPress={form.close} />
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.sheetWrap} pointerEvents="box-none">
           <Animated.View
             style={[styles.sheet, { backgroundColor: palette.surface, paddingBottom: insets.bottom + 16 }, dragStyle]}
@@ -387,7 +53,7 @@ export function ItemDetailSheet() {
           <View style={styles.header}>
             <Text style={{ fontFamily: font.extrabold, fontSize: 24, color: palette.text }}>{typeLabel}</Text>
             <Pressable
-              onPress={close}
+              onPress={form.close}
               style={[styles.closeButton, { backgroundColor: palette.surfaceLow }]}
               accessibilityRole="button"
               accessibilityLabel={t('a11yCloseSheet')}
@@ -396,7 +62,7 @@ export function ItemDetailSheet() {
             </Pressable>
           </View>
 
-          {readOnly ? (
+          {form.readOnly ? (
             <View style={[styles.readOnlyBanner, { backgroundColor: `${palette.textDim}1A` }]}>
               <Icon name="users" size={16} color={palette.textDim} />
               <Text style={{ fontFamily: font.medium, fontSize: 13, color: palette.textDim, flex: 1 }}>
@@ -405,16 +71,16 @@ export function ItemDetailSheet() {
             </View>
           ) : null}
 
-          <View pointerEvents={readOnly ? 'none' : 'auto'} style={readOnly ? styles.readOnlyForm : undefined}>
-          {item.type !== 'moment' ? <TypeTabs value={type} onChange={handleTypeChange} /> : null}
+          <View pointerEvents={form.readOnly ? 'none' : 'auto'} style={form.readOnly ? styles.readOnlyForm : undefined}>
+          {item.type !== 'moment' ? <TypeTabs value={form.type} onChange={form.handleTypeChange} /> : null}
 
           <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.titleRow}>
               <View style={[styles.inputBox, { flex: 1, backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
                 <TextInput
-                  value={title}
-                  onChangeText={setTitle}
-                  placeholder={dictation.listening ? t('listeningPlaceholder') : t(meta.placeholderKey)}
+                  value={form.title}
+                  onChangeText={form.setTitle}
+                  placeholder={form.dictation.listening ? t('listeningPlaceholder') : t(form.meta.placeholderKey)}
                   placeholderTextColor={palette.textDim}
                   autoCorrect={false}
                   spellCheck={false}
@@ -422,21 +88,21 @@ export function ItemDetailSheet() {
                   style={{ fontFamily: font.medium, fontSize: 16, color: palette.text, padding: 0, paddingRight: 36 }}
                 />
                 <Pressable
-                  onPress={dictation.toggle}
-                  style={[styles.micButton, { backgroundColor: dictation.listening ? palette.accent : palette.surfaceHigh }]}
+                  onPress={form.dictation.toggle}
+                  style={[styles.micButton, { backgroundColor: form.dictation.listening ? palette.accent : palette.surfaceHigh }]}
                   accessibilityRole="button"
                   accessibilityLabel={t('a11yDictateTitle')}
                 >
-                  <Icon name="mic" size={15} color={dictation.listening ? '#fff' : palette.textDim} />
+                  <Icon name="mic" size={15} color={form.dictation.listening ? '#fff' : palette.textDim} />
                 </Pressable>
               </View>
             </View>
 
-            {type === 'note' && (
+            {form.type === 'note' && (
               <View style={[styles.noteBodyBox, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
                 <TextInput
-                  value={richTextBody}
-                  onChangeText={setRichTextBody}
+                  value={form.richTextBody}
+                  onChangeText={form.setRichTextBody}
                   placeholder={t('notePlaceholderBody')}
                   placeholderTextColor={palette.textDim}
                   multiline
@@ -446,19 +112,19 @@ export function ItemDetailSheet() {
               </View>
             )}
 
-            {type === 'voiceMemo' && (
+            {form.type === 'voiceMemo' && (
               <FieldSection>
                 {item.type === 'voiceMemo' ? (
                   <FieldRow icon="graphic-eq" label={t('fieldRecorded')} value={item.audioFileUri ? formatDuration(item.durationSeconds) : t('audioDeleted')} onPress={() => {}} showBorder={false} />
                 ) : (
                   <VoiceRecordRow
-                    recorder={recorder}
-                    recordedUri={recordedUri}
-                    recordedSeconds={recordedSeconds}
-                    onRecorded={handleVoiceRecorded}
-                    onDelete={handleVoiceDelete}
-                    onPermissionDenied={handleVoicePermissionDenied}
-                    onError={handleVoiceError}
+                    recorder={form.recorder}
+                    recordedUri={form.recordedUri}
+                    recordedSeconds={form.recordedSeconds}
+                    onRecorded={form.handleVoiceRecorded}
+                    onDelete={form.handleVoiceDelete}
+                    onPermissionDenied={form.handleVoicePermissionDenied}
+                    onError={form.handleVoiceError}
                     showBorder={false}
                   />
                 )}
@@ -469,47 +135,47 @@ export function ItemDetailSheet() {
               <DateFieldRow
                 icon="calendar-month"
                 label={t('fieldDate')}
-                dateKey={dateKey}
-                onChange={setDateKey}
+                dateKey={form.dateKey}
+                onChange={form.setDateKey}
                 allowInbox
                 showBorder
               />
 
-              {type === 'task' && (
+              {form.type === 'task' && (
                 <>
-                  <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={taskReminderMinutes} onChange={setTaskReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime />
-                  <PresetFieldRow icon="repeat" label={t('fieldRepeat')} options={REPEAT_OPTIONS} value={taskRepeat} onChange={setTaskRepeat} lang={lang} showBorder={false} />
+                  <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={form.taskReminderMinutes} onChange={form.setTaskReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime />
+                  <PresetFieldRow icon="repeat" label={t('fieldRepeat')} options={REPEAT_OPTIONS} value={form.taskRepeat} onChange={form.setTaskRepeat} lang={lang} showBorder={false} />
                 </>
               )}
 
-              {type === 'event' && (
+              {form.type === 'event' && (
                 <>
-                  <TimeFieldRow icon="schedule" label={t('fieldStarts')} minutes={eventStartMinutes} onChange={(m) => setEventStartMinutes(m ?? eventStartMinutes)} offLabel="" />
-                  <DurationFieldRow icon="schedule" label={t('fieldDuration')} minutes={eventDurationMinutes} onChange={setEventDurationMinutes} />
-                  <PresetFieldRow icon="notifications" label={t('fieldEarlyAlert')} options={EARLY_ALERT_OPTIONS} value={eventEarlyAlert} onChange={setEventEarlyAlert} lang={lang} showBorder={false} />
+                  <TimeFieldRow icon="schedule" label={t('fieldStarts')} minutes={form.eventStartMinutes} onChange={(m) => form.setEventStartMinutes(m ?? form.eventStartMinutes)} offLabel="" />
+                  <DurationFieldRow icon="schedule" label={t('fieldDuration')} minutes={form.eventDurationMinutes} onChange={form.setEventDurationMinutes} />
+                  <PresetFieldRow icon="notifications" label={t('fieldEarlyAlert')} options={EARLY_ALERT_OPTIONS} value={form.eventEarlyAlert} onChange={form.setEventEarlyAlert} lang={lang} showBorder={false} />
                 </>
               )}
 
-              {type === 'voiceMemo' && (
-                <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={voiceReminderMinutes} onChange={setVoiceReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime showBorder={false} />
+              {form.type === 'voiceMemo' && (
+                <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={form.voiceReminderMinutes} onChange={form.setVoiceReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime showBorder={false} />
               )}
 
-              {type === 'note' && (
-                <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={noteReminderMinutes} onChange={setNoteReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime showBorder={false} />
+              {form.type === 'note' && (
+                <TimeFieldRow icon="notifications" label={t('fieldRemindMe')} minutes={form.noteReminderMinutes} onChange={form.setNoteReminderMinutes} offLabel={t('offLabel')} clearable allowAnyTime showBorder={false} />
               )}
 
-              {type === 'habit' && (
+              {form.type === 'habit' && (
                 <>
-                  <PresetFieldRow icon="repeat" label={t('fieldSchedule')} options={HABIT_SCHEDULE_OPTIONS} value={habitSchedule} onChange={setHabitSchedule} lang={lang} />
-                  <PresetFieldRow icon="schedule" label={t('fieldPreferredTime')} options={HABIT_PREFERRED_TIME_OPTIONS} value={habitPreferredTime} onChange={setHabitPreferredTime} lang={lang} />
+                  <PresetFieldRow icon="repeat" label={t('fieldSchedule')} options={HABIT_SCHEDULE_OPTIONS} value={form.habitSchedule} onChange={form.setHabitSchedule} lang={lang} />
+                  <PresetFieldRow icon="schedule" label={t('fieldPreferredTime')} options={HABIT_PREFERRED_TIME_OPTIONS} value={form.habitPreferredTime} onChange={form.setHabitPreferredTime} lang={lang} />
                   <HealthAutoTrackFieldRow
                     icon="favorite"
                     label={t('fieldAutoTrack')}
-                    metricId={habitHealthMetric}
-                    target={habitHealthMetricTarget}
+                    metricId={form.habitHealthMetric}
+                    target={form.habitHealthMetricTarget}
                     onChange={(nextId, nextTarget) => {
-                      setHabitHealthMetric(nextId);
-                      setHabitHealthMetricTarget(nextTarget);
+                      form.setHabitHealthMetric(nextId);
+                      form.setHabitHealthMetricTarget(nextTarget);
                     }}
                     showBorder={false}
                   />
@@ -517,28 +183,28 @@ export function ItemDetailSheet() {
               )}
             </FieldSection>
 
-            {(type === 'task' || type === 'event') && (
+            {(form.type === 'task' || form.type === 'event') && (
               <FieldSection>
-              <LinkFieldRow value={link} onChange={setLink} showBorder={false} />
+              <LinkFieldRow value={form.link} onChange={form.setLink} showBorder={false} />
               </FieldSection>
             )}
 
             <FieldSection>
-              <CategoryChips value={category?.label ?? null} onChange={(label, color) => setCategory({ label, color })} showBorder />
-              <PriorityTabs value={priority} onChange={setPriority} />
+              <CategoryChips value={form.category?.label ?? null} onChange={(label, color) => form.setCategory({ label, color })} showBorder />
+              <PriorityTabs value={form.priority} onChange={form.setPriority} />
             </FieldSection>
           </ScrollView>
           </View>
 
           <SheetActions
-            onCancel={close}
-            onConfirm={() => handleSave()}
-            confirmLabel={type === 'task' || type === 'habit' ? t('itemDetailUpdateAction') : t(meta.ctaUpdateKey)}
-            confirmDisabled={saveDisabled}
-            secondaryLabel={type === 'habit' ? (isDoneToday ? t('itemDetailMarkUndone') : t('itemDetailMarkHabitDone')) : isDoneToday ? t('itemDetailMarkUndone') : t('itemDetailMarkDone')}
+            onCancel={form.close}
+            onConfirm={() => form.handleSave()}
+            confirmLabel={form.type === 'task' || form.type === 'habit' ? t('itemDetailUpdateAction') : t(form.meta.ctaUpdateKey)}
+            confirmDisabled={form.saveDisabled}
+            secondaryLabel={form.type === 'habit' ? (form.isDoneToday ? t('itemDetailMarkUndone') : t('itemDetailMarkHabitDone')) : form.isDoneToday ? t('itemDetailMarkUndone') : t('itemDetailMarkDone')}
             secondaryIcon="check"
-            onSecondary={!readOnly && (type === 'task' || type === 'habit') ? handleMarkToggle : undefined}
-            secondaryActive={isDoneToday}
+            onSecondary={!form.readOnly && (form.type === 'task' || form.type === 'habit') ? form.handleMarkToggle : undefined}
+            secondaryActive={form.isDoneToday}
           />
         </Animated.View>
         </KeyboardAvoidingView>

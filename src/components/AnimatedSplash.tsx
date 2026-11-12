@@ -52,8 +52,8 @@ const ICON_SIZE = 160;
  *       mueve un píxel al aparecer el texto.
  *    El glow ambiental sí puede fundirse desde 0 sin problema (no existe
  *    versión nativa de él, no hay nada con qué solaparse) pulsando detrás
- *    (`RadialGradient` real, no un disco plano — mismo patrón que
- *    `AuraBackground.tsx`), wordmark "Meld" y lema en cascada.
+ *    (`RadialGradient` real, no un disco plano), wordmark "Meld" y lema en
+ *    cascada.
  * 2) Hold breve con todo visible.
  * 3) Expansión: el MISMO nodo del glow (no uno nuevo/duplicado — así el
  *    color es exactamente igual al que rodea el ícono, no una aproximación)

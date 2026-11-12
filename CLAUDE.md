@@ -173,11 +173,6 @@ Componentes compartidos que conviene conocer antes de crear uno nuevo:
   vive en el header FIJO de Calendar para quedar sticky.
 - **`calendar/CalendarFilterSheet.tsx`** — hoja del filtro de Calendario.
 - **`quickAdd/TimeFieldRow.tsx`, `DateFieldRow.tsx`** — ver "Sistema visual".
-- Sin uso, conservados por si se retoman: `calendar/CalendarViewSwitch.tsx`
-  (switch de íconos; Calendar usa `SegmentedToggle` de texto),
-  `calendar/CalendarFilterBar.tsx` (pill flotante; el filtro se abre desde "•••"),
-  `AuraBackground.tsx` (fondo con degradado de Today; hoy Today usa `palette.bg`
-  plano). No volver a montarlos sin que se pida.
 
 ### Seed (`data/local/seed.ts`)
 

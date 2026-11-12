@@ -274,7 +274,7 @@ export const es = {
   viewMonth: 'Mes',
   viewYear: 'Año',
 
-  // CalendarFilterBar / CalendarFilterSheet
+  // CalendarFilterSheet
   filterLabel: 'Filtro',
   filterEverything: 'Todo',
   filterTasks: 'Tareas',

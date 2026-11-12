@@ -157,9 +157,9 @@ export default function RootLayout() {
   // toda la pantalla de forma confiable (bug real: el glow quedaba flotando
   // sobre Today). Pero `GestureHandlerRootView`/`SafeAreaProvider` se montan
   // SIEMPRE, una sola vez — `AnimatedSplash` usa `react-native-svg`
-  // (`Circle`/`RadialGradient` del glow) igual que `AuraBackground` en
-  // Today, y ese árbol necesita el mounting manager de Fabric ya
-  // inicializado por esos providers para poder pintar (sin ellos, el SVG
+  // (`Circle`/`RadialGradient` del glow), y ese árbol necesita el mounting
+  // manager de Fabric ya inicializado por esos providers para poder pintar
+  // (sin ellos, el SVG
   // queda mudo: los props nunca llegan a la vista nativa aunque Reanimated
   // siga corriendo del lado JS — bug real visto en dispositivo, el splash
   // "terminaba" a tiempo pero nunca se veían ni el glow ni el texto).
