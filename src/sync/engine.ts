@@ -1,13 +1,3 @@
-/**
- * Motor de respaldo (SYNC_ROADMAP.md, Fase 3). SQLite sigue siendo la fuente de verdad: acá solo
- * se copia a/desde `users/{uid}` en segundo plano. Ninguna pantalla espera.
- *
- * Una corrida a la vez: traer → unir (`pickWinner`) → subir. Traer primero evita que la primera
- * subida pise con datos locales viejos algo más nuevo de la nube.
- *
- * Disparadores: sesión iniciada (al abrir la app o al entrar), volver a primer plano, y cambios
- * locales (solo subir, con espera de 3 s para agrupar — ver `onLocalChange`).
- */
 import { AppState } from 'react-native';
 import { getAuth, onAuthStateChanged } from '@react-native-firebase/auth';
 import { categoryRepository } from '@/data/local/categoryRepository';
@@ -79,20 +69,13 @@ import { isOffline, withTimeout } from './net';
 import { deleteAccount, signOut } from './session';
 import { useSyncStatus } from './status';
 
-/** Sin red no se espera más de esto por corrida (ver `net.ts`). */
 const OFFLINE_RETRY_MS = 60000;
 const LOCAL_CHANGE_DEBOUNCE_MS = 3000;
-/** Volver a primer plano no trae más de una vez por este intervalo (lecturas = cuota). */
 const FOREGROUND_MIN_INTERVAL_MS = 30000;
 
-/** Respaldo en la nube es de Pro (SYNC_ROADMAP.md, Fase 5: sin RevenueCat todavía, usa el flag
- * local — ver `settingsStore.plan`, que incluye la prueba simulada). Solo gatea la SUBIDA: traer
- * corre siempre (así alguien que tuvo Pro y lo perdió no pierde lo que ya había respaldado). */
 function hasBackupPlan(): boolean {
   return useSettingsStore.getState().plan === 'pro';
 }
-
-// ─── Traer y unir ────────────────────────────────────────────────────────────
 
 async function pullItems(uid: string, meta: SyncMeta): Promise<{ meta: SyncMeta; changed: boolean }> {
   const docs = await withTimeout(pullCollection<DayItemDoc>(uid, 'items', meta.cursors.items ?? 0));
@@ -171,9 +154,6 @@ async function pull(uid: string, meta: SyncMeta): Promise<SyncMeta> {
   meta = await pullTaskCompletions(uid, meta);
   const cats = await pullCategories(uid, meta);
   meta = cats.meta;
-  // Un hábito/task que repite recalcula su progreso/racha a partir de `habit_completions`/
-  // `task_completions`, así que un cambio ahí también necesita refrescar Today aunque
-  // `items.changed` sea falso.
   if (items.changed || cats.changed) {
     await refreshWidgets().catch(() => undefined);
   }
@@ -181,13 +161,6 @@ async function pull(uid: string, meta: SyncMeta): Promise<SyncMeta> {
   if (cats.changed) await useCategoriesStore.getState().load();
   return meta;
 }
-
-// ─── Subir ───────────────────────────────────────────────────────────────────
-
-// Fase 4: `listPendingSync()` de las 4 tablas trae TODO lo pendiente, personal y de espacios
-// mezclado (ver `PendingDayItem.spaceId`/`PendingCompletion.spaceId`/`PendingCategory.spaceId`).
-// Acá solo sube lo personal (`spaceId == null`) a `users/{uid}/...`; `pushSpaces()` más abajo
-// agrupa y sube lo demás a `spaces/{spaceId}/...` en su lugar.
 
 async function pushItems(uid: string): Promise<void> {
   const pending = (await dayItemRepository.listPendingSync()).filter((p) => p.spaceId == null);
@@ -248,10 +221,6 @@ async function push(uid: string): Promise<void> {
   await pushCategories(uid);
 }
 
-// ─── Espacios compartidos — traer y subir (SYNC_ROADMAP.md, Fase 4) ───────────────
-
-/** Mi rol en un espacio — `editorUids` ausente = legado, todos editores (mismo fallback que
- * `firestore.rules` → `isEditor()`). */
 function myRole(data: SpaceDoc, uid: string): SpaceRole {
   return (data.editorUids ?? data.memberUids).includes(uid) ? 'editor' : 'viewer';
 }
@@ -323,13 +292,6 @@ async function pullSpaceTaskCompletions(spaceId: string, meta: SyncMeta): Promis
   return meta;
 }
 
-/**
- * Descubre los espacios de los que soy miembro, desliga los que ya no (salí/me sacaron/se
- * eliminó — "quien pierde el acceso conserva la categoría como propia", ver
- * `categoryRepository.unlinkSpace`) y trae config + ítems + completados de los que siguen vivos.
- * A diferencia de `pull()` (personal), no sube nada — eso es `pushSpaces()`, llamado aparte y sin
- * el gate de plan Pro (T9: solo el dueño necesita Pro, un invitado Free participa igual).
- */
 async function pullSpaces(uid: string, meta: SyncMeta): Promise<{ meta: SyncMeta; changed: boolean }> {
   const remote = await withTimeout(discoverSpaces(uid));
   const alive = remote.filter((s) => s.data.deletedAt == null);
@@ -359,8 +321,6 @@ async function pullSpaces(uid: string, meta: SyncMeta): Promise<{ meta: SyncMeta
     );
     if (config) changed = true;
 
-    // Caché local de nombres (Fase 4 — indicador "quién completó esto", ver `schema.ts` →
-    // `spaceMembers`): se resuelve en `DayItemRow` sin pegarle a la red por cada fila.
     const members = await withTimeout(listCategoryMembers(s.id)).catch(() => []);
     if (members.length > 0) await spaceMemberRepository.upsertMany(s.id, members);
 
@@ -389,12 +349,6 @@ function spaceGroup(map: Map<string, SpacePushGroup>, spaceId: string): SpacePus
   return g;
 }
 
-/** Resuelve `completedByUid`/`byUid` al momento de subir (Fase 4 — indicador "quién completó
- * esto"): si ya hay un valor local, lo conserva tal cual (ya quedó "fijo" la primera vez que se
- * subió, o llegó de un pull de otra persona); si todavía es `null` y la fila está completada
- * (`isDone`), lo estampa con `currentUid()` y lo persiste localmente ANTES de construir el
- * documento (vía `persist`, ver `dayItemRepository.setCompletedByUid`) — así una futura edición
- * de OTRA persona nunca lo pisa. `isDone=false` siempre devuelve `null` sin tocar nada. */
 async function resolveCompletedByUidForPush(
   current: string | null,
   isDone: boolean,
@@ -407,11 +361,6 @@ async function resolveCompletedByUidForPush(
   return uid;
 }
 
-/** Sube lo pendiente de cada espacio (items/habitCompletions/taskCompletions a
- * `spaces/{spaceId}/...`, la categoría a `config/category` en vez de `users/{uid}/categories`).
- * Nunca gateado por plan (T9) — a diferencia de `push()`, que sí lo está. Si algo pendiente es de
- * un lector (sin gating de UI todavía, ver roadmap), `firestore.rules` lo rechaza y queda
- * `pending` para reintentar, como cualquier otro error. */
 async function pushSpaces(): Promise<void> {
   const [items, habits, tasks, cats] = await Promise.all([
     dayItemRepository.listPendingSync(),
@@ -471,10 +420,6 @@ async function pushSpaces(): Promise<void> {
     if (group.tasks.length > 0) await taskCompletionSyncRepository.markSynced(group.tasks.map((p) => p.id));
   }
 
-  // Categoría ligada a un espacio: config/category, no `users/{uid}/categories`. Un tombstone acá
-  // no debería pasar en flujo normal (desligar usa `unlinkSpace`, no `remove()`, ver roadmap) —
-  // si pasa igual, no hay nada que tombstonear en `config/category` (no tiene ese concepto), así
-  // que solo se marca subida para no reintentarlo en vano.
   for (const p of cats) {
     if (!p.spaceId) continue;
     if (p.category) {
@@ -491,23 +436,8 @@ async function pushSpaces(): Promise<void> {
   }
 }
 
-// ─── Compartir una categoría (SYNC_ROADMAP.md, Fase 4) ───────────────────────────
-
-/** Vence a los 7 días (ver "Reglas de seguridad" del roadmap) — `firestore.rules` solo exige
- * `<= 8 días`, se deja un día de margen. */
 const INVITE_CODE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * Convierte una categoría personal en un espacio compartido del que soy dueño: crea `spaces/{id}`
- * (mismo `id` que la categoría — ver el comentario largo en `data/local/schema.ts` →
- * `categories.spaceId`) + `config/category`, liga la categoría local, migra sus ítems/completados
- * existentes (`dayItemRepository.migrateCategoryToSpace` + el mismo método en
- * `habitCompletionSyncRepository`/`taskCompletionSyncRepository`) y tombstona en
- * `users/{uid}/...` lo que ya se había subido ahí (de ahora en más esa categoría y su contenido
- * viven solo en `spaces/{id}/...`). Lanza si no hay sesión, si la categoría no existe o si ya
- * está compartida (la UI no debería dejar llegar hasta acá en esos casos, pero el motor no confía
- * ciegamente en quien llama).
- */
 export async function shareCategory(categoryId: string): Promise<void> {
   const uid = currentUid();
   if (!uid) throw new Error('shareCategory: sin sesión');
@@ -524,13 +454,9 @@ export async function shareCategory(categoryId: string): Promise<void> {
     await withTimeout(createSpaceDoc(categoryId, { ownerUid: uid, memberUids: [uid], editorUids: [uid], createdAt: now, deletedAt: null }));
   }
   await withTimeout(setSpaceConfig(categoryId, { label: cat.label, icon: cat.icon, color: cat.color, updatedAt: now }));
-  // Bug real encontrado probando con dos cuentas reales: sin esto, el dueño nunca tenía su
-  // propia fila en members/{uid} (solo joinCategoryWithCode la creaba, para quien se UNE) — la
-  // lista de miembros mostraba su uid crudo en vez de su nombre.
+  // ver docs/adr/0011-dueno-necesita-su-propia-fila-de-miembro.md
   const displayName = getAuth().currentUser?.displayName ?? '';
   await withTimeout(setSpaceMember(categoryId, uid, { name: displayName, joinedAt: now, updatedAt: now })).catch(() => undefined);
-  // Si esta categoría ya se había subido como personal antes de compartirla, esa fila queda
-  // huérfana (de ahora en más vive en spaces/{id}/config/category, no en users/{uid}/categories).
   await withTimeout(deletePersonalDocs(uid, 'categories', [categoryId])).catch(() => undefined);
 
   await categoryRepository.setSpaceLink(categoryId, { spaceId: categoryId, role: 'editor', ownerUid: uid });
@@ -548,9 +474,6 @@ export async function shareCategory(categoryId: string): Promise<void> {
   requestSync({ pull: false });
 }
 
-/** Genera un código de invitación para un espacio del que ya soy miembro (compartir de nuevo, o
- * invitar a más gente). Reintenta con otro código al azar si el generado ya existe (colisión
- * rarísima, 32⁶ combinaciones — ver `domain/inviteCode.ts`). */
 export async function createCategoryInviteCode(spaceId: string, role: 'editor' | 'viewer'): Promise<string> {
   const uid = currentUid();
   if (!uid) throw new Error('createCategoryInviteCode: sin sesión');
@@ -566,14 +489,6 @@ export async function createCategoryInviteCode(spaceId: string, role: 'editor' |
   throw new Error('createCategoryInviteCode: no se pudo generar un código');
 }
 
-// ─── Unirme con un código (SYNC_ROADMAP.md, Fase 4) ──────────────────────────────
-
-/** Motivo por el que `joinCategoryWithCode` no pudo unirse — la UI elige el mensaje (vía `t()`,
- * ver `ShareCategorySheet.tsx` para el patrón equivalente del lado de compartir). `denied` es el
- * fallback de cualquier motivo que solo el servidor puede rechazar: ya soy miembro, el espacio ya
- * llegó al límite (T10), o se eliminó — `spaces/{id}` no se puede leer de antemano para
- * distinguirlos acá (`allow get` exige ya ser miembro, ver el comentario de `joinSpace` en
- * `remote.ts`), así que todos caen en el mismo mensaje genérico. */
 export type JoinCodeErrorKind = 'no-session' | 'invalid-code' | 'expired-code' | 'free-limit' | 'denied';
 
 export class JoinCodeError extends Error {
@@ -582,10 +497,6 @@ export class JoinCodeError extends Error {
   }
 }
 
-/** Cuántas categorías tengo como INVITADO (compartidas por otra persona, no las que yo comparto)
- * — T10: un Free puede estar en como máximo 2 así. Sin Cloud Functions no hay forma de que el
- * servidor lo haga cumplir (ver el comentario de T10 en el roadmap); esto es solo el chequeo de
- * la app, antes de intentar unirse. */
 const FREE_INVITEE_LIMIT = 2;
 
 async function invitedCategoryCount(uid: string): Promise<number> {
@@ -593,17 +504,6 @@ async function invitedCategoryCount(uid: string): Promise<number> {
   return linked.filter((c) => c.space!.ownerUid !== uid).length;
 }
 
-/**
- * Me uno a una categoría compartida con un código (T9: un invitado Free participa igual, no
- * necesita Pro — solo quien la compartió lo necesitaba). Valida lo que se puede localmente ANTES
- * de tocar Firestore (sesión, código vigente, límite T10) para dar un mensaje preciso; el resto —
- * ya soy miembro, el espacio ya llegó al límite de miembros, o se eliminó — solo lo sabe el
- * servidor al intentar el `update` (ver el comentario de `joinSpace` en `remote.ts`: no se puede
- * leer `spaces/{id}` de antemano sin ya ser miembro), así que cae en `denied`. Al unirme con
- * éxito, pido una traída (`requestSync({ pull: true })`): el próximo ciclo de `pullSpaces`
- * descubre el espacio nuevo y crea la categoría local sola, mismo camino ya probado para
- * cualquier espacio del que soy miembro.
- */
 export async function joinCategoryWithCode(rawCode: string): Promise<void> {
   const uid = currentUid();
   if (!uid) throw new JoinCodeError('no-session');
@@ -630,8 +530,6 @@ export async function joinCategoryWithCode(rawCode: string): Promise<void> {
   requestSync({ pull: true });
 }
 
-// ─── Gestión de miembros (SYNC_ROADMAP.md, Fase 4) ───────────────────────────────
-
 export interface SpaceMemberInfo {
   uid: string;
   name: string;
@@ -639,11 +537,7 @@ export interface SpaceMemberInfo {
   isOwner: boolean;
 }
 
-/** Crea/actualiza MI PROPIA fila en `members/{uid}` si falta (autocura un espacio compartido
- * antes de que `shareCategory` empezara a crearla para el dueño — ver su comentario). Solo
- * puedo escribir la mía (`firestore.rules`: `allow create: if canWrite(id) && uid ==
- * request.auth.uid`), así que esto únicamente arregla mi propia fila, nunca la de otro miembro
- * viejo sin nombre — cada quien la autocura al abrir `ShareCategorySheet`. */
+// ver docs/adr/0011-dueno-necesita-su-propia-fila-de-miembro.md
 export async function ensureMyMemberRow(spaceId: string): Promise<void> {
   const uid = currentUid();
   if (!uid) return;
@@ -652,11 +546,6 @@ export async function ensureMyMemberRow(spaceId: string): Promise<void> {
   await withTimeout(setSpaceMember(spaceId, uid, { name: displayName, joinedAt: now, updatedAt: now })).catch(() => undefined);
 }
 
-/** Miembros de un espacio con su nombre (`members/{uid}`) y rol (`editorUids`/`memberUids` del
- * espacio mismo — `members/{uid}` no guarda el rol, ver `mappers.ts` → `SpaceMemberDoc`). Un
- * nombre vacío (cuenta que nunca puso `displayName`, o se unió antes de que
- * `joinCategoryWithCode` empezara a guardarlo) cae al propio `uid` — mejor que una fila en
- * blanco. */
 export async function listCategoryMembers(spaceId: string): Promise<SpaceMemberInfo[]> {
   const [space, members] = await Promise.all([withTimeout(getSpaceDoc(spaceId)), withTimeout(listSpaceMembers(spaceId))]);
   if (!space) return [];
@@ -670,9 +559,6 @@ export async function listCategoryMembers(spaceId: string): Promise<SpaceMemberI
   }));
 }
 
-/** El dueño cambia el rol de alguien (T11) — lee el espacio primero (quien llama ya es miembro,
- * a diferencia de `joinCategoryWithCode`, ver el comentario de `getSpaceDoc`) para reconstruir
- * `editorUids` entero; el dueño siempre queda adentro, nunca se autodegrada por accidente. */
 export async function changeMemberRole(spaceId: string, memberUid: string, role: SpaceRole): Promise<void> {
   const space = await withTimeout(getSpaceDoc(spaceId));
   if (!space) throw new Error('changeMemberRole: espacio no encontrado');
@@ -683,18 +569,10 @@ export async function changeMemberRole(spaceId: string, memberUid: string, role:
   await withTimeout(setSpaceEditorUids(spaceId, Array.from(next)));
 }
 
-/** El dueño quita a alguien más del espacio. Nada que hacer localmente acá (a diferencia de
- * `leaveCategorySpace`/`deleteCategorySpace`): el afectado se desvincula solo en SU propio
- * próximo `pullSpaces` — `discoverSpaces(suUid)` ya no va a traer este espacio en absoluto en
- * cuanto deje de estar en `memberUids`. */
 export async function removeMemberFromCategory(spaceId: string, memberUid: string): Promise<void> {
   await withTimeout(removeSpaceMember(spaceId, memberUid));
 }
 
-/** Desliga localmente una categoría de su espacio ya eliminado/abandonado — mismo trío de
- * llamadas que ya hace `pullSpaces` al descubrir que un espacio dejó de estar vivo, factorizado
- * acá para que `leaveCategorySpace`/`deleteCategorySpace` no esperen al próximo ciclo de sync
- * para que la UI se entere (se llama justo después de la escritura remota, no en su lugar). */
 async function unlinkSpaceLocally(spaceId: string): Promise<void> {
   await categoryRepository.unlinkSpace(spaceId);
   await dayItemRepository.unlinkSpace(spaceId);
@@ -705,8 +583,6 @@ async function unlinkSpaceLocally(spaceId: string): Promise<void> {
   await useCategoriesStore.getState().load();
 }
 
-/** Un miembro (no el dueño) sale por su cuenta — "quien pierde el acceso conserva la categoría
- * como propia" (ver roadmap): queda personal y pending para resubir, en vez de desaparecer. */
 export async function leaveCategorySpace(spaceId: string): Promise<void> {
   const uid = currentUid();
   if (!uid) throw new Error('leaveCategorySpace: sin sesión');
@@ -714,15 +590,10 @@ export async function leaveCategorySpace(spaceId: string): Promise<void> {
   await unlinkSpaceLocally(spaceId);
 }
 
-/** El dueño elimina el espacio entero (`deletedAt`, nunca un delete real — ver el comentario de
- * `remote.ts` → `deleteSpace`). El dueño también pierde el vínculo localmente (mismo trato que
- * cualquier otro miembro); los demás se enteran en su propio próximo `pullSpaces`. */
 export async function deleteCategorySpace(spaceId: string): Promise<void> {
   await withTimeout(deleteSpace(spaceId));
   await unlinkSpaceLocally(spaceId);
 }
-
-// ─── Ajustes visuales — un solo documento, LWW (SYNC_ROADMAP.md, Fase 3) ──────────
 
 const SETTINGS_EPOCH = '1970-01-01T00:00:00.000Z';
 
@@ -741,11 +612,6 @@ function localSettingsDoc(): AppSettingsDoc {
   };
 }
 
-/** Trae y, si corresponde, sube — ver el mismo patrón en `pickWinner`. Sin lista de pendientes
- * (es un solo documento): basta comparar `updatedAt` cada corrida, es barato (1 lectura). Si gana
- * lo local pero nunca se tocó en este teléfono (`settingsUpdatedAt` null = los defaults de
- * `settingsStore.ts`), no sube nada — evita pisar un respaldo real con un doc vacío recién
- * instalado. */
 async function syncSettings(uid: string, canBackup: boolean): Promise<void> {
   const remote = await getUserSettingsDoc(uid);
   const local = localSettingsDoc();
@@ -758,8 +624,6 @@ async function syncSettings(uid: string, canBackup: boolean): Promise<void> {
   }
 }
 
-// ─── Pendientes (para Ajustes → Cuenta) ──────────────────────────────────────
-
 export async function pendingChanges(): Promise<number> {
   const [items, habits, tasks, cats] = await Promise.all([
     dayItemRepository.listPendingSync(),
@@ -769,8 +633,6 @@ export async function pendingChanges(): Promise<number> {
   ]);
   return items.length + habits.length + tasks.length + cats.length;
 }
-
-// ─── Orquestación ────────────────────────────────────────────────────────────
 
 let running: Promise<void> | null = null;
 let again: { pull: boolean } | null = null;
@@ -799,8 +661,6 @@ async function syncOnce(uid: string, opts: { pull: boolean }): Promise<void> {
     }
     await syncSettings(uid, canBackup);
     if (canBackup) await push(uid);
-    // Sin gate de plan (T9): un invitado Free sigue participando de un espacio aunque no tenga
-    // Pro — solo el dueño necesitaba Pro para compartirlo.
     await pushSpaces();
     meta = { ...meta, lastSyncAt: Date.now() };
     await saveMeta(meta);
@@ -815,7 +675,6 @@ async function syncOnce(uid: string, opts: { pull: boolean }): Promise<void> {
   }
 }
 
-/** Pide una corrida; si ya hay una, se repite al terminar (con traída si alguna la pidió). */
 export function requestSync(opts: { pull: boolean }): Promise<void> {
   const uid = currentUid();
   if (!uid) return Promise.resolve();
@@ -834,10 +693,6 @@ export function requestSync(opts: { pull: boolean }): Promise<void> {
         next = again;
       }
     } catch (e) {
-      // `syncOnce` ya captura todo lo suyo internamente — este catch es solo una red de
-      // seguridad para que un error inesperado (p. ej. agregado por un cambio futuro fuera del
-      // try/catch de `syncOnce`) nunca deje `running` como una promesa rechazada sin manejar:
-      // `startSync()` la dispara con `void syncNow()`, que la ignoraría en silencio.
       console.warn('[sync] Error inesperado:', e);
     } finally {
       running = null;
@@ -846,14 +701,12 @@ export function requestSync(opts: { pull: boolean }): Promise<void> {
   return running;
 }
 
-/** Traer y subir ya (iniciar sesión, deslizar en Ajustes → Cuenta). */
 export function syncNow(): Promise<void> {
   return requestSync({ pull: true });
 }
 
 let started = false;
 
-/** Una vez, al arrancar la app (tras el bootstrap). Sin sesión no hace nada hasta que la haya. */
 export function startSync(): void {
   if (started) return;
   started = true;
@@ -882,13 +735,6 @@ export function startSync(): void {
   });
 }
 
-// ─── Cuenta: eliminar cuenta ──────────────────────────────────────────────────
-
-/**
- * Eliminar cuenta (Google Play lo exige ofrecerlo): borra todo lo de la nube mientras la sesión
- * sigue siendo válida, después la cuenta. Los datos del teléfono se quedan intactos (quedan
- * "pendientes" de nuevo si más adelante se vuelve a iniciar sesión con otra cuenta Pro).
- */
 export async function deleteAccountAndCloudData(): Promise<void> {
   if (running) await running.catch(() => undefined);
   await deleteAccount(async (uid) => {
@@ -898,13 +744,6 @@ export async function deleteAccountAndCloudData(): Promise<void> {
   useSyncStatus.getState().set({ phase: 'idle', pending: 0, lastSyncAt: null });
 }
 
-// ─── Cuenta: cerrar sesión ──────────────────────────────────────────────────
-
-/**
- * Cerrar sesión dejando los datos del teléfono tal cual (SYNC_ROADMAP.md, T8 — "Mantener"). El
- * respaldo en la nube sigue ahí; si se vuelve a iniciar sesión con la misma cuenta, `pull` lo trae
- * de nuevo. No bloquea aunque haya cambios sin subir — "Mantener" nunca pierde nada.
- */
 export async function signOutKeepingLocalData(): Promise<void> {
   if (running) await running.catch(() => undefined);
   await signOut();
@@ -912,14 +751,6 @@ export async function signOutKeepingLocalData(): Promise<void> {
   useSyncStatus.getState().set({ phase: 'idle', pending: 0, lastSyncAt: null });
 }
 
-/**
- * Cerrar sesión Y borrar los datos de este teléfono (SYNC_ROADMAP.md, T8 — "Borrar"). El caller
- * (Ajustes) ya confirmó con el usuario y ya verificó `pendingChanges() === 0` antes de ofrecer
- * esta opción — acá no se vuelve a chequear porque entre ambos pasos no hay forma de que algo
- * nuevo quede pendiente (ningún otro flujo escribe en SQLite durante un modal de confirmación).
- * El respaldo en la nube NO se toca (a diferencia de `deleteAccountAndCloudData`): sigue
- * disponible si el usuario vuelve a iniciar sesión más adelante, en este teléfono o en otro.
- */
 export async function signOutAndWipeLocalData(): Promise<void> {
   if (running) await running.catch(() => undefined);
   await signOut();
