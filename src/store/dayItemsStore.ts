@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import * as FileSystem from 'expo-file-system';
-import { dayItemRepository, habitCompletionSyncRepository, taskCompletionSyncRepository } from '@/data/local/dayItemRepository';
+import { dayItemRepository } from '@/data/local/dayItemRepository';
+import { habitCompletionSyncRepository } from '@/data/local/habitCompletionRepository';
+import { taskCompletionSyncRepository } from '@/data/local/taskCompletionRepository';
 import type { DayItem, Habit, Task } from '@/domain/dayItem';
 import { toDateKey, fromDateKey, addDays } from '@/domain/date';
 import { getWeekRange } from '@/domain/week';

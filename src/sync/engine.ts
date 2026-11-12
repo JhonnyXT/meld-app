@@ -12,13 +12,9 @@ import { AppState } from 'react-native';
 import { getAuth, onAuthStateChanged } from '@react-native-firebase/auth';
 import { categoryRepository } from '@/data/local/categoryRepository';
 import { spaceMemberRepository } from '@/data/local/spaceMemberRepository';
-import {
-  dayItemRepository,
-  habitCompletionSyncRepository,
-  taskCompletionSyncRepository,
-  type PendingCompletion,
-  type PendingDayItem,
-} from '@/data/local/dayItemRepository';
+import { dayItemRepository, type PendingDayItem } from '@/data/local/dayItemRepository';
+import { habitCompletionSyncRepository, type PendingCompletion } from '@/data/local/habitCompletionRepository';
+import { taskCompletionSyncRepository } from '@/data/local/taskCompletionRepository';
 import { onLocalChange } from '@/data/local/localChanges';
 import { wipeLocalData } from '@/data/local/wipeLocalData';
 import type { IconName } from '@/domain/iconNames';
