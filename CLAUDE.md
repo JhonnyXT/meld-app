@@ -1034,6 +1034,12 @@ queda la baja (`/api/unsubscribe`, Resend). Deploy en Vercel (proyecto `meld`, `
 `JhonnyXT/meld-app` con `Root Directory: landing` — cada push a `main` despliega.
 Detalle en `landing/README.md`.
 
+## Escala y costo (Firestore)
+
+`docs/adr/0005-limites-de-escala-y-costo.md` — reglas a respetar antes de agregar una query nueva
+de sync (índices compuestos) o tocar los límites de espacio compartido (`maxMembers`,
+`FREE_INVITEE_LIMIT`).
+
 ## Publicar en Google Play
 
 Checklist completo en `docs/play-store-checklist.md` — leerlo antes de cualquier
