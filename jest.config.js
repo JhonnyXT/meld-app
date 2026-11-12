@@ -7,6 +7,7 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
     '^expo-crypto$': '<rootDir>/jest/expoCryptoMock.js',
+    '^expo-sqlite$': '<rootDir>/jest/expoSqliteMock.js',
   },
   testPathIgnorePatterns: [
     '<rootDir>/node_modules/',

@@ -168,11 +168,17 @@ Nada visible cambia; deja todo listo para que dos teléfonos no choquen.
   renombrar/recolorear una categoría se refleje en sus ítems ya creados) queda para cuando se
   construya el filtrado por espacio en la Fase 4, tocando a la vez `dayItemsStore`/`inboxStore`/
   `useWeekAgenda`/los widgets — hacerlo ahora era más riesgo del que esta fase necesitaba.
-- [ ] Tests de las migraciones: sin infraestructura de tests en este repo todavía (a diferencia
-  de My Wallet, que usa Jest) — verificado a mano en dispositivo con datos reales en vez de un
-  test automatizado. Jest se instala recién en la Fase 2 (ver ahí el porqué): lo que esta Fase 1
-  toca es solo SQLite local, sin red, así que el riesgo de verificar a mano fue aceptable;
-  `pickWinner` tampoco aplica todavía (no hay nada remoto con qué comparar hasta la Fase 3).
+- [x] **Tests de las migraciones** (2026-11-11): `src/data/local/db.migrations.test.ts`, 6 tests.
+  `initDb()` ganó un parámetro `conn: SqliteLike = sqlite` (default = la conexión real de
+  `expo-sqlite`, ningún call-site de la app le pasa nada distinto) — permite inyectar en tests una
+  conexión de `better-sqlite3` (devDependency nueva, habla SQLite real sin el runtime nativo de
+  Expo), así los tests corren el SQL de las migraciones tal cual, sin reinterpretarlo. Mock nuevo
+  `jest/expoSqliteMock.js` (igual patrón que `expoCryptoMock.js`) para que `db.ts` sea importable
+  bajo Jest sin crashear (el `expo-sqlite` real no carga fuera de la app). Cubre: instalación nueva
+  (tablas/columnas completas, siembra de categorías, idempotencia corriendo `initDb` dos veces) y
+  dispositivo con datos previos (esquema viejo sin las columnas de Fase 4, agregar columnas sin
+  perder filas, backfill de `category_id`, y la regresión real ya corregida de crear el índice de
+  `category_id` antes de que la columna exista en una tabla vieja).
 
 **Hecho cuando:** la app funciona igual que hoy, cada registro nuevo tiene id único y fecha de
 edición, borrar/desmarcar deja tombstone en vez de eliminar, y un dispositivo con datos previos
