@@ -2,7 +2,7 @@ import { eq, and, or, ne, lt, isNull, isNotNull, gte, lte, like, asc, inArray } 
 import { db } from './db';
 import { dayItems, habitCompletions, taskCompletions, categories } from './schema';
 import { emitLocalChange } from './localChanges';
-import type { DayItem } from '@/domain/dayItem';
+import type { DayItem, DayItemStatus } from '@/domain/dayItem';
 
 /** Lo mínimo para que `src/sync/` decida con `pickWinner` sin traer el ítem entero. */
 export interface SyncVersion {
@@ -20,6 +20,10 @@ export interface PendingDayItem {
   /** Fase 4 — a qué colección sube este ítem: `null` = `users/{uid}/items` (personal, el caso de
    * siempre); si no, `spaces/{spaceId}/items` en vez de ahí. Ver `schema.ts` → `dayItems.spaceId`. */
   spaceId: string | null;
+  /** Fase 4 — "quién completó esto" (`null` si todavía no se estampó o no está hecha) — ver
+   * `resolveCompletedByUid`. Solo relevante cuando `spaceId` no es `null`: `pushSpaces()` lo lee
+   * para decidir si ya hay que mandarlo o si hace falta estamparlo primero. */
+  completedByUid: string | null;
   item: DayItem | null;
 }
 
@@ -102,6 +106,27 @@ async function resolveSpaceId(categoryId: string | null): Promise<string | null>
   if (!categoryId) return null;
   const rows = await db.select({ spaceId: categories.spaceId }).from(categories).where(eq(categories.id, categoryId)).limit(1);
   return rows[0]?.spaceId ?? null;
+}
+
+/** `completedByUid` (Fase 4 — indicador "quién completó esto") al guardar vía `upsert()`: el
+ * único camino por el que `status` llega a `'done'` directo en `day_items` es una task SIN
+ * `repeatRule` (hábitos y tasks que repiten usan sus propias tablas de completado — ver
+ * `habitCompletionSyncRepository`/`taskCompletionSyncRepository` — y nunca tocan `status` acá).
+ * - `status !== 'done'`: `null` (nadie la completó).
+ * - `status === 'done'` y YA estaba `'done'` antes (una edición sin relación con completarla):
+ *   conserva el valor existente, no lo pisa.
+ * - `status === 'done'` recién AHORA (transición real): `null` — queda "por estampar"; lo hace
+ *   `src/sync/engine.ts` → `pushSpaces()` al subir (el repositorio no puede leer el uid de la
+ *   sesión sin importar Firebase, lo que violaría la Regla #3: la red solo vive en `src/sync/`). */
+async function resolveCompletedByUid(id: string, nextStatus: DayItemStatus): Promise<string | null> {
+  if (nextStatus !== 'done') return null;
+  const rows = await db
+    .select({ status: dayItems.status, completedByUid: dayItems.completedByUid })
+    .from(dayItems)
+    .where(eq(dayItems.id, id))
+    .limit(1);
+  const prev = rows[0];
+  return prev && prev.status === 'done' ? prev.completedByUid : null;
 }
 
 function toRow(item: DayItem, categoryId: string | null, spaceId: string | null): NewRow {
@@ -239,7 +264,8 @@ export const dayItemRepository = {
   async upsert(item: DayItem): Promise<void> {
     const categoryId = await resolveCategoryId(item.category);
     const spaceId = await resolveSpaceId(categoryId);
-    const row = toRow(item, categoryId, spaceId);
+    const completedByUid = await resolveCompletedByUid(item.id, item.status);
+    const row = { ...toRow(item, categoryId, spaceId), completedByUid };
     await db
       .insert(dayItems)
       .values(row)
@@ -296,15 +322,18 @@ export const dayItemRepository = {
     if (isActive) {
       await db
         .update(habitCompletions)
-        .set({ deletedAt: now, updatedAt: now, syncState: 'pending' })
+        .set({ deletedAt: now, updatedAt: now, syncState: 'pending', completedByUid: null })
         .where(eq(habitCompletions.id, id));
       emitLocalChange();
       return false;
     }
     if (existing.length > 0) {
+      // Reusa la fila (mismo id determinístico) — limpia `completedByUid` para que quede
+      // atribuida a quien la RE-completa, no a quien la había completado la vez anterior (Fase
+      // 4: el próximo `pushSpaces()` la vuelve a estampar, ver su comentario).
       await db
         .update(habitCompletions)
-        .set({ deletedAt: null, updatedAt: now, syncState: 'pending' })
+        .set({ deletedAt: null, updatedAt: now, syncState: 'pending', completedByUid: null })
         .where(eq(habitCompletions.id, id));
     } else {
       const spaceId = await getItemSpaceId(habitId);
@@ -371,15 +400,16 @@ export const dayItemRepository = {
     if (isActive) {
       await db
         .update(taskCompletions)
-        .set({ deletedAt: now, updatedAt: now, syncState: 'pending' })
+        .set({ deletedAt: now, updatedAt: now, syncState: 'pending', completedByUid: null })
         .where(eq(taskCompletions.id, id));
       emitLocalChange();
       return false;
     }
     if (existing.length > 0) {
+      // Mismo criterio que `toggleHabitCompletion` — ver su comentario.
       await db
         .update(taskCompletions)
-        .set({ deletedAt: null, updatedAt: now, syncState: 'pending' })
+        .set({ deletedAt: null, updatedAt: now, syncState: 'pending', completedByUid: null })
         .where(eq(taskCompletions.id, id));
     } else {
       const spaceId = await getItemSpaceId(taskId);
@@ -434,6 +464,7 @@ export const dayItemRepository = {
       deletedAt: row.deletedAt,
       categoryId: row.categoryId,
       spaceId: row.spaceId,
+      completedByUid: row.completedByUid,
       item: row.deletedAt ? null : toDomain(row),
     }));
   },
@@ -442,6 +473,28 @@ export const dayItemRepository = {
   async markSynced(ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     await db.update(dayItems).set({ syncState: 'synced' }).where(inArray(dayItems.id, ids));
+  },
+
+  /** Fase 4 — persiste el `completedByUid` recién estampado por `src/sync/engine.ts` →
+   * `pushSpaces()` (ver el comentario de `resolveCompletedByUid`): sin esto, la próxima subida de
+   * una edición no relacionada volvería a leer `null` localmente y re-estamparía con quien sea
+   * que esté en sesión en ESE momento, perdiendo la atribución original. No toca `syncState` (la
+   * fila ya se está subiendo en la misma corrida que llama a esto). */
+  async setCompletedByUid(id: string, uid: string): Promise<void> {
+    await db.update(dayItems).set({ completedByUid: uid }).where(eq(dayItems.id, id));
+  },
+
+  /** Fase 4 — `completedByUid` de cada id dado, para el badge "completado por X" de
+   * `dayItemsStore.reload()` (una task SIN `repeatRule` lo guarda directo acá; hábitos/tasks que
+   * repiten lo guardan en sus propias tablas, ver `habitCompletionSyncRepository`/
+   * `taskCompletionSyncRepository` → `getCompletedByUidMap`). Una sola query por lote de ids
+   * visibles, no una por fila. */
+  async getCompletedByUidMap(ids: string[]): Promise<Record<string, string | null>> {
+    if (ids.length === 0) return {};
+    const rows = await db.select({ id: dayItems.id, completedByUid: dayItems.completedByUid }).from(dayItems).where(inArray(dayItems.id, ids));
+    const map: Record<string, string | null> = {};
+    for (const r of rows) map[r.id] = r.completedByUid;
+    return map;
   },
 
   /** Versión local de un ítem (exista o no), para que `src/sync/` llame a `pickWinner` antes de
@@ -469,8 +522,8 @@ export const dayItemRepository = {
    * categoría local de un espacio SIEMPRE tiene ese mismo id (ver el comentario largo en
    * `schema.ts` → `categories.spaceId`), así que no hace falta resolverlo por nombre como
    * `resolveCategoryId` hace con los ítems personales. */
-  async applySpaceRemoteUpsert(item: DayItem, spaceId: string): Promise<void> {
-    const row = { ...toRow(item, spaceId, spaceId), syncState: 'synced' as const };
+  async applySpaceRemoteUpsert(item: DayItem, spaceId: string, completedByUid: string | null = null): Promise<void> {
+    const row = { ...toRow(item, spaceId, spaceId), syncState: 'synced' as const, completedByUid };
     await db.insert(dayItems).values(row).onConflictDoUpdate({ target: dayItems.id, set: row });
   },
 
@@ -539,6 +592,8 @@ export interface PendingCompletion {
   /** Fase 4 — mismo criterio que `PendingDayItem.spaceId`: `null` = `users/{uid}/habitCompletions`
    * (o `taskCompletions`) personal; si no, `spaces/{spaceId}/...` en vez de ahí. */
   spaceId: string | null;
+  /** Fase 4 — mismo criterio que `PendingDayItem.completedByUid`: quién completó esta fecha. */
+  completedByUid: string | null;
 }
 
 export const habitCompletionSyncRepository = {
@@ -556,11 +611,27 @@ export const habitCompletionSyncRepository = {
       habitId: r.habitId,
       date: r.date,
       spaceId: r.spaceId,
+      completedByUid: r.completedByUid,
     }));
   },
   async markSynced(ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     await db.update(habitCompletions).set({ syncState: 'synced' }).where(inArray(habitCompletions.id, ids));
+  },
+  /** Mismo criterio que `dayItemRepository.setCompletedByUid`. */
+  async setCompletedByUid(id: string, uid: string): Promise<void> {
+    await db.update(habitCompletions).set({ completedByUid: uid }).where(eq(habitCompletions.id, id));
+  },
+  /** `habitId -> completedByUid` de todo lo marcado hecho en `date` — mismo criterio que
+   * `dayItemRepository.getCompletedByUidMap`, una sola query para `dayItemsStore.reload()`. */
+  async getCompletedByUidMap(date: string): Promise<Record<string, string | null>> {
+    const rows = await db
+      .select({ habitId: habitCompletions.habitId, completedByUid: habitCompletions.completedByUid })
+      .from(habitCompletions)
+      .where(and(eq(habitCompletions.date, date), isNull(habitCompletions.deletedAt)));
+    const map: Record<string, string | null> = {};
+    for (const r of rows) map[r.habitId] = r.completedByUid;
+    return map;
   },
   async getSyncVersion(id: string): Promise<SyncVersion | null> {
     const rows = await db
@@ -592,13 +663,20 @@ export const habitCompletionSyncRepository = {
    * parámetro extra del de arriba) porque CORRIGE el `space_id` local en el `set` del conflicto,
    * algo que el personal explícitamente NO debe hacer (si una fila ya existe ahí como personal, no
    * hay que empezar a tratarla como de un espacio solo porque también llegó por ese camino). */
-  async applySpaceRemoteUpsert(id: string, habitId: string, date: string, updatedAt: string, spaceId: string): Promise<void> {
+  async applySpaceRemoteUpsert(
+    id: string,
+    habitId: string,
+    date: string,
+    updatedAt: string,
+    spaceId: string,
+    completedByUid: string | null = null,
+  ): Promise<void> {
     await db
       .insert(habitCompletions)
-      .values({ id, habitId, date, updatedAt, deletedAt: null, syncState: 'synced', spaceId })
+      .values({ id, habitId, date, updatedAt, deletedAt: null, syncState: 'synced', spaceId, completedByUid })
       .onConflictDoUpdate({
         target: [habitCompletions.habitId, habitCompletions.date],
-        set: { updatedAt, deletedAt: null, syncState: 'synced', spaceId },
+        set: { updatedAt, deletedAt: null, syncState: 'synced', spaceId, completedByUid },
       });
   },
   async applyRemoteDelete(id: string, habitId: string, date: string, deletedAt: string): Promise<void> {
@@ -650,11 +728,26 @@ export const taskCompletionSyncRepository = {
       taskId: r.taskId,
       date: r.date,
       spaceId: r.spaceId,
+      completedByUid: r.completedByUid,
     }));
   },
   async markSynced(ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     await db.update(taskCompletions).set({ syncState: 'synced' }).where(inArray(taskCompletions.id, ids));
+  },
+  /** Mismo criterio que `dayItemRepository.setCompletedByUid`. */
+  async setCompletedByUid(id: string, uid: string): Promise<void> {
+    await db.update(taskCompletions).set({ completedByUid: uid }).where(eq(taskCompletions.id, id));
+  },
+  /** Mismo criterio que `habitCompletionSyncRepository.getCompletedByUidMap`. */
+  async getCompletedByUidMap(date: string): Promise<Record<string, string | null>> {
+    const rows = await db
+      .select({ taskId: taskCompletions.taskId, completedByUid: taskCompletions.completedByUid })
+      .from(taskCompletions)
+      .where(and(eq(taskCompletions.date, date), isNull(taskCompletions.deletedAt)));
+    const map: Record<string, string | null> = {};
+    for (const r of rows) map[r.taskId] = r.completedByUid;
+    return map;
   },
   async getSyncVersion(id: string): Promise<SyncVersion | null> {
     const rows = await db
@@ -675,13 +768,20 @@ export const taskCompletionSyncRepository = {
       });
   },
   /** Mismo criterio que `habitCompletionSyncRepository.applySpaceRemoteUpsert`. */
-  async applySpaceRemoteUpsert(id: string, taskId: string, date: string, updatedAt: string, spaceId: string): Promise<void> {
+  async applySpaceRemoteUpsert(
+    id: string,
+    taskId: string,
+    date: string,
+    updatedAt: string,
+    spaceId: string,
+    completedByUid: string | null = null,
+  ): Promise<void> {
     await db
       .insert(taskCompletions)
-      .values({ id, taskId, date, updatedAt, deletedAt: null, syncState: 'synced', spaceId })
+      .values({ id, taskId, date, updatedAt, deletedAt: null, syncState: 'synced', spaceId, completedByUid })
       .onConflictDoUpdate({
         target: [taskCompletions.taskId, taskCompletions.date],
-        set: { updatedAt, deletedAt: null, syncState: 'synced', spaceId },
+        set: { updatedAt, deletedAt: null, syncState: 'synced', spaceId, completedByUid },
       });
   },
   async applyRemoteDelete(id: string, taskId: string, date: string, deletedAt: string): Promise<void> {

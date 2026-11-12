@@ -8,8 +8,10 @@
  * atrasado).
  */
 import {
+  arrayRemove,
   arrayUnion,
   collection,
+  deleteDoc,
   doc,
   getDocFromServer,
   getDocsFromServer,
@@ -217,6 +219,22 @@ export async function createSpaceDoc(spaceId: string, data: SpaceDoc): Promise<v
   await setDoc(doc(db(), 'spaces', spaceId), { ...data, serverUpdatedAt: serverTimestamp() });
 }
 
+/** Revive un espacio PROPIO ya eliminado (`deletedAt` != null) — compartir de nuevo la MISMA
+ * categoría después de haberla "eliminado" antes no puede usar `createSpaceDoc`: el documento ya
+ * existe en Firestore (solo marcado `deletedAt`, nunca se borra de verdad), así que un `setDoc`
+ * ahí es un `update` para las reglas, no un `create`, y ninguna rama de `allow update` admite
+ * reescribir TODO el documento de una — bug real encontrado probando este camino (2026-11-11).
+ * En dos pasos porque las reglas no dejan tocar `memberUids` y `editorUids` en el mismo `update`
+ * (son ramas distintas de `allow update`, cada una con su propio `changedOnly`): primero
+ * `memberUids: [uid]` + `deletedAt: null` (rama del dueño: quitar gente + reactivar), después
+ * `editorUids: [uid]` (rama de cambiar rol) — reinicia limpio con solo el dueño adentro, en vez
+ * de arrastrar a quien ya estaba antes de eliminarlo (que de todos modos ya se desvinculó
+ * localmente al ver `deletedAt`, y sorprendería verse re-agregado sin haber hecho nada). */
+export async function reviveSpaceDoc(spaceId: string, uid: string): Promise<void> {
+  await updateDoc(doc(db(), 'spaces', spaceId), { memberUids: [uid], deletedAt: null, serverUpdatedAt: serverTimestamp() });
+  await updateDoc(doc(db(), 'spaces', spaceId), { editorUids: [uid], serverUpdatedAt: serverTimestamp() });
+}
+
 /** Borra puntualmente documentos de `users/{uid}/{kind}` por id — usado al compartir una
  * categoría (SYNC_ROADMAP.md, Fase 4): sus ítems/completados/la categoría misma dejan de vivir en
  * el respaldo personal (de ahí en más viven en `spaces/{id}/...`), así que su fila vieja ahí (si
@@ -289,4 +307,63 @@ export async function joinSpace(spaceId: string, uid: string, data: { joinCode: 
   };
   if (data.asEditor) update.editorUids = arrayUnion(uid);
   await updateDoc(doc(db(), 'spaces', spaceId), update);
+}
+
+// ─── Gestión de miembros (SYNC_ROADMAP.md, Fase 4) ───────────────────────────────
+
+/** El espacio tal cual está en Firestore ahora mismo — a diferencia de `joinSpace` (que no puede
+ * leer antes de ser miembro), acá quien llama YA es miembro (ve la lista de miembros, cambia un
+ * rol, sale, o es el dueño eliminando el espacio), así que un `GET` normal sí funciona. Hace
+ * falta para construir `editorUids` a mano al cambiar el rol de alguien (`changedOnly(['editorUids',
+ * 'serverUpdatedAt'])` en las reglas no admite `arrayUnion`/`arrayRemove` solos: exige que el
+ * resultado sea subconjunto de `memberUids` Y que el dueño siga adentro, dos condiciones sobre el
+ * arreglo completo, no sobre un elemento). */
+export async function getSpaceDoc(spaceId: string): Promise<SpaceDoc | null> {
+  const snap = await getDocFromServer(doc(db(), 'spaces', spaceId));
+  if (!snap.exists()) return null;
+  return snap.data() as SpaceDoc;
+}
+
+/** Miembros de un espacio (`spaces/{id}/members/*`, id = uid de cada uno) — para la pantalla de
+ * gestión ("Miembros" en `ShareCategorySheet`). Cualquier miembro puede leer la lista (`allow
+ * read: if isMember(id) || isOwner(id)` en `firestore.rules`, igual para `get` y `list`). */
+export async function listSpaceMembers(spaceId: string): Promise<RemoteDoc<SpaceMemberDoc>[]> {
+  const snap = await getDocsFromServer(collection(db(), 'spaces', spaceId, 'members'));
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return { id: d.id, data: data as SpaceMemberDoc & VersionedDoc, serverUpdatedAt: millis(data.serverUpdatedAt) };
+  });
+}
+
+/** El dueño cambia el rol de alguien (T11) — reemplaza `editorUids` entero; quien llama ya leyó
+ * el espacio con `getSpaceDoc` para construir el arreglo nuevo (ver su comentario). */
+export async function setSpaceEditorUids(spaceId: string, editorUids: string[]): Promise<void> {
+  await updateDoc(doc(db(), 'spaces', spaceId), { editorUids, serverUpdatedAt: serverTimestamp() });
+}
+
+/** Un miembro (no el dueño) sale por su cuenta — `arrayRemove` del propio uid, SOLO `memberUids`
+ * (`firestore.rules`: la regla de "salir" no admite tocar `editorUids`; un rastro ahí queda
+ * inerte, ver el comentario de la regla). Borra la fila `members/{uid}` ANTES del `update` del
+ * padre, mientras `isMember(id)` todavía es cierto (si se hiciera después, `allow delete` ya no
+ * tendría cómo validar que quien borra sigue siendo miembro de ESE espacio). */
+export async function leaveSpace(spaceId: string, uid: string): Promise<void> {
+  await deleteDoc(doc(db(), 'spaces', spaceId, 'members', uid)).catch(() => undefined);
+  await updateDoc(doc(db(), 'spaces', spaceId), { memberUids: arrayRemove(uid), serverUpdatedAt: serverTimestamp() });
+}
+
+/** El dueño quita a alguien más (mismo mecanismo de `arrayRemove`, pero el dueño puede borrar
+ * CUALQUIER fila `members/{uid}` sin el problema de orden de `leaveSpace` — `allow delete: if
+ * isOwner(id) || ...`). */
+export async function removeSpaceMember(spaceId: string, memberUid: string): Promise<void> {
+  await deleteDoc(doc(db(), 'spaces', spaceId, 'members', memberUid)).catch(() => undefined);
+  await updateDoc(doc(db(), 'spaces', spaceId), { memberUids: arrayRemove(memberUid), serverUpdatedAt: serverTimestamp() });
+}
+
+/** El dueño elimina el espacio entero (marca `deletedAt`, nunca un `delete` real de Firestore —
+ * eso lo exige `firestore.rules` para que cada miembro se entere al leerlo una vez más). El
+ * próximo `pullSpaces` de CADA miembro, incluido el dueño, lo ve con `deletedAt != null` y
+ * desliga la categoría local sola (mismo camino ya probado al eliminar un espacio de prueba),
+ * "quien pierde el acceso conserva la categoría como propia" — también aplica al dueño. */
+export async function deleteSpace(spaceId: string): Promise<void> {
+  await updateDoc(doc(db(), 'spaces', spaceId), { deletedAt: new Date().toISOString(), serverUpdatedAt: serverTimestamp() });
 }

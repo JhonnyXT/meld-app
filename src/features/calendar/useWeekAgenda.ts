@@ -19,19 +19,29 @@ export function useWeekAgenda(referenceDate: Date) {
   const { start, end } = useMemo(() => getWeekRange(referenceDate), [referenceDate]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(start, i)), [start]);
   const [itemsByDate, setItemsByDate] = useState<Record<string, DayItem[]>>({});
+  const [completedByMap, setCompletedByMap] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(() => {
     const startKey = toDateKey(start);
     const endKey = toDateKey(end);
     setLoading(true);
-    dayItemRepository.listByDateRange(startKey, endKey).then((items) => {
+    dayItemRepository.listByDateRange(startKey, endKey).then(async (items) => {
       const grouped: Record<string, DayItem[]> = {};
       for (const item of items) {
         if (!item.date) continue;
         (grouped[item.date] ??= []).push(item);
       }
+      // "Completado por X" (Fase 4): acá los ítems abarcan varios días, a diferencia de
+      // `dayItemsStore` (un solo `selectedDateKey`) — este mapa es propio, no se puede reusar el
+      // de Today porque nunca recarga para días fuera del seleccionado ahí (bug real encontrado
+      // probando con dos cuentas reales, 2026-11-11: el badge no aparecía en la agenda Semana
+      // aunque el dato ya estaba sincronizado). Solo cubre tasks/eventos sin repetir (columna
+      // directa en `day_items`) — hábitos/tasks que repiten no recurren acá (ver "Simplificaciones
+      // conocidas"), así que no hace falta su propio mapa por fecha.
+      const completedBy = await dayItemRepository.getCompletedByUidMap(items.map((i) => i.id));
       setItemsByDate(grouped);
+      setCompletedByMap(completedBy);
       setLoading(false);
     });
   }, [start, end]);
@@ -91,5 +101,5 @@ export function useWeekAgenda(referenceDate: Date) {
     [itemsByDate, patchItem],
   );
 
-  return { days, itemsByDate, loading, reload, toggleComplete, remove, clearVoiceMemoAudio };
+  return { days, itemsByDate, completedByMap, loading, reload, toggleComplete, remove, clearVoiceMemoAudio };
 }

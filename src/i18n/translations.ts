@@ -428,6 +428,10 @@ export const es = {
   categoriesEmptyTitle: 'Sin categorías todavía',
   categoriesEmptyMessage: 'Crea una para empezar a organizar tus ítems.',
   categoryAllDone: 'Completado',
+  categoryPendingCount: '{count} pendientes',
+  categorySharedEditor: 'Compartida · Editor',
+  categorySharedViewer: 'Compartida · Lector',
+  categoriesCount: '{count} categorías',
   categoryNewTitle: 'Nueva categoría',
   categoryEditTitle: 'Editar categoría',
   categoryNamePlaceholder: 'Nombre de la categoría',
@@ -471,6 +475,23 @@ export const es = {
   joinCategoryErrorFreeLimit: 'Con el plan Free puedes unirte a 2 categorías compartidas. Suscríbete a Pro para unirte a más.',
   joinCategoryErrorDenied: 'No se pudo unir — puede que ya formes parte de esta categoría o que ya esté llena.',
   itemDetailReadOnlyBanner: 'Solo puedes ver este ítem — eres lector de esta categoría compartida.',
+  shareCategoryMembersTitle: 'Miembros',
+  shareCategoryMemberYou: 'Tú',
+  shareCategoryMemberOwner: 'Dueño',
+  shareCategoryRoleEditorShort: 'Editor',
+  shareCategoryRoleViewerShort: 'Lector',
+  a11yRemoveMember: 'Quitar',
+  shareCategoryRemoveMemberConfirmTitle: '¿Quitar a esta persona?',
+  shareCategoryRemoveMemberConfirmMessage:
+    'Deja de ver y editar "{label}" en su teléfono. Conserva lo que ya tenía como una categoría propia.',
+  shareCategoryLeaveButton: 'Salir de esta categoría',
+  shareCategoryLeaveConfirmTitle: '¿Salir de esta categoría compartida?',
+  shareCategoryLeaveConfirmMessage:
+    'Dejas de ver y editar "{label}" en los demás teléfonos. Conservas lo que ya tenías como una categoría propia.',
+  shareCategoryDeleteButton: 'Eliminar categoría compartida',
+  shareCategoryDeleteConfirmTitle: '¿Eliminar esta categoría compartida?',
+  shareCategoryDeleteConfirmMessage:
+    'Todos dejan de verla y editarla. Cada quien conserva lo que ya tenía como una categoría propia.',
 } as const;
 
 export const en: Record<keyof typeof es, string> = {
@@ -858,6 +879,10 @@ export const en: Record<keyof typeof es, string> = {
   categoriesEmptyTitle: 'No categories yet',
   categoriesEmptyMessage: 'Create one to start organizing your items.',
   categoryAllDone: 'All done',
+  categoryPendingCount: '{count} pending',
+  categorySharedEditor: 'Shared · Editor',
+  categorySharedViewer: 'Shared · Viewer',
+  categoriesCount: '{count} categories',
   categoryNewTitle: 'New category',
   categoryEditTitle: 'Edit category',
   categoryNamePlaceholder: 'Category name',
@@ -900,6 +925,23 @@ export const en: Record<keyof typeof es, string> = {
   joinCategoryErrorFreeLimit: 'On the Free plan you can join 2 shared categories. Subscribe to Pro to join more.',
   joinCategoryErrorDenied: "Couldn't join — you might already be part of this category, or it's full.",
   itemDetailReadOnlyBanner: "You can only view this item — you're a viewer of this shared category.",
+  shareCategoryMembersTitle: 'Members',
+  shareCategoryMemberYou: 'You',
+  shareCategoryMemberOwner: 'Owner',
+  shareCategoryRoleEditorShort: 'Editor',
+  shareCategoryRoleViewerShort: 'Viewer',
+  a11yRemoveMember: 'Remove',
+  shareCategoryRemoveMemberConfirmTitle: 'Remove this person?',
+  shareCategoryRemoveMemberConfirmMessage:
+    'They stop seeing and editing "{label}" on their phone. They keep what they already had as their own category.',
+  shareCategoryLeaveButton: 'Leave this category',
+  shareCategoryLeaveConfirmTitle: 'Leave this shared category?',
+  shareCategoryLeaveConfirmMessage:
+    'You stop seeing and editing "{label}" on other phones. You keep what you already had as your own category.',
+  shareCategoryDeleteButton: 'Delete shared category',
+  shareCategoryDeleteConfirmTitle: 'Delete this shared category?',
+  shareCategoryDeleteConfirmMessage:
+    'Everyone stops seeing and editing it. Each person keeps what they already had as their own category.',
 };
 
 export const WEEKDAY_SHORT: Record<Language, string[]> = {

@@ -68,6 +68,13 @@ export const dayItems = sqliteTable('day_items', {
   // roadmap) le da SIEMPRE un id nuevo + tombstone del viejo, nunca reasigna `spaceId` en el
   // mismo id, así que este valor es inmutable durante toda la vida de una fila.
   spaceId: text('space_id'),
+  // Fase 4 — indicador "quién completó esto" (ítem compartido, task SIN `repeatRule`): quién
+  // marcó `status: 'done'`. NULL mientras no está hecha, o en cualquier ítem personal (sin
+  // `spaceId`, nunca se estampa ahí). Se fija al SUBIR, no al guardar localmente (ver
+  // `src/sync/engine.ts` → `pushSpaces`): el repositorio no tiene forma de saber el uid de la
+  // sesión sin importar Firebase, que viola la Regla #3 (la red solo vive en `src/sync/`) — ver
+  // el comentario largo en `dayItemRepository.upsert` sobre cómo se limpia al des-completar.
+  completedByUid: text('completed_by_uid'),
 });
 
 /** Un registro por día que un hábito se marcó como hecho. Es la fuente real
@@ -88,6 +95,11 @@ export const habitCompletions = sqliteTable('habit_completions', {
   // comentario largo en `dayItems.spaceId`): un hábito compartido nunca cambia de espacio en el
   // mismo id, así que esto es estable una vez escrito.
   spaceId: text('space_id'),
+  // Fase 4 — quién marcó este día como hecho (mismo criterio que `dayItems.completedByUid`:
+  // estampado al subir, no al guardar; NULL en un hábito personal). Al re-completar (reusa la
+  // misma fila, limpiando `deletedAt`) se limpia también acá, para que quede atribuido a quien
+  // re-completó, no a quien la había completado la vez anterior.
+  completedByUid: text('completed_by_uid'),
 });
 
 /** Un registro por día que una task QUE REPITE (`repeatRule` no null) se
@@ -104,6 +116,8 @@ export const taskCompletions = sqliteTable('task_completions', {
   syncState: text('sync_state', { enum: ['synced', 'pending'] }),
   // Fase 4 — mismo criterio que `habitCompletions.spaceId`.
   spaceId: text('space_id'),
+  // Fase 4 — mismo criterio que `habitCompletions.completedByUid`.
+  completedByUid: text('completed_by_uid'),
 });
 
 /** Catálogo de categorías configurable por el usuario (Ajustes > Categorías,
@@ -135,4 +149,20 @@ export const categories = sqliteTable('categories', {
   spaceId: text('space_id'),
   spaceRole: text('space_role', { enum: ['editor', 'viewer'] }),
   spaceOwnerUid: text('space_owner_uid'),
+});
+
+/** Caché local de `spaces/{id}/members/*` (SYNC_ROADMAP.md, Fase 4) — solo `uid → name`, para
+ * resolver el badge "completado por X" (`DayItemRow` → `TrailingBadge` de tipo `completedBy`)
+ * sin pegarle a la red en cada fila de Today. Se llena en `pullSpaces()`
+ * (`src/sync/engine.ts`), reusando `listCategoryMembers(spaceId)` que ya existe para
+ * `ShareCategorySheet`. `id` = `${spaceId}:${uid}` (compuesto, sin necesidad de clave primaria
+ * de dos columnas en Drizzle/SQLite). Se desentiende sola al desvincularse de un espacio (nunca
+ * se borra explícitamente — un nombre "stale" de un espacio ya abandonado es inofensivo, no se
+ * vuelve a leer una vez que `categories.spaceId` para ese id es `null`). */
+export const spaceMembers = sqliteTable('space_members', {
+  id: text('id').primaryKey(),
+  spaceId: text('space_id').notNull(),
+  uid: text('uid').notNull(),
+  name: text('name').notNull(),
+  updatedAt: text('updated_at').notNull(),
 });

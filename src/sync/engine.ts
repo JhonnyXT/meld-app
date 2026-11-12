@@ -11,6 +11,7 @@
 import { AppState } from 'react-native';
 import { getAuth, onAuthStateChanged } from '@react-native-firebase/auth';
 import { categoryRepository } from '@/data/local/categoryRepository';
+import { spaceMemberRepository } from '@/data/local/spaceMemberRepository';
 import {
   dayItemRepository,
   habitCompletionSyncRepository,
@@ -71,6 +72,7 @@ import {
   pushBatch,
   pushSpaceBatch,
   removeSpaceMember,
+  reviveSpaceDoc,
   setSpaceConfig,
   setSpaceEditorUids,
   setSpaceMember,
@@ -271,7 +273,7 @@ async function pullSpaceItems(spaceId: string, meta: SyncMeta): Promise<{ meta: 
       await cancelReminderNotification(d.id).catch(() => undefined);
     } else {
       const item = docToDayItemFromSpace(d.id, d.data);
-      await dayItemRepository.applySpaceRemoteUpsert(item, spaceId);
+      await dayItemRepository.applySpaceRemoteUpsert(item, spaceId, d.data.completedByUid ?? null);
       await syncReminderNotification(item).catch(() => undefined);
     }
   }
@@ -288,7 +290,14 @@ async function pullSpaceHabitCompletions(spaceId: string, meta: SyncMeta): Promi
     if (d.data.deletedAt != null) {
       await habitCompletionSyncRepository.applyRemoteDelete(d.id, d.data.habitId, d.data.date, d.data.deletedAt);
     } else {
-      await habitCompletionSyncRepository.applySpaceRemoteUpsert(d.id, d.data.habitId, d.data.date, d.data.updatedAt, spaceId);
+      await habitCompletionSyncRepository.applySpaceRemoteUpsert(
+        d.id,
+        d.data.habitId,
+        d.data.date,
+        d.data.updatedAt,
+        spaceId,
+        d.data.byUid ?? null,
+      );
     }
   }
   if (docs.length > 0) meta = advanceCursor(meta, key, Math.max(...docs.map((d) => d.serverUpdatedAt)));
@@ -304,7 +313,14 @@ async function pullSpaceTaskCompletions(spaceId: string, meta: SyncMeta): Promis
     if (d.data.deletedAt != null) {
       await taskCompletionSyncRepository.applyRemoteDelete(d.id, d.data.taskId, d.data.date, d.data.deletedAt);
     } else {
-      await taskCompletionSyncRepository.applySpaceRemoteUpsert(d.id, d.data.taskId, d.data.date, d.data.updatedAt, spaceId);
+      await taskCompletionSyncRepository.applySpaceRemoteUpsert(
+        d.id,
+        d.data.taskId,
+        d.data.date,
+        d.data.updatedAt,
+        spaceId,
+        d.data.byUid ?? null,
+      );
     }
   }
   if (docs.length > 0) meta = advanceCursor(meta, key, Math.max(...docs.map((d) => d.serverUpdatedAt)));
@@ -347,6 +363,11 @@ async function pullSpaces(uid: string, meta: SyncMeta): Promise<{ meta: SyncMeta
     );
     if (config) changed = true;
 
+    // Caché local de nombres (Fase 4 — indicador "quién completó esto", ver `schema.ts` →
+    // `spaceMembers`): se resuelve en `DayItemRow` sin pegarle a la red por cada fila.
+    const members = await withTimeout(listCategoryMembers(s.id)).catch(() => []);
+    if (members.length > 0) await spaceMemberRepository.upsertMany(s.id, members);
+
     const items = await pullSpaceItems(s.id, meta);
     meta = items.meta;
     meta = await pullSpaceHabitCompletions(s.id, meta);
@@ -372,6 +393,24 @@ function spaceGroup(map: Map<string, SpacePushGroup>, spaceId: string): SpacePus
   return g;
 }
 
+/** Resuelve `completedByUid`/`byUid` al momento de subir (Fase 4 — indicador "quién completó
+ * esto"): si ya hay un valor local, lo conserva tal cual (ya quedó "fijo" la primera vez que se
+ * subió, o llegó de un pull de otra persona); si todavía es `null` y la fila está completada
+ * (`isDone`), lo estampa con `currentUid()` y lo persiste localmente ANTES de construir el
+ * documento (vía `persist`, ver `dayItemRepository.setCompletedByUid`) — así una futura edición
+ * de OTRA persona nunca lo pisa. `isDone=false` siempre devuelve `null` sin tocar nada. */
+async function resolveCompletedByUidForPush(
+  current: string | null,
+  isDone: boolean,
+  persist: (uid: string) => Promise<void>,
+): Promise<string | null> {
+  if (!isDone || current) return isDone ? current : null;
+  const uid = currentUid();
+  if (!uid) return null;
+  await persist(uid);
+  return uid;
+}
+
 /** Sube lo pendiente de cada espacio (items/habitCompletions/taskCompletions a
  * `spaces/{spaceId}/...`, la categoría a `config/category` en vez de `users/{uid}/categories`).
  * Nunca gateado por plan (T9) — a diferencia de `push()`, que sí lo está. Si algo pendiente es de
@@ -391,27 +430,45 @@ async function pushSpaces(): Promise<void> {
   for (const p of tasks) if (p.spaceId) spaceGroup(bySpace, p.spaceId).tasks.push(p);
 
   for (const [spaceId, group] of bySpace) {
-    const ops: PushOp[] = [
-      ...group.items.map((p) => ({
-        kind: 'items' as const,
+    const ops: PushOp[] = [];
+    for (const p of group.items) {
+      if (!p.item) {
+        ops.push({ kind: 'items', id: p.id, data: tombstoneDoc(p.deletedAt!) });
+        continue;
+      }
+      const completedByUid = await resolveCompletedByUidForPush(p.completedByUid, p.item.status === 'done', async (uid) => {
+        await dayItemRepository.setCompletedByUid(p.id, uid);
+      });
+      ops.push({ kind: 'items', id: p.id, data: dayItemToSpaceDoc(p.item, completedByUid) });
+    }
+    for (const p of group.habits) {
+      if (p.deletedAt) {
+        ops.push({ kind: 'habitCompletions', id: p.id, data: tombstoneDoc(p.deletedAt) });
+        continue;
+      }
+      const byUid = await resolveCompletedByUidForPush(p.completedByUid, true, async (uid) => {
+        await habitCompletionSyncRepository.setCompletedByUid(p.id, uid);
+      });
+      ops.push({
+        kind: 'habitCompletions',
         id: p.id,
-        data: p.item ? dayItemToSpaceDoc(p.item) : tombstoneDoc(p.deletedAt!),
-      })),
-      ...group.habits.map((p) => ({
-        kind: 'habitCompletions' as const,
+        data: habitCompletionToDoc({ habitId: p.habitId!, date: p.date, updatedAt: p.updatedAt, deletedAt: null, byUid }),
+      });
+    }
+    for (const p of group.tasks) {
+      if (p.deletedAt) {
+        ops.push({ kind: 'taskCompletions', id: p.id, data: tombstoneDoc(p.deletedAt) });
+        continue;
+      }
+      const byUid = await resolveCompletedByUidForPush(p.completedByUid, true, async (uid) => {
+        await taskCompletionSyncRepository.setCompletedByUid(p.id, uid);
+      });
+      ops.push({
+        kind: 'taskCompletions',
         id: p.id,
-        data: p.deletedAt
-          ? tombstoneDoc(p.deletedAt)
-          : habitCompletionToDoc({ habitId: p.habitId!, date: p.date, updatedAt: p.updatedAt, deletedAt: null }),
-      })),
-      ...group.tasks.map((p) => ({
-        kind: 'taskCompletions' as const,
-        id: p.id,
-        data: p.deletedAt
-          ? tombstoneDoc(p.deletedAt)
-          : taskCompletionToDoc({ taskId: p.taskId!, date: p.date, updatedAt: p.updatedAt, deletedAt: null }),
-      })),
-    ];
+        data: taskCompletionToDoc({ taskId: p.taskId!, date: p.date, updatedAt: p.updatedAt, deletedAt: null, byUid }),
+      });
+    }
     if (ops.length > 0) await withTimeout(pushSpaceBatch(spaceId, ops));
     if (group.items.length > 0) await dayItemRepository.markSynced(group.items.map((p) => p.id));
     if (group.habits.length > 0) await habitCompletionSyncRepository.markSynced(group.habits.map((p) => p.id));
@@ -463,7 +520,17 @@ export async function shareCategory(categoryId: string): Promise<void> {
   if (cat.space) throw new Error('shareCategory: ya está compartida');
 
   const now = new Date().toISOString();
-  await withTimeout(createSpaceDoc(categoryId, { ownerUid: uid, memberUids: [uid], editorUids: [uid], createdAt: now, deletedAt: null }));
+  // Esta categoría pudo haber sido un espacio antes (se compartió, se eliminó, y ahora se
+  // comparte de nuevo — mismo `spaceId` siempre, ver el comentario largo en `schema.ts` →
+  // `categories.spaceId`): el documento viejo sigue existiendo en Firestore, solo marcado
+  // `deletedAt` (nunca se borra de verdad), así que hay que REVIVIRLO en vez de crear uno nuevo
+  // encima (ver el comentario de `reviveSpaceDoc` — un `setDoc` ahí fallaría contra las reglas).
+  const existing = await withTimeout(getSpaceDoc(categoryId)).catch(() => null);
+  if (existing && existing.ownerUid === uid) {
+    await withTimeout(reviveSpaceDoc(categoryId, uid));
+  } else {
+    await withTimeout(createSpaceDoc(categoryId, { ownerUid: uid, memberUids: [uid], editorUids: [uid], createdAt: now, deletedAt: null }));
+  }
   await withTimeout(setSpaceConfig(categoryId, { label: cat.label, icon: cat.icon, color: cat.color, updatedAt: now }));
   // Bug real encontrado probando con dos cuentas reales: sin esto, el dueño nunca tenía su
   // propia fila en members/{uid} (solo joinCategoryWithCode la creaba, para quien se UNE) — la

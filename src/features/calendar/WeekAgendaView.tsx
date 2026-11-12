@@ -10,6 +10,7 @@ import type { DayItem } from '@/domain/dayItem';
 interface WeekAgendaViewProps {
   days: Date[];
   itemsByDate: Record<string, DayItem[]>;
+  completedByMap: Record<string, string | null>;
   filter: CalendarFilter;
   onToggleComplete: (id: string, date: string) => void;
   onDelete: (id: string, date: string) => void;
@@ -23,6 +24,7 @@ interface WeekAgendaViewProps {
 export function WeekAgendaView({
   days,
   itemsByDate,
+  completedByMap,
   filter,
   onToggleComplete,
   onDelete,
@@ -70,6 +72,7 @@ export function WeekAgendaView({
                     onToggleComplete={(id) => onToggleComplete(id, key)}
                     onDelete={(id) => onDelete(id, key)}
                     onClearVoiceMemoAudio={(id) => onClearVoiceMemoAudio(id, key)}
+                    completedByUidOverride={completedByMap[item.id] ?? null}
                   />
                 ))}
               </View>

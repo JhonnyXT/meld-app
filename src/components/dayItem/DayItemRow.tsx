@@ -48,7 +48,10 @@ export type TrailingBadge =
    * `dayItemsStore.reload`). El mapper solo lo emite con racha ≥ 2. */
   | { kind: 'streak'; count: number }
   | { kind: 'favorite' }
-  | { kind: 'category'; color: string; label: string };
+  | { kind: 'category'; color: string; label: string }
+  /** Fase 4 — "completado por X" en un ítem de categoría compartida (nunca para mis propios
+   * completados, ver `trailingBadgesFor`). Precedencia más baja — el primero en caerse. */
+  | { kind: 'completedBy'; name: string };
 
 /** Naranja "llama" para el badge de racha — no hay token para esto y no
  * debería mezclarse con `accent` (coral de marca) ni con el ámbar de
@@ -437,6 +440,16 @@ function TrailingBadgeView({
   }
   if (badge.kind === 'favorite') {
     return <Icon name="favorite" size={14} color={accent} />;
+  }
+  if (badge.kind === 'completedBy') {
+    return (
+      <View style={styles.trailingRow}>
+        <Icon name="check-circle" size={12} color={dim} />
+        <Text numberOfLines={1} style={{ fontFamily: font, fontSize: 12, color: dim, maxWidth: 72 }}>
+          {badge.name}
+        </Text>
+      </View>
+    );
   }
   // habitProgress
   return <Text style={{ fontFamily: font, fontSize: 12, color: dim }}>{badge.label}</Text>;

@@ -7,6 +7,7 @@ import { useItemDetailStore } from '@/store/itemDetailStore';
 import { useDayItemsStore } from '@/store/dayItemsStore';
 import { useCategoriesStore } from '@/store/categoriesStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useSession } from '@/sync';
 import { nowMinutes, minutesTo12h } from '@/domain/time';
 import { useTranslation } from '@/i18n';
 import type { DayItem } from '@/domain/dayItem';
@@ -29,6 +30,10 @@ interface TodayItemRowProps {
    * hecha el día que se está viendo (`dayItemsStore.taskCompletedMap`). Una
    * task sin repetición sigue leyendo `item.status` directo, ignora esto. */
   taskCompletedToday?: boolean;
+  /** "Completado por X" (Fase 4) ya resuelto por el llamador — solo lo pasa `WeekAgendaView`
+   * (su propio mapa por rango de fechas, ver `useWeekAgenda`). Sin esto, se cae al mapa global
+   * de `dayItemsStore` (que solo cubre el día seleccionado de Today). */
+  completedByUidOverride?: string | null;
 }
 
 export function TodayItemRow({
@@ -39,6 +44,7 @@ export function TodayItemRow({
   habitCompletedToday,
   onToggleHabitComplete,
   taskCompletedToday,
+  completedByUidOverride,
 }: TodayItemRowProps) {
   const { t } = useTranslation();
   const hasAudio = item.type === 'voiceMemo' && !!item.audioFileUri;
@@ -52,7 +58,18 @@ export function TodayItemRow({
   // ni borrar acá; `onPress` sigue abriendo el detalle para VER (`ItemDetailSheet` bloquea el
   // resto del formulario si corresponde).
   const readOnly = !!item.category && readOnlyLabels.has(item.category);
-  const row = toRowViewModel(item, habitCompletedToday, coolHabitsEnabled, taskCompletedToday);
+
+  // Fase 4 — "completado por X": solo si alguien MÁS la completó (nunca para mis propios
+  // completados, sería ruido) — `completedByMap`/`memberNames` ya resueltos por `reload()`/
+  // `categoriesStore.load()`, sin `await` acá.
+  const { user: sessionUser } = useSession();
+  const completedByUidFromStore = useDayItemsStore((s) => s.completedByMap[item.id]);
+  const completedByUid = completedByUidOverride !== undefined ? completedByUidOverride : completedByUidFromStore;
+  const memberNames = useCategoriesStore((s) => s.memberNames);
+  const completedByName =
+    completedByUid && completedByUid !== sessionUser?.uid ? memberNames[completedByUid] : undefined;
+
+  const row = toRowViewModel(item, habitCompletedToday, coolHabitsEnabled, taskCompletedToday, completedByName);
 
   if (isDraggingThis) {
     row.timeMarker = { kind: 'dragging', ...minutesTo12h(draggingMinutes) };

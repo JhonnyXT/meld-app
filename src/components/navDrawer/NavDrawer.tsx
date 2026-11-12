@@ -16,7 +16,6 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useTranslation, type TranslationKey } from '@/i18n';
 import { useNavigateMenuStore } from '@/store/navigateMenuStore';
 import { useInboxStore } from '@/store/inboxStore';
-import { useCategoriesSheetStore } from '@/store/categoriesSheetStore';
 import { buildMonthGrid } from '@/domain/calendarGrid';
 import { formatLongDate, toDateKey } from '@/domain/date';
 
@@ -33,18 +32,18 @@ const WEEKDAY_INITIALS = { en: ['M', 'T', 'W', 'T', 'F', 'S', 'S'], es: ['L', 'M
 
 type DrawerEntry =
   | { kind: 'route'; path: string; labelKey: TranslationKey; icon: IconName; badge?: 'inbox' }
-  | { kind: 'action'; id: 'categories'; labelKey: TranslationKey; icon: IconName }
   | { kind: 'divider'; id: string };
 
 /** Orden de la referencia: pantallas del día › organizar › ajustes. Hábitos no
- * tiene pantalla propia todavía (viven en Hoy), así que no figura. */
+ * tiene pantalla propia todavía (viven en Hoy), así que no figura. Categorías es una ruta real
+ * desde 2026-11-06 (antes abría un Modal aparte) — mismo `goTo` que el resto. */
 const ENTRIES: DrawerEntry[] = [
   { kind: 'route', path: '/', labelKey: 'today', icon: 'view-day' },
   { kind: 'route', path: '/calendar', labelKey: 'calendar', icon: 'calendar-month' },
   { kind: 'route', path: '/moments', labelKey: 'moments', icon: 'photo-library' },
   { kind: 'divider', id: 'd1' },
   { kind: 'route', path: '/inbox', labelKey: 'inbox', icon: 'inbox', badge: 'inbox' },
-  { kind: 'action', id: 'categories', labelKey: 'settingsCategories', icon: 'folder' },
+  { kind: 'route', path: '/categories', labelKey: 'settingsCategories', icon: 'folder' },
   { kind: 'divider', id: 'd2' },
   { kind: 'route', path: '/settings', labelKey: 'settings', icon: 'settings' },
 ];
@@ -166,11 +165,6 @@ function NavDrawerMenu() {
     else router.replace({ pathname: '/', params: { date: dateKey } });
   };
 
-  const openCategories = () => {
-    closeMenu();
-    useCategoriesSheetStore.getState().open();
-  };
-
   return (
     <View style={[styles.menuInner, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
       <Text style={{ fontFamily: font.bold, fontSize: 16, color: palette.text, marginBottom: 14, paddingHorizontal: 4 }}>
@@ -215,12 +209,12 @@ function NavDrawerMenu() {
           if (entry.kind === 'divider') {
             return <View key={entry.id} style={[styles.divider, { backgroundColor: palette.border }]} />;
           }
-          const active = entry.kind === 'route' && pathname === entry.path;
-          const count = entry.kind === 'route' && entry.badge === 'inbox' ? inboxCount : 0;
+          const active = pathname === entry.path;
+          const count = entry.badge === 'inbox' ? inboxCount : 0;
           return (
             <Pressable
-              key={entry.kind === 'route' ? entry.path : entry.id}
-              onPress={() => (entry.kind === 'route' ? goTo(entry.path) : openCategories())}
+              key={entry.path}
+              onPress={() => goTo(entry.path)}
               style={({ pressed }) => [
                 styles.item,
                 (active || pressed) && { backgroundColor: palette.surfaceHigh },

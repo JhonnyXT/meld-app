@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { categoryRepository } from '@/data/local/categoryRepository';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
+import { spaceMemberRepository } from '@/data/local/spaceMemberRepository';
 import type { Category } from '@/domain/category';
 import type { IconName } from '@/domain/iconNames';
 
@@ -21,6 +22,10 @@ interface CategoriesState {
    * `DayItem.category` (texto copiado), consistente con cómo toda la app ya resuelve "a qué
    * categoría pertenece este ítem" (ver CLAUDE.md → "Categorías configurables"). */
   readOnlyLabels: Set<string>;
+  /** Caché local `uid -> name` (SYNC_ROADMAP.md, Fase 4 — indicador "quién completó esto"), ver
+   * `spaceMemberRepository`. Cargado junto con `categories` para que `TodayItemRow.tsx` resuelva
+   * el badge sin un `await` por fila. */
+  memberNames: Record<string, string>;
   loading: boolean;
   loaded: boolean;
   load: () => Promise<void>;
@@ -44,14 +49,19 @@ export const useCategoriesStore = create<CategoriesState>((set, get) => ({
   categories: [],
   usage: {},
   readOnlyLabels: new Set(),
+  memberNames: {},
   loading: false,
   loaded: false,
 
   load: async () => {
     set({ loading: true });
-    const [categories, usageRows] = await Promise.all([categoryRepository.list(), dayItemRepository.listCategoryUsage()]);
+    const [categories, usageRows, memberNames] = await Promise.all([
+      categoryRepository.list(),
+      dayItemRepository.listCategoryUsage(),
+      spaceMemberRepository.getAllNames(),
+    ]);
     const readOnlyLabels = new Set(categories.filter((c) => c.space?.role === 'viewer').map((c) => c.label));
-    set({ categories, usage: buildUsage(usageRows), readOnlyLabels, loading: false, loaded: true });
+    set({ categories, usage: buildUsage(usageRows), readOnlyLabels, memberNames, loading: false, loaded: true });
   },
 
   add: async (input) => {

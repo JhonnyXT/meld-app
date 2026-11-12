@@ -168,9 +168,17 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
             </GestureDetector>
 
             <View style={styles.header}>
-              <Text style={{ fontFamily: font.extrabold, fontSize: 22, color: palette.text }}>
-                {t('shareCategoryTitle')}
-              </Text>
+              <View style={[styles.previewCircle, { backgroundColor: category.color }]}>
+                <Icon name={category.icon} size={20} color="#fff" />
+              </View>
+              <View style={styles.headerText}>
+                <Text numberOfLines={1} style={{ fontFamily: font.extrabold, fontSize: 19, color: palette.text }}>
+                  {category.label}
+                </Text>
+                <Text style={{ fontFamily: font.regular, fontSize: 13, color: palette.textDim }}>
+                  {t('shareCategoryTitle')}
+                </Text>
+              </View>
               <Pressable
                 onPress={onClose}
                 style={[styles.closeButton, { backgroundColor: palette.surfaceLow }]}
@@ -182,15 +190,6 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.preview}>
-                <View style={[styles.previewCircle, { backgroundColor: category.color }]}>
-                  <Icon name={category.icon} size={24} color="#fff" />
-                </View>
-                <Text style={{ fontFamily: font.bold, fontSize: 17, color: palette.text, marginTop: 10 }}>
-                  {category.label}
-                </Text>
-              </View>
-
               {!sessionUser ? (
                 <EmptyNotice
                   icon="log-out"
@@ -210,74 +209,77 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
                 />
               ) : (
                 <>
-                  <Text style={{ fontFamily: font.regular, fontSize: 14, color: palette.textDim, lineHeight: 20, marginBottom: 20 }}>
-                    {t('shareCategoryIntro', { label: category.label })}
-                  </Text>
-
-                  {alreadyShared ? (
-                    <View style={[styles.badge, { backgroundColor: `${palette.accent}1A` }]}>
-                      <Icon name="users" size={16} color={palette.accent} />
-                      <Text style={{ fontFamily: font.semibold, fontSize: 13, color: palette.accent }}>
-                        {t('shareCategoryAlreadyShared')}
-                      </Text>
-                    </View>
+                  {!alreadyShared ? (
+                    <Text style={{ fontFamily: font.regular, fontSize: 14, color: palette.textDim, lineHeight: 20, marginBottom: 20 }}>
+                      {t('shareCategoryIntro', { label: category.label })}
+                    </Text>
                   ) : null}
 
                   {alreadyShared && !membersLoading && members.length > 0 ? (
-                    <View style={styles.membersSection}>
-                      <Text style={{ fontFamily: font.semibold, fontSize: 13, color: palette.textDim, marginBottom: 10 }}>
-                        {t('shareCategoryMembersTitle')}
-                      </Text>
-                      {members.map((member) => {
-                        const isMe = member.uid === sessionUser?.uid;
-                        return (
-                          <View key={member.uid} style={[styles.memberRow, { borderBottomColor: palette.border }]}>
-                            <Text
-                              numberOfLines={1}
-                              style={{ fontFamily: font.medium, fontSize: 14, color: palette.text, flex: 1 }}
+                    <View style={styles.section}>
+                      <Text style={[styles.sectionLabel, { fontFamily: font.semibold, color: palette.textDim }]}>{t('shareCategoryMembersTitle')}</Text>
+                      <View style={[styles.card, { backgroundColor: palette.surfaceLow }]}>
+                        {members.map((member, i) => {
+                          const isMe = member.uid === sessionUser?.uid;
+                          const name = isMe ? t('shareCategoryMemberYou') : member.name;
+                          const initial = name.trim().charAt(0).toUpperCase() || '?';
+                          return (
+                            <View
+                              key={member.uid}
+                              style={[
+                                styles.memberRow,
+                                i < members.length - 1 && { borderBottomWidth: 1, borderBottomColor: palette.border },
+                              ]}
                             >
-                              {isMe ? t('shareCategoryMemberYou') : member.name}
-                            </Text>
-                            {member.isOwner ? (
-                              <Text style={{ fontFamily: font.regular, fontSize: 13, color: palette.textDim }}>
-                                {t('shareCategoryMemberOwner')}
+                              <View style={[styles.avatar, { backgroundColor: category.color }]}>
+                                <Text style={{ fontFamily: font.bold, fontSize: 13, color: '#fff' }}>{initial}</Text>
+                              </View>
+                              <Text numberOfLines={1} style={{ fontFamily: font.medium, fontSize: 14, color: palette.text, flex: 1 }}>
+                                {name}
                               </Text>
-                            ) : isOwner ? (
-                              <>
-                                <Pressable
-                                  onPress={() => handleRoleChange(member, member.role === 'editor' ? 'viewer' : 'editor')}
-                                  style={[styles.memberRolePill, { backgroundColor: palette.surfaceLow }]}
-                                >
-                                  <Text style={{ fontFamily: font.semibold, fontSize: 12, color: palette.text }}>
+                              {member.isOwner ? (
+                                <View style={[styles.memberRolePill, { backgroundColor: palette.surfaceHigh }]}>
+                                  <Text style={{ fontFamily: font.semibold, fontSize: 12, color: palette.textDim }}>
+                                    {t('shareCategoryMemberOwner')}
+                                  </Text>
+                                </View>
+                              ) : isOwner ? (
+                                <>
+                                  <Pressable
+                                    onPress={() => handleRoleChange(member, member.role === 'editor' ? 'viewer' : 'editor')}
+                                    style={[styles.memberRolePill, { backgroundColor: palette.surfaceHigh }]}
+                                  >
+                                    <Text style={{ fontFamily: font.semibold, fontSize: 12, color: palette.text }}>
+                                      {member.role === 'editor' ? t('shareCategoryRoleEditorShort') : t('shareCategoryRoleViewerShort')}
+                                    </Text>
+                                  </Pressable>
+                                  <Pressable
+                                    onPress={() => setPendingRemove(member)}
+                                    hitSlop={8}
+                                    style={styles.memberRemoveBtn}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('a11yRemoveMember')}
+                                  >
+                                    <Icon name="delete-outline" size={16} color={palette.danger} />
+                                  </Pressable>
+                                </>
+                              ) : (
+                                <View style={[styles.memberRolePill, { backgroundColor: palette.surfaceHigh }]}>
+                                  <Text style={{ fontFamily: font.semibold, fontSize: 12, color: palette.textDim }}>
                                     {member.role === 'editor' ? t('shareCategoryRoleEditorShort') : t('shareCategoryRoleViewerShort')}
                                   </Text>
-                                </Pressable>
-                                <Pressable
-                                  onPress={() => setPendingRemove(member)}
-                                  hitSlop={8}
-                                  style={styles.memberRemoveBtn}
-                                  accessibilityRole="button"
-                                  accessibilityLabel={t('a11yRemoveMember')}
-                                >
-                                  <Icon name="delete-outline" size={16} color={palette.danger} />
-                                </Pressable>
-                              </>
-                            ) : (
-                              <Text style={{ fontFamily: font.regular, fontSize: 13, color: palette.textDim }}>
-                                {member.role === 'editor' ? t('shareCategoryRoleEditorShort') : t('shareCategoryRoleViewerShort')}
-                              </Text>
-                            )}
-                          </View>
-                        );
-                      })}
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })}
+                      </View>
                     </View>
                   ) : null}
 
                   {!code ? (
-                    <>
-                      <Text style={{ fontFamily: font.semibold, fontSize: 13, color: palette.textDim, marginBottom: 10 }}>
-                        {t('shareCategoryRoleLabel')}
-                      </Text>
+                    <View style={styles.section}>
+                      <Text style={[styles.sectionLabel, { fontFamily: font.semibold, color: palette.textDim }]}>{t('shareCategoryRoleLabel')}</Text>
                       <View style={styles.roleRow}>
                         {(['editor', 'viewer'] as const).map((opt) => {
                           const active = opt === role;
@@ -302,7 +304,7 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
                       </View>
 
                       {error ? (
-                        <Text style={{ fontFamily: font.regular, fontSize: 13, color: palette.danger, marginTop: 14 }}>
+                        <Text style={{ fontFamily: font.regular, fontSize: 13, color: palette.danger, marginTop: 12 }}>
                           {t('shareCategoryError')}
                         </Text>
                       ) : null}
@@ -317,20 +319,18 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
                           {alreadyShared ? t('shareCategoryGenerateAgain') : t('shareCategoryGenerate')}
                         </Text>
                       </Pressable>
-                    </>
+                    </View>
                   ) : (
-                    <>
-                      <Text style={{ fontFamily: font.semibold, fontSize: 13, color: palette.textDim, marginBottom: 8 }}>
-                        {t('shareCategoryCodeLabel')}
-                      </Text>
+                    <View style={styles.section}>
+                      <Text style={[styles.sectionLabel, { fontFamily: font.semibold, color: palette.textDim }]}>{t('shareCategoryCodeLabel')}</Text>
                       <View style={[styles.codeBox, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
                         <Text selectable style={{ fontFamily: font.extrabold, fontSize: 32, letterSpacing: 6, color: palette.text }}>
                           {code}
                         </Text>
+                        <Text style={{ fontFamily: font.regular, fontSize: 13, color: palette.textDim, marginTop: 8 }}>
+                          {t('shareCategoryCodeExpires')}
+                        </Text>
                       </View>
-                      <Text style={{ fontFamily: font.regular, fontSize: 13, color: palette.textDim, marginTop: 8, marginBottom: 20 }}>
-                        {t('shareCategoryCodeExpires')}
-                      </Text>
 
                       <Pressable onPress={handleShare} style={[styles.cta, { backgroundColor: palette.accent }]}>
                         <Icon name="share" size={20} color="#fff" />
@@ -338,25 +338,27 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
                           {t('shareCategoryShareAction')}
                         </Text>
                       </Pressable>
-                    </>
+                    </View>
                   )}
 
                   {alreadyShared ? (
-                    isOwner ? (
-                      <Pressable onPress={() => setDeleteConfirmVisible(true)} style={styles.dangerRow}>
-                        <Icon name="delete-outline" size={18} color={palette.danger} />
-                        <Text style={{ fontFamily: font.semibold, fontSize: 15, color: palette.danger }}>
-                          {t('shareCategoryDeleteButton')}
-                        </Text>
-                      </Pressable>
-                    ) : (
-                      <Pressable onPress={() => setLeaveConfirmVisible(true)} style={styles.dangerRow}>
-                        <Icon name="log-out" size={18} color={palette.danger} />
-                        <Text style={{ fontFamily: font.semibold, fontSize: 15, color: palette.danger }}>
-                          {t('shareCategoryLeaveButton')}
-                        </Text>
-                      </Pressable>
-                    )
+                    <View style={[styles.dangerSection, { borderTopColor: palette.border }]}>
+                      {isOwner ? (
+                        <Pressable onPress={() => setDeleteConfirmVisible(true)} style={styles.dangerRow}>
+                          <Icon name="delete-outline" size={18} color={palette.danger} />
+                          <Text style={{ fontFamily: font.semibold, fontSize: 15, color: palette.danger }}>
+                            {t('shareCategoryDeleteButton')}
+                          </Text>
+                        </Pressable>
+                      ) : (
+                        <Pressable onPress={() => setLeaveConfirmVisible(true)} style={styles.dangerRow}>
+                          <Icon name="log-out" size={18} color={palette.danger} />
+                          <Text style={{ fontFamily: font.semibold, fontSize: 15, color: palette.danger }}>
+                            {t('shareCategoryLeaveButton')}
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
                   ) : null}
                 </>
               )}
@@ -422,20 +424,16 @@ const styles = StyleSheet.create({
   },
   handleGrabArea: { paddingTop: 12, paddingBottom: 16, alignItems: 'center' },
   handle: { width: 36, height: 4, borderRadius: 2 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+  headerText: { flex: 1, gap: 1 },
   closeButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  preview: { alignItems: 'center', marginBottom: 20 },
-  previewCircle: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    marginBottom: 16,
-  },
+  previewCircle: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  // Cada bloque (Miembros / rol a elegir / código) es su propia sección con etiqueta chica arriba
+  // — mismo lenguaje que `FieldSection` de Quick Add, para que el sheet se sienta agrupado en vez
+  // de una lista suelta de elementos (rediseño pedido por el usuario, 2026-11-11).
+  section: { marginBottom: 20 },
+  sectionLabel: { fontSize: 13, marginBottom: 10 },
+  card: { borderRadius: 16, overflow: 'hidden' },
   roleRow: { flexDirection: 'row', gap: 10 },
   roleChip: { flex: 1, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, alignItems: 'center' },
   codeBox: { borderRadius: 18, borderWidth: 1, paddingVertical: 22, alignItems: 'center' },
@@ -446,25 +444,25 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 16,
     borderRadius: 20,
-    marginTop: 28,
+    marginTop: 16,
   },
   notice: { borderRadius: 18, borderWidth: 1, padding: 20, alignItems: 'center', marginBottom: 8 },
-  membersSection: { marginBottom: 20 },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
+  avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   memberRolePill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
   memberRemoveBtn: { padding: 4 },
+  dangerSection: { borderTopWidth: 1, paddingTop: 4, marginTop: 4 },
   dangerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 16,
-    marginTop: 12,
   },
 });

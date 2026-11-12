@@ -266,6 +266,7 @@ export function CalendarScreen() {
                 <WeekAgendaView
                   days={weekAgenda.days}
                   itemsByDate={weekAgenda.itemsByDate}
+                  completedByMap={weekAgenda.completedByMap}
                   filter={calendarFilter}
                   onToggleComplete={weekAgenda.toggleComplete}
                   onDelete={weekAgenda.remove}

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import * as FileSystem from 'expo-file-system';
-import { dayItemRepository } from '@/data/local/dayItemRepository';
+import { dayItemRepository, habitCompletionSyncRepository, taskCompletionSyncRepository } from '@/data/local/dayItemRepository';
 import type { DayItem, Habit, Task } from '@/domain/dayItem';
 import { toDateKey, fromDateKey, addDays } from '@/domain/date';
 import { getWeekRange } from '@/domain/week';
@@ -114,6 +114,12 @@ interface DayItemsState {
    * repiten (`repeatRule` no null, ver `loadTaskOccurrences`) — una task sin
    * repetición sigue leyendo `status` directo, no aparece acá. */
   taskCompletedMap: Record<string, boolean>;
+  /** id -> uid de quien completó (Fase 4, ítem de categoría compartida) — `null`/ausente = nadie
+   * (o personal, sin concepto de autor). Cubre los 3 caminos: `day_items.completed_by_uid`
+   * (task sin repetir), `habit_completions`/`task_completions.completed_by_uid` (hábito/task que
+   * repite, para `selectedDateKey`). Resuelto a nombre en `TodayItemRow.tsx` vía
+   * `spaceMemberRepository`. */
+  completedByMap: Record<string, string | null>;
   loading: boolean;
   setSelectedDate: (date: Date) => Promise<void>;
   reload: () => Promise<void>;
@@ -128,6 +134,7 @@ export const useDayItemsStore = create<DayItemsState>((set, get) => ({
   items: [],
   habitCompletedMap: {},
   taskCompletedMap: {},
+  completedByMap: {},
   // Arranca en `true` para que "Hoy" pinte la maquetación de carga
   // (`components/ListSkeleton`) desde el primer frame, en vez del estado
   // vacío, hasta que el primer `reload()` traiga los ítems reales.
@@ -150,7 +157,7 @@ export const useDayItemsStore = create<DayItemsState>((set, get) => ({
     // realmente se sentía lento al cambiar de día (swipe, flechas, "Volver a
     // hoy"): pedido explícito del usuario, 2026-09-16. Cualquier consulta
     // nueva va acá adentro, nunca suelta antes/después del `Promise.all`.
-    const [dateItems, habitData, taskData, overdueTasks] = await Promise.all([
+    const [dateItems, habitData, taskData, overdueTasks, habitCompletedBy, taskCompletedBy] = await Promise.all([
       dayItemRepository.listByDate(dateKey),
       habitsEnabled ? loadHabitOccurrences(dateKey) : Promise.resolve(null),
       loadTaskOccurrences(dateKey),
@@ -160,6 +167,9 @@ export const useDayItemsStore = create<DayItemsState>((set, get) => ({
       // `date` real (ver `listOverdueTasks`), así que Calendario sigue
       // mostrándolas en su día original.
       isRealToday ? dayItemRepository.listOverdueTasks(dateKey) : Promise.resolve([]),
+      // Fase 4 — "quién completó esto" para hábitos/tasks que repiten (ver `completedByMap`).
+      habitCompletionSyncRepository.getCompletedByUidMap(dateKey),
+      taskCompletionSyncRepository.getCompletedByUidMap(dateKey),
     ]);
 
     let items = dateItems;
@@ -191,7 +201,14 @@ export const useDayItemsStore = create<DayItemsState>((set, get) => ({
       items = [...newOverdue, ...items];
     }
 
-    set({ items, habitCompletedMap, taskCompletedMap, loading: false });
+    // Fase 4 — un solo mapa combinado: task sin repetir (`day_items.completed_by_uid`, una query
+    // acá recién con los ids finales ya mergeados) + hábito/task que repite (ya resueltos arriba,
+    // antes de conocer `items`, porque esos dos solo necesitan `dateKey`). Sin colisión de claves
+    // entre los tres (cada id vive en como mucho una de las tres fuentes).
+    const itemCompletedBy = await dayItemRepository.getCompletedByUidMap(items.map((i) => i.id));
+    const completedByMap = { ...itemCompletedBy, ...habitCompletedBy, ...taskCompletedBy };
+
+    set({ items, habitCompletedMap, taskCompletedMap, completedByMap, loading: false });
     // "Fire and forget" — no bloquea el reload de la pantalla ni depende de
     // que `selectedDateKey` sea hoy (el widget recalcula su propio "hoy"
     // desde cero, ver `getTodayWidgetData`). Un solo punto de enganche cubre

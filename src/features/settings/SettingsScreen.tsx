@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { ScrollView, Text, View, StyleSheet, Linking } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FloatingBar } from '@/components/FloatingBar';
@@ -32,7 +32,6 @@ import {
   type CompletedItemStyle,
 } from '@/store/settingsStore';
 import { useNavigateMenuStore } from '@/store/navigateMenuStore';
-import { useCategoriesSheetStore } from '@/store/categoriesSheetStore';
 import { getNotificationPermissionStatus, requestNotificationPermission, scheduleTestReminder } from '@/services/notifications';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
 import { useDayItemsStore } from '@/store/dayItemsStore';
@@ -61,6 +60,7 @@ const COMPLETED_STYLE_LABEL_KEY: Record<CompletedItemStyle, TranslationKey> = {
 export function SettingsScreen() {
   const { palette, font } = useTheme();
   const { t, lang } = useTranslation();
+  const router = useRouter();
   const notificationsEnabled = useSettingsStore((s) => s.notificationsEnabled);
   const setNotificationsEnabled = useSettingsStore((s) => s.setNotificationsEnabled);
   const [notificationsCanAskAgain, setNotificationsCanAskAgain] = useState(true);
@@ -342,7 +342,7 @@ export function SettingsScreen() {
             icon="folder"
             title={t('settingsCategories')}
             subtitle={t('settingsCategoriesSubtitle')}
-            onPress={() => useCategoriesSheetStore.getState().open()}
+            onPress={() => router.push('/categories')}
             right={<Icon name="chevron-right" size={18} color={palette.textDim} />}
           />
         </SettingsSection>

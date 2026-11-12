@@ -93,7 +93,7 @@ function leadingFor(item: DayItem, habitCompletedToday: boolean, coolHabitsEnabl
  * Precedencia: prioridad (media/alta) › subtareas (reservado, aún sin
  * modelo) › recurrencia › progreso/❤ de hábito › categoría. La categoría es
  * la primera en caerse si hay más de dos. */
-function trailingBadgesFor(item: DayItem, coolHabitsEnabled: boolean): TrailingBadge[] {
+function trailingBadgesFor(item: DayItem, coolHabitsEnabled: boolean, completedByName?: string): TrailingBadge[] {
   const badges: TrailingBadge[] = [];
 
   // Rollover de tareas (ver `dayItemsStore.reload`) — máxima precedencia,
@@ -132,6 +132,13 @@ function trailingBadgesFor(item: DayItem, coolHabitsEnabled: boolean): TrailingB
     badges.push({ kind: 'category', color: item.categoryColor, label: shortCategory(item.category) });
   }
 
+  // Fase 4 — "completado por X" (categoría compartida, alguien más la completó): precedencia más
+  // baja, el primero en caerse. `completedByName` llega ya resuelto desde `TodayItemRow.tsx`
+  // (nunca para mis propios completados — eso se decide ahí, no acá).
+  if (completedByName) {
+    badges.push({ kind: 'completedBy', name: completedByName });
+  }
+
   return badges.slice(0, MAX_TRAILING_BADGES);
 }
 
@@ -145,13 +152,14 @@ export function toRowViewModel(
   habitCompletedToday = false,
   coolHabitsEnabled = false,
   taskCompletedToday = false,
+  completedByName?: string,
 ): DayItemRowViewModel {
   return {
     id: item.id,
     timeMarker: timeMarkerFor(item),
     leading: leadingFor(item, habitCompletedToday, coolHabitsEnabled, taskCompletedToday),
     title: item.title,
-    trailing: trailingBadgesFor(item, coolHabitsEnabled),
+    trailing: trailingBadgesFor(item, coolHabitsEnabled, completedByName),
     hasLink: (item.type === 'task' || item.type === 'event') && !!item.link,
     completed: item.type === 'task' && item.repeatRule ? taskCompletedToday : item.status === 'done',
   };

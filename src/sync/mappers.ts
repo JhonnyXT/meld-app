@@ -68,10 +68,15 @@ export interface CompletionDoc extends VersionedDoc {
 
 export interface HabitCompletionDoc extends CompletionDoc {
   habitId: string;
+  /** Fase 4 — "quién completó esto" (solo en completados de un espacio; ausente/`null` en el
+   * respaldo personal, que no tiene concepto de autor). Ver `src/sync/engine.ts` → `pushSpaces`. */
+  byUid?: string | null;
 }
 
 export interface TaskCompletionDoc extends CompletionDoc {
   taskId: string;
+  /** Fase 4 — mismo criterio que `HabitCompletionDoc.byUid`. */
+  byUid?: string | null;
 }
 
 export function habitCompletionToDoc(row: {
@@ -79,8 +84,15 @@ export function habitCompletionToDoc(row: {
   date: string;
   updatedAt: string;
   deletedAt: string | null;
+  byUid?: string | null;
 }): HabitCompletionDoc {
-  return { habitId: row.habitId, date: row.date, updatedAt: row.updatedAt, deletedAt: row.deletedAt };
+  return stripUndefined({
+    habitId: row.habitId,
+    date: row.date,
+    updatedAt: row.updatedAt,
+    deletedAt: row.deletedAt,
+    byUid: row.byUid,
+  });
 }
 
 export function taskCompletionToDoc(row: {
@@ -88,8 +100,15 @@ export function taskCompletionToDoc(row: {
   date: string;
   updatedAt: string;
   deletedAt: string | null;
+  byUid?: string | null;
 }): TaskCompletionDoc {
-  return { taskId: row.taskId, date: row.date, updatedAt: row.updatedAt, deletedAt: row.deletedAt };
+  return stripUndefined({
+    taskId: row.taskId,
+    date: row.date,
+    updatedAt: row.updatedAt,
+    deletedAt: row.deletedAt,
+    byUid: row.byUid,
+  });
 }
 
 // ─── categories ─────────────────────────────────────────────────────────────────
@@ -192,14 +211,23 @@ export interface InviteCodeDoc {
  * personales, SIN `categoryId` (la categoría es el espacio entero, no hace falta apuntar a
  * cuál) — D5 del diseño de My Wallet: mover un ítem a otra categoría (sea personal o compartida)
  * le da un id nuevo en el destino + tombstone del viejo, nunca se "migra" el mismo documento. */
-export type SpaceItemDoc = Omit<DayItemDoc, 'categoryId'>;
+export type SpaceItemDoc = Omit<DayItemDoc, 'categoryId'> & {
+  /** Fase 4 — "quién completó esto" (solo aplica a una task SIN `repeatRule`, el único tipo que
+   * guarda su completado directo en `status` — ver `dayItemRepository.resolveCompletedByUid`).
+   * `null`/ausente = nadie la completó, o el dato es de antes de este campo. */
+  completedByUid?: string | null;
+};
 
-export function dayItemToSpaceDoc(item: DayItem): SpaceItemDoc {
+export function dayItemToSpaceDoc(item: DayItem, completedByUid?: string | null): SpaceItemDoc {
   const { id: _id, ...rest } = item;
-  return stripUndefined({ ...rest, deletedAt: null }) as SpaceItemDoc;
+  return stripUndefined({ ...rest, deletedAt: null, completedByUid }) as SpaceItemDoc;
 }
 
+/** No se expone `completedByUid` en el `DayItem` de dominio (es bookkeeping de sync, igual que
+ * `categoryId`/`spaceId` — vive solo en el borde con SQLite, ver `dayItemRepository.toRow`):
+ * quien llama (`src/sync/engine.ts` → `pullSpaceItems`) lee `doc.completedByUid` aparte, antes de
+ * convertir a `DayItem`. */
 export function docToDayItemFromSpace(id: string, doc: SpaceItemDoc): DayItem {
-  const { deletedAt: _deletedAt, ...rest } = doc;
+  const { deletedAt: _deletedAt, completedByUid: _completedByUid, ...rest } = doc;
   return { ...rest, id } as unknown as DayItem;
 }

@@ -499,7 +499,43 @@ en modo avión aparece en la nube al volver la conexión.
       instantánea igual que "Salir"; en el Moto (quien no la ejecutó) hizo falta reabrir la app
       para que su propio `pullSpaces` descubriera el `deletedAt` y desvinculara — confirmando que
       **el dueño también pierde el vínculo al eliminar**, no solo los invitados.
-- [ ] Indicador en la fila de quién creó o completó un ítem compartido (por definir).
+- [x] **Indicador en la fila de quién completó un ítem compartido** (2026-11-11). Alcance
+  resuelto por el lado simple: un ítem/hábito compartido sigue siendo UNA sola fila de completado
+  por fecha (sin fork de comportamiento por persona); lo nuevo es solo la ATRIBUCIÓN. Se dejó
+  fuera "quién CREÓ el ítem" (solo completado) — la señal realmente útil día a día, documentado a
+  propósito como pendiente menor.
+  - **Esquema**: columna `completed_by_uid` (nullable) en `day_items`/`habit_completions`/
+    `task_completions` (`db.ts`, `addColumnIfMissing`). Nueva tabla `space_members` (caché local
+    de `uid → name` por espacio, poblada en cada `pullSpaces()` reusando `listCategoryMembers`) —
+    evita pegarle a la red por fila al pintar el badge.
+  - **Estampado** (`engine.ts` → `pushSpaces()`): si el campo local es `null` y el ítem está
+    `done`, se fija a `currentUid()` y se persiste ANTES de subir — queda fijo la primera vez,
+    nunca se pisa en ediciones futuras de otra persona. Se limpia a `null` al descompletar una
+    task sin repetir, o al reusar una fila de completado de hábito/task que repite (re-completar
+    atribuye a quien lo hizo esta vez, no a quien lo había hecho antes).
+  - **UI**: nuevo `TrailingBadge: {kind:'completedBy', name}` en `DayItemRow.tsx`, precedencia más
+    baja (el primero en caerse). Solo se muestra si lo completó ALGUIEN MÁS (nunca para mis
+    propios completados). `completedByUid`/`spaceId` NO se agregaron a `DayItem` del dominio
+    (bookkeeping de sync, igual que `categoryId` — CLAUDE.md).
+  - **Bug real encontrado y corregido en la verificación**: compartir de nuevo una categoría que
+    ya tuvo un espacio eliminado antes fallaba ("No se pudo compartir la categoría") — el
+    documento `spaces/{id}` sigue existiendo en Firestore (solo `deletedAt`, nunca se borra de
+    verdad), así que un `setDoc` ahí es un `update` para las reglas, no un `create`, y ninguna
+    rama de `allow update` admite reescribir todo el documento de una. Arreglado con
+    `reviveSpaceDoc()` (`remote.ts`): dos `updateDoc` secuenciales (`memberUids`+`deletedAt`,
+    después `editorUids`) que reinician el espacio limpio con solo el dueño adentro, en vez de
+    arrastrar a quien ya estaba antes de eliminarlo.
+  - **Segundo bug encontrado y corregido**: el badge no aparecía en la agenda Semana de
+    Calendario aunque el dato ya estaba sincronizado — `completedByMap` vivía solo en
+    `dayItemsStore` (acoplado al `selectedDateKey` de Today), y la agenda Semana trae ítems de
+    varios días por su cuenta (`useWeekAgenda`) sin pasar por ese reload. Arreglado dándole a
+    `useWeekAgenda` su propio `completedByMap` (poblado en su propio `reload()`), pasado a
+    `TodayItemRow` vía la prop `completedByUidOverride` (si no se pasa, cae al mapa global de
+    Today — Today sigue sin necesitarla, ahí el ítem se oculta al completarse de todos modos).
+  - **Verificado de punta a punta en dispositivo** (S24 + Moto, cuentas reales): se completó un
+    ítem de la categoría compartida "Work" desde el Moto (invitado) y el S24 (dueño) mostró
+    "✓ Hernán Blan…" en la fila, en Calendario → Semana (Today oculta las completadas, así que
+    ahí nunca se vería — comportamiento esperado, no un hueco de esta feature).
 - [x] **Modelo de datos + reglas de `spaces/**` e `inviteCodes` + tests** (2026-11-04): diseño
   adaptado de `my-wallet-app/firestore.rules` (mismo patrón de roles/límites — funciones
   `isMember`/`isMemberAfter`/`canWrite`/`isOwner`/`isEditor`/`isEditorAfter`/`canEdit`,

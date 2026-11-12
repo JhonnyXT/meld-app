@@ -29,7 +29,6 @@ import { VoiceAddScreen } from '@/components/voiceAdd/VoiceAddScreen';
 import { ItemDetailSheet } from '@/components/itemDetail/ItemDetailSheet';
 import { TimeDragOverlay } from '@/components/TimeDragOverlay';
 import { RemindersSheet } from '@/components/reminders/RemindersSheet';
-import { CategoriesManagerSheet } from '@/components/settings/CategoriesManagerSheet';
 import { TrialEndedDialog } from '@/components/TrialEndedDialog';
 import { NavDrawerLayout } from '@/components/navDrawer/NavDrawer';
 import { OnboardingScreen } from '@/features/onboarding/OnboardingScreen';
@@ -104,7 +103,6 @@ function RootStack() {
       <ItemDetailSheet />
       <TimeDragOverlay />
       <RemindersSheet />
-      <CategoriesManagerSheet />
       <TrialEndedDialog />
     </>
   );
