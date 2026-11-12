@@ -9,7 +9,6 @@ export interface WeekInfo {
   label: string;
 }
 
-/** Número de semana ISO-8601 (semanas de lunes a domingo, semana 1 contiene el primer jueves del año). */
 export function getISOWeek(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = (d.getUTCDay() + 6) % 7;
@@ -21,13 +20,12 @@ export function getISOWeek(date: Date): number {
 }
 
 export function getWeekRange(date: Date): { start: Date; end: Date } {
-  const dow = (date.getDay() + 6) % 7; // 0 = lunes
+  const dow = (date.getDay() + 6) % 7;
   const start = addDays(date, -dow);
   const end = addDays(start, 6);
   return { start, end };
 }
 
-/** "Jul 27 – Aug 2" o "Jul 20 – 26" según si la semana cruza de mes. */
 function formatWeekRangeLabel(start: Date, end: Date, lang: Language): string {
   const startLabel = `${MONTH_SHORT[lang][start.getMonth()]} ${start.getDate()}`;
   const endLabel =
@@ -37,7 +35,6 @@ function formatWeekRangeLabel(start: Date, end: Date, lang: Language): string {
   return `${startLabel} – ${endLabel}`;
 }
 
-/** Últimas `count` semanas terminando en la semana que contiene `today`, de más reciente a más antigua. */
 export function recentWeeks(today: Date, count: number, lang: Language = 'es'): WeekInfo[] {
   const weeks: WeekInfo[] = [];
   for (let i = 0; i < count; i++) {

@@ -4,17 +4,10 @@ import type { TranslationKey } from '@/i18n';
 export type HealthMetricGroup = 'activity' | 'rings' | 'workouts';
 
 export interface HealthMetricOption {
-  /** Valor interno, SIEMPRE en inglés (se persiste tal cual en
-   * `Habit.healthMetric`, mismo criterio que `REPEAT_OPTIONS`/
-   * `HABIT_SCHEDULE_OPTIONS` en `domain/quickAdd.ts`) — lo que se traduce es
-   * solo `labelKey`. */
   id: string;
   group: HealthMetricGroup;
   icon: IconName;
   labelKey: TranslationKey;
-  /** Solo las 4 métricas de "Actividad" tienen un objetivo numérico
-   * ajustable (stepper +/- en el modal) — Anillos y Entrenamientos son
-   * binarios (cerrado/no cerrado, hecho/no hecho), sin target. */
   defaultTarget?: number;
   unitKey?: TranslationKey;
   step?: number;

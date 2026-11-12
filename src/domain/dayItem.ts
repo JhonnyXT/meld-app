@@ -8,16 +8,13 @@ export interface DayItemBase {
   id: string;
   createdAt: string;
   updatedAt: string;
-  /** Día al que pertenece. Null mientras el ítem vive en el Inbox. */
   date: string | null;
   title: string;
   category: string | null;
   categoryColor: string | null;
-  /** Cualquier ítem, sin importar su tipo, puede tener un recordatorio. */
   reminderAt: string | null;
   status: DayItemStatus;
   type: DayItemType;
-  /** Nivel de prioridad, aplica a cualquier tipo de ítem (Quick Add lo muestra siempre). */
   priority: PriorityLevel;
 }
 
@@ -32,9 +29,6 @@ export interface Event extends DayItemBase {
   startTime: string;
   endTime: string;
   calendarSource: string | null;
-  /** URL opcional asociada al evento (link de la reunión, doc, etc.) —
-   * editable en Quick Add / detalle, se muestra como botón de acceso rápido
-   * en la fila. Misma columna SQL `link` que usa Task. */
   link: string | null;
 }
 
@@ -45,23 +39,8 @@ export interface Habit extends DayItemBase {
   targetFrequency: string;
   currentStreak: number;
   progress: string;
-  /** `true` cuando el hábito tiene una métrica de Auto-registro elegida
-   * (`healthMetric !== null`, ver `domain/healthMetrics.ts`). HOY esto es
-   * puramente informativo/visual (ícono de la métrica + corazón) — el check
-   * de "hecho" sigue siendo 100% manual, sin importar este valor. ROADMAP
-   * Pro (no implementado): con Apple Health/Google Fit conectados, el check
-   * se marcaría solo apenas la app detecte que se cumplió la meta ahí —
-   * lectura on-device, read-only; el check manual seguiría existiendo y
-   * "ganando" siempre (se puede corregir a mano aunque Health diga otra
-   * cosa). Ver `autoTrackProNote` en `i18n/translations.ts` (texto real que
-   * ve el usuario en el modal) y CLAUDE.md → "## Roadmap Pro" (junta TODO
-   * lo pendiente de plan Pro en un solo lugar). */
   autoTrack: boolean;
-  /** id de `HEALTH_METRIC_OPTIONS` (`domain/healthMetrics.ts`), o null si el
-   * hábito no tiene Auto-registro (se marca a mano). */
   healthMetric: string | null;
-  /** Solo aplica a las métricas de "Actividad" (Steps/Exercise minutes/
-   * Active energy/Sleep) — null para Anillos/Entrenamientos. */
   healthMetricTarget: number | null;
   colorStyle: HabitColorStyle;
 }

@@ -58,23 +58,12 @@ export const QUICK_ADD_META: Record<
   },
 };
 
-// Categorías por default (siembra de la tabla `categories`, ver `db.ts`) y
-// fallback de palabras clave de `voiceParser.ts` — desde 2026-09-11 las
-// categorías reales son configurables por el usuario en Ajustes (tabla
-// `categories`, `store/categoriesStore.ts`), esta lista fija ya NO es lo que
-// lee `CategoryChips` en Quick Add/`ItemDetailSheet`. `label` es el valor
-// canónico que se persiste en `DayItem.category` — siempre en inglés,
-// independiente del idioma de la UI (ver `presetLabel` arriba). `labelKey`
-// es la traducción que se muestra en el chip.
 export const QUICK_ADD_CATEGORIES: { label: string; labelKey: TranslationKey; color: string }[] = [
   { label: 'Work', labelKey: 'categoryWork', color: '#4F84FF' },
   { label: 'Personal', labelKey: 'categoryPersonal', color: '#A55CFF' },
   { label: 'Health', labelKey: 'categoryHealth', color: '#5dde97' },
 ];
 
-/** Paleta acotada de colores elegibles al crear/editar una categoría (Ajustes
- * > Categorías) — mismo criterio que `accentPalette` de `theme/tokens.ts`
- * (swatches fijos, no un color picker libre). */
 export const CATEGORY_COLOR_PALETTE = [
   '#4F84FF',
   '#A55CFF',
@@ -86,8 +75,6 @@ export const CATEGORY_COLOR_PALETTE = [
   '#8E8E93',
 ] as const;
 
-/** Set acotado de íconos elegibles para una categoría — ver
- * `components/settings/CategoryFormModal.tsx`. */
 export const CATEGORY_ICON_OPTIONS: IconName[] = [
   'briefcase',
   'person',
@@ -114,9 +101,6 @@ export const PRIORITY_OPTIONS: { id: PriorityLevel; labelKey: TranslationKey; co
   { id: 'high', labelKey: 'priorityHigh', color: '#E5484D' },
 ];
 
-/** Color de la bandera de prioridad por nivel — misma paleta que
- * `PRIORITY_OPTIONS`, expuesto aparte para la fila (`DayItemRow`) sin tener
- * que hacer `.find` en cada render. */
 export const PRIORITY_COLOR: Record<PriorityLevel, string> = {
   none: '#8E8E93',
   low: '#4F9DDE',
@@ -124,12 +108,6 @@ export const PRIORITY_COLOR: Record<PriorityLevel, string> = {
   high: '#E5484D',
 };
 
-// Los valores de estos presets son el estado interno real (se guardan tal
-// cual en el dominio — p. ej. `repeatRule`, o se parsean con labelToHour24 /
-// earlyAlertToMinutes / frequencyTarget más abajo).
-// SIEMPRE en inglés — cambiar de idioma no debe alterar cómo se persisten ni
-// cómo `cycleValue` los compara. Lo que se traduce es solo la ETIQUETA que
-// ve el usuario, vía `presetLabel()`.
 export const REPEAT_OPTIONS = ['Never', 'Daily', 'Weekly', 'Monthly'];
 
 export const EARLY_ALERT_OPTIONS = ['Off', '10 min before', '30 min before', '1 hr before'];
@@ -158,8 +136,6 @@ const PRESET_LABELS_ES: Record<string, string> = {
   '1 hr before': '1 h antes',
 };
 
-/** Traduce SOLO la etiqueta visible de un preset — el valor interno (estado,
- * `cycleValue`, parsers de abajo) siempre queda en inglés. */
 export function presetLabel(value: string, lang: Language): string {
   if (lang === 'en') return value;
   return PRESET_LABELS_ES[value] ?? value;
@@ -176,7 +152,6 @@ const PART_OF_DAY_HOURS: Record<string, string> = {
   Evening: '18:00',
 };
 
-/** Convierte una hora en formato "9:00 AM" / "Morning" / etc. a "HH:MM" 24h. */
 export function labelToHour24(label: string): string | null {
   if (label in PART_OF_DAY_HOURS) return PART_OF_DAY_HOURS[label];
   const match = label.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);

@@ -14,20 +14,16 @@ export function fromDateKey(key: string): Date {
   return new Date(y, m - 1, d);
 }
 
-/** "Fri Jul 31" / "Vie 31 Jul" — usado en el header de Today. */
 export function formatHeaderDate(date: Date, lang: Language = 'es'): string {
   const weekday = WEEKDAY_SHORT[lang][date.getDay()];
   const month = MONTH_SHORT[lang][date.getMonth()];
   return lang === 'es' ? `${weekday} ${date.getDate()} ${month}` : `${weekday} ${month} ${date.getDate()}`;
 }
 
-/** "Fri 31" — usado en la Day Bar. */
 export function formatDayBarDate(date: Date, lang: Language = 'es'): string {
   return `${WEEKDAY_SHORT[lang][date.getDay()]} ${date.getDate()}`;
 }
 
-/** "Hoy" si `dateKey` es la fecha de hoy, si no "Vie 31 Jul" — usado en Búsqueda
- * y Próximos recordatorios, donde los resultados pueden ser de cualquier día. */
 export function formatShortDateLabel(dateKey: string, lang: Language = 'es', now: Date = new Date()): string {
   if (dateKey === toDateKey(now)) return lang === 'es' ? 'Hoy' : 'Today';
   return formatHeaderDate(fromDateKey(dateKey), lang);
@@ -43,7 +39,6 @@ function isSameCalendarDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-/** "2h ago" / "Yesterday" / "Mon" / "Jul 31" — usado en Inbox. */
 export function formatRelativeCreated(iso: string, lang: Language = 'es', now: Date = new Date()): string {
   const created = new Date(iso);
   const diffMs = now.getTime() - created.getTime();
@@ -62,18 +57,14 @@ export function formatRelativeCreated(iso: string, lang: Language = 'es', now: D
   return `${MONTH_SHORT[lang][created.getMonth()]} ${created.getDate()}`;
 }
 
-/** "Jul 2026" — usado en Calendar (Day Bar). */
 export function formatMonthYearLabel(date: Date, lang: Language = 'es'): string {
   return `${MONTH_SHORT[lang][date.getMonth()]} ${date.getFullYear()}`;
 }
 
-/** "July 2026" — usado en el header de Calendar (vista Month). */
 export function formatFullMonthYear(date: Date, lang: Language = 'es'): string {
   return `${MONTH_FULL[lang][date.getMonth()]} ${date.getFullYear()}`;
 }
 
-/** "Friday, September 18" / "Viernes, 18 de septiembre" — título del menú
- * lateral (`NavDrawer`). */
 export function formatLongDate(date: Date, lang: Language = 'es'): string {
   const weekday = WEEKDAY_FULL[lang][date.getDay()];
   const month = MONTH_FULL[lang][date.getMonth()];

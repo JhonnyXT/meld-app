@@ -10,10 +10,9 @@ export interface MonthGridCell {
   isWeekend: boolean;
 }
 
-/** Grilla mensual, semana empezando en lunes, con el número de filas real del mes (5 o 6). */
 export function buildMonthGrid(year: number, monthIndex: number, today: Date): MonthGridCell[] {
   const firstOfMonth = new Date(year, monthIndex, 1);
-  const leadDays = (firstOfMonth.getDay() + 6) % 7; // 0 = lunes
+  const leadDays = (firstOfMonth.getDay() + 6) % 7;
   const totalDays = daysInMonth(year, monthIndex);
   const totalCells = Math.ceil((leadDays + totalDays) / 7) * 7;
   const gridStart = addDays(firstOfMonth, -leadDays);
@@ -21,7 +20,7 @@ export function buildMonthGrid(year: number, monthIndex: number, today: Date): M
 
   return Array.from({ length: totalCells }, (_, i) => {
     const date = addDays(gridStart, i);
-    const dow = (date.getDay() + 6) % 7; // 0 = lunes .. 6 = domingo
+    const dow = (date.getDay() + 6) % 7;
     return {
       date,
       dateKey: toDateKey(date),

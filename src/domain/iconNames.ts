@@ -1,11 +1,3 @@
-/**
- * Nombres semánticos de ícono usados en todo el dominio — desacoplados de la
- * librería de íconos concreta (hoy `lucide-react-native`, ver `components/Icon.tsx`,
- * que mapea cada uno de estos nombres a su componente Lucide). Vive en `domain`
- * (no en `components`) para que archivos de dominio puros como `quickAdd.ts` y
- * los mappers de `features/*` puedan tipar sus campos `icon` sin depender de
- * la capa de componentes.
- */
 export type IconName =
   | 'add'
   | 'calendar-month'
@@ -49,7 +41,6 @@ export type IconName =
   | 'view-week'
   | 'view-grid'
   | 'filter-list'
-  // Métricas de Auto-registro (`domain/healthMetrics.ts`)
   | 'footprints'
   | 'timer'
   | 'flame'
@@ -71,8 +62,6 @@ export type IconName =
   | 'check-circle'
   | 'sparkles'
   | 'checklist'
-  // Set de íconos elegibles al crear/editar una categoría (Ajustes >
-  // Categorías, ver `components/settings/CategoryFormModal.tsx`)
   | 'briefcase'
   | 'person'
   | 'book-open'
@@ -82,6 +71,5 @@ export type IconName =
   | 'music'
   | 'plane'
   | 'log-out'
-  // Categorías compartidas (SYNC_ROADMAP.md, Fase 4)
   | 'share'
   | 'users';
