@@ -28,7 +28,7 @@ import { ICON_BY_TYPE } from '@/features/inbox/mapInboxItemToRow';
 import { seedIfEmpty } from '@/data/local/seed';
 import { isDev } from '@/constants/appVariant';
 import { formatHeaderDate, formatDayBarDate, formatShortDateLabel, addDays, toDateKey, fromDateKey } from '@/domain/date';
-import { syncNow, useSession, useSyncStatus } from '@/sync';
+import { syncNow, useSession } from '@/sync';
 
 const ROW_TRANSITION = LinearTransition.duration(220);
 

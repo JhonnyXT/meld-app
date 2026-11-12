@@ -23,7 +23,7 @@ import { useInboxStore } from '@/store/inboxStore';
 import { useCategoriesStore } from '@/store/categoriesStore';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
 import { syncReminderNotification } from '@/services/notifications';
-import { toDateKey, addDays } from '@/domain/date';
+import { toDateKey } from '@/domain/date';
 import { minutesToHour24, ANY_TIME_HHMM, ANY_TIME_MINUTES } from '@/domain/time';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { useVoiceDictation } from '@/hooks/useVoiceDictation';

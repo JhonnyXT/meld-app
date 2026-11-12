@@ -252,7 +252,6 @@ function cleanTitle(raw: string): string {
 }
 
 // ─── Principal ──────────────────────────────────────────────────────────────
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function parseVoiceInput(raw: string, _lang: Language, now: Date = new Date()): VoicePrefill {
   const n = normalize(raw);
 

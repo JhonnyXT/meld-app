@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Modal, Pressable, Animated, StyleSheet } from 'react-native';
+import { Modal, Pressable, Animated, StyleSheet } from 'react-native';
 import { WheelTimePicker } from './WheelTimePicker';
 
 interface TimePickerModalProps {

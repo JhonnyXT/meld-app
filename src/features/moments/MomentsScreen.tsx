@@ -8,7 +8,7 @@ import { ListSkeleton } from '@/components/ListSkeleton';
 import { MomentsDayRow } from '@/components/moments/MomentsDayRow';
 import { MomentPhotoViewer } from '@/components/moments/MomentPhotoViewer';
 import { useTheme } from '@/theme/ThemeProvider';
-import { toDateKey, fromDateKey, addDays, formatShortDateLabel, formatFullMonthYear } from '@/domain/date';
+import { toDateKey, addDays, formatShortDateLabel, formatFullMonthYear } from '@/domain/date';
 import { useTranslation } from '@/i18n';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
 import { pickMomentPhotoForToday } from '@/services/pickMomentPhoto';
