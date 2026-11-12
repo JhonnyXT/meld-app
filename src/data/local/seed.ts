@@ -6,16 +6,6 @@ import { addDays, toDateKey } from '@/domain/date';
 import { getISOWeek } from '@/domain/week';
 import { ANY_TIME_HHMM } from '@/domain/time';
 
-/**
- * Contenido de ejemplo para el variant `dev` (gateado con `isDev` en
- * `TodayScreen`). Antes solo reproducía el mock de Today; ahora siembra data
- * "completa" — tareas/eventos/notas/nota de voz/hábitos con historial real de
- * completado (`habit_completions`) y Momentos con foto — repartida por el mes
- * actual, para poder sacar screenshots representativos de Today / Hábitos /
- * Calendario / Momentos (los mockups del onboarding, ver
- * `src/features/onboarding/`). Solo se inserta si `day_items` está vacía.
- */
-
 const CAT = {
   work: { category: 'Trabajo', categoryColor: '#4F84FF' },
   personal: { category: 'Personal', categoryColor: '#A55CFF' },
@@ -30,15 +20,11 @@ const SEED_PHOTOS = [
   require('../../../assets/seed/seed-moment-4.jpg'),
 ];
 
-// Clips de audio silencioso, solo para que las notas de voz de ejemplo tengan
-// un archivo reproducible real (si `audioFileUri` está vacío, la fila muestra
-// "Audio eliminado" en vez del botón de play).
 const SEED_AUDIO = [
   require('../../../assets/seed/seed-voice-1.m4a'),
   require('../../../assets/seed/seed-voice-2.m4a'),
 ];
 
-/** Copia un asset del bundle a almacenamiento propio y devuelve su `file://`. */
 async function materializeAsset(mod: number, name: string): Promise<string | null> {
   try {
     const asset = Asset.fromModule(mod);
@@ -84,7 +70,6 @@ export async function seedIfEmpty(): Promise<void> {
     SEED_AUDIO.map((mod, i) => materializeAsset(mod, `seed-voice-${i + 1}.m4a`)),
   );
 
-  // ── Hoy ────────────────────────────────────────────────────────────────
   const todayRows: SeedRow[] = [
     mk({
       id: 'seed-task-proposal',
@@ -149,7 +134,6 @@ export async function seedIfEmpty(): Promise<void> {
     }),
   ];
 
-  // ── Atrasadas (para ver el rollover de tareas en Hoy) ───────────────────
   const overdueRows: SeedRow[] = [
     mk({
       id: 'seed-task-overdue-contract',
@@ -168,7 +152,6 @@ export async function seedIfEmpty(): Promise<void> {
     }),
   ];
 
-  // ── Inbox ──────────────────────────────────────────────────────────────
   const inboxRows: SeedRow[] = [
     mk({
       id: 'seed-inbox-brief',
@@ -242,7 +225,6 @@ export async function seedIfEmpty(): Promise<void> {
     }),
   ];
 
-  // ── Hábitos ────────────────────────────────────────────────────────────
   type HabitSeed = {
     id: string;
     title: string;
@@ -250,7 +232,6 @@ export async function seedIfEmpty(): Promise<void> {
     cool?: boolean;
     healthMetric?: string;
     healthMetricTarget?: number;
-    /** offsets (días atrás desde hoy) marcados como hechos. */
     doneOffsets: number[];
     createdDay: number;
   };
@@ -317,16 +298,11 @@ export async function seedIfEmpty(): Promise<void> {
   const completionRows = habitSeeds.flatMap((h) =>
     h.doneOffsets.map((offset) => {
       const date = toDateKey(addDays(now, -offset));
-      // Mismo esquema de id que `dayItemRepository.toggleHabitCompletion` (`${habitId}-${date}`,
-      // no `${habitId}-${offset}`) — con offset, un re-seed (p. ej. "Borrar de este teléfono" en
-      // dev, que reinstala vacío) generaba un id distinto para el mismo (habit_id, date) que ya
-      // existía en la nube, y el pull siguiente tiraba "UNIQUE constraint failed" (bug real, visto
-      // en dispositivo al probar T8).
+      // ver docs/adr/0007-conflicto-por-habit-date-no-id.md
       return { id: `${h.id}-${date}`, habitId: h.id, date };
     }),
   );
 
-  // ── Repartido por el mes (Calendario) ──────────────────────────────────
   const spread: Array<Partial<SeedRow> & Pick<SeedRow, 'id' | 'type' | 'title' | 'date'>> = [
     { id: 'seed-cal-1', type: 'event', title: 'Kickoff cliente', date: dayInMonth(2), startTime: '11:00', endTime: '12:00', ...CAT.work },
     { id: 'seed-cal-2', type: 'task', title: 'Enviar informe mensual', date: dayInMonth(4), ...CAT.work, priority: 'medium' },
@@ -344,7 +320,6 @@ export async function seedIfEmpty(): Promise<void> {
   ];
   const spreadRows: SeedRow[] = spread.map((s) => mk(s));
 
-  // ── Momentos (varias fotos por día, días recientes + uno en el mes) ────
   const momentRows: SeedRow[] = [];
   const addMoment = (id: string, when: Date, uri: string | null) => {
     if (!uri) return;
@@ -359,11 +334,9 @@ export async function seedIfEmpty(): Promise<void> {
       }),
     );
   };
-  // Hoy con 2 fotos (para mostrar que se pueden guardar varias por día).
   addMoment('seed-moment-today-1', now, photoUris[0]);
   addMoment('seed-moment-today-2', now, photoUris[1]);
   addMoment('seed-moment-3d', addDays(now, -3), photoUris[2]);
-  // Uno en el mes para que se vea la miniatura en una celda del grid de Mes.
   if (photoUris[3]) {
     momentRows.push(
       mk({
