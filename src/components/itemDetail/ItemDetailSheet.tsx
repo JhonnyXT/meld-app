@@ -115,6 +115,15 @@ export function ItemDetailSheet() {
   const [habitHealthMetric, setHabitHealthMetric] = useState<string | null>(null);
   const [habitHealthMetricTarget, setHabitHealthMetricTarget] = useState<number | null>(null);
 
+  // "Marcar completada/hecho" (footer) — a diferencia de `status` (que sirve para una task SIN
+  // `repeatRule`), un hábito o una task QUE REPITE se completa por DÍA vía su propia tabla de
+  // completions (mismo patrón que `dayItemsStore`), nunca tocando `status`. Acá el día relevante
+  // es siempre HOY (`todayKey`) — este sheet no sabe en qué ocurrencia/día se tocó la fila que lo
+  // abrió, y la inmensa mayoría de las veces se abre desde Today (que opera sobre el día actual).
+  const todayKey = toDateKey(new Date());
+  const [habitCompletedToday, setHabitCompletedToday] = useState(false);
+  const [taskCompletedToday, setTaskCompletedToday] = useState(false);
+
   // Cambiar de tipo desde la hoja de detalle (p. ej. una task del Inbox que en
   // realidad era un Event) resetea SOLO los campos específicos del tipo
   // anterior a sus defaults — a diferencia de Quick Add, acá título/fecha/
@@ -182,10 +191,17 @@ export function ItemDetailSheet() {
       setHabitPreferredTime('Anytime');
       setHabitHealthMetric(null);
       setHabitHealthMetricTarget(null);
+      setHabitCompletedToday(false);
+      setTaskCompletedToday(false);
 
       if (loaded.type === 'task') {
         setTaskReminderMinutes(reminderMinutesOrNull(loaded.reminderAt));
         setTaskRepeat(loaded.repeatRule ?? 'Never');
+        if (loaded.repeatRule) {
+          dayItemRepository.listTaskCompletionDates(loaded.id, toDateKey(new Date()), toDateKey(new Date())).then((dates) => {
+            setTaskCompletedToday(dates.length > 0);
+          });
+        }
       } else if (loaded.type === 'event') {
         setEventStartMinutes(hour24ToMinutes(loaded.startTime));
         const minutes = hour24ToMinutes(loaded.endTime) - hour24ToMinutes(loaded.startTime);
@@ -208,6 +224,9 @@ export function ItemDetailSheet() {
         setHabitPreferredTime('Anytime');
         setHabitHealthMetric(loaded.healthMetric);
         setHabitHealthMetricTarget(loaded.healthMetricTarget);
+        dayItemRepository.listHabitCompletionDates(loaded.id, toDateKey(new Date()), toDateKey(new Date())).then((dates) => {
+          setHabitCompletedToday(dates.length > 0);
+        });
       }
     });
   }, [itemId]);
@@ -222,7 +241,10 @@ export function ItemDetailSheet() {
 
   if (!item) return <Modal visible={!!itemId} transparent animationType="fade" />;
 
-  const handleSave = async () => {
+  // `statusOverride` lo usa `handleMarkToggle` para una Task SIN `repeatRule` — evita el desfasaje
+  // de un closure viejo que tendría `setStatus(...)` seguido de `handleSave()` en el mismo
+  // handler (el `status` del render actual todavía no reflejaría el cambio).
+  const handleSave = async (statusOverride?: 'inbox' | 'scheduled' | 'done') => {
     if (item.type === 'moment') {
       // Moments no se editan desde esta hoja.
       close();
@@ -232,9 +254,11 @@ export function ItemDetailSheet() {
     const now = new Date().toISOString();
     const categoryLabel = category?.label ?? null;
     const categoryColor = category?.color ?? null;
+    const effectiveStatus = statusOverride ?? status;
     // Si se saca de Inbox asignándole fecha, pasa a agendado; si se manda a Inbox
     // (sin fecha), vuelve a 'inbox'. Un task ya marcado "done" no se reabre por esto.
-    const finalStatus: 'inbox' | 'scheduled' | 'done' = dateKey === null ? 'inbox' : status === 'inbox' ? 'scheduled' : status;
+    const finalStatus: 'inbox' | 'scheduled' | 'done' =
+      dateKey === null ? 'inbox' : effectiveStatus === 'inbox' ? 'scheduled' : effectiveStatus;
     const base = {
       id: item.id,
       createdAt: item.createdAt,
@@ -320,6 +344,25 @@ export function ItemDetailSheet() {
     close();
   };
 
+  /** Botón "Marcar completada/hecho" del footer (solo Tarea/Hábito) — guarda también cualquier
+   * otro campo editado en el formulario (reusa `handleSave`), así nunca se pierde una edición en
+   * curso al marcar. */
+  const handleMarkToggle = async () => {
+    if (type === 'habit') {
+      await dayItemRepository.toggleHabitCompletion(item.id, todayKey);
+      await handleSave();
+      return;
+    }
+    if (type === 'task' && taskRepeat !== 'Never') {
+      await dayItemRepository.toggleTaskCompletion(item.id, todayKey);
+      await handleSave();
+      return;
+    }
+    await handleSave(status === 'done' ? 'scheduled' : 'done');
+  };
+
+  const isDoneToday = type === 'habit' ? habitCompletedToday : type === 'task' && taskRepeat !== 'Never' ? taskCompletedToday : status === 'done';
+
   const meta = QUICK_ADD_META[type];
   const typeLabel = t(meta.tabLabelKey);
   // Mismo criterio que QuickAddSheet: sin título (o sin grabación en nota de
@@ -367,20 +410,6 @@ export function ItemDetailSheet() {
 
           <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.titleRow}>
-              {type === 'task' ? (
-                <Pressable
-                  onPress={() => setStatus(status === 'done' ? 'scheduled' : 'done')}
-                  style={[
-                    styles.checkBox,
-                    {
-                      borderColor: status === 'done' ? palette.accent : palette.border,
-                      backgroundColor: status === 'done' ? palette.accent : 'transparent',
-                    },
-                  ]}
-                >
-                  {status === 'done' ? <Icon name="check" size={16} color="#fff" /> : null}
-                </Pressable>
-              ) : null}
               <View style={[styles.inputBox, { flex: 1, backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
                 <TextInput
                   value={title}
@@ -501,7 +530,16 @@ export function ItemDetailSheet() {
           </ScrollView>
           </View>
 
-          <SheetActions onCancel={close} onConfirm={handleSave} confirmLabel={t(meta.ctaUpdateKey)} confirmDisabled={saveDisabled} />
+          <SheetActions
+            onCancel={close}
+            onConfirm={() => handleSave()}
+            confirmLabel={type === 'task' || type === 'habit' ? t('itemDetailUpdateAction') : t(meta.ctaUpdateKey)}
+            confirmDisabled={saveDisabled}
+            secondaryLabel={type === 'habit' ? (isDoneToday ? t('itemDetailMarkUndone') : t('itemDetailMarkHabitDone')) : isDoneToday ? t('itemDetailMarkUndone') : t('itemDetailMarkDone')}
+            secondaryIcon="check"
+            onSecondary={!readOnly && (type === 'task' || type === 'habit') ? handleMarkToggle : undefined}
+            secondaryActive={isDoneToday}
+          />
         </Animated.View>
         </KeyboardAvoidingView>
       </GestureHandlerRootView>
@@ -519,7 +557,6 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 20 },
   closeButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
-  checkBox: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   inputBox: {
     borderRadius: 16,
     padding: 18,

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Icon } from '@/components/Icon';
+import type { IconName } from '@/domain/iconNames';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useTranslation } from '@/i18n';
 
@@ -9,24 +10,55 @@ interface SheetActionsProps {
   onConfirm: () => void;
   confirmLabel: string;
   confirmDisabled?: boolean;
+  /** Reemplaza el botón "Cancelar" por una acción real — usado por `ItemDetailSheet` en
+   * Tarea/Hábito para "Marcar completada/hecho" en vez de solo cerrar (pedido explícito del
+   * usuario: la "X" del header ya cierra sin guardar, así que "Cancelar" ahí era redundante).
+   * Sin `onSecondary`, el botón sigue siendo "Cancelar" (comportamiento de siempre). */
+  secondaryLabel?: string;
+  secondaryIcon?: IconName;
+  onSecondary?: () => void;
+  /** Tinta el botón secundario en `accent` — indica que el ítem YA está marcado (toggle, no una
+   * acción de un solo sentido). */
+  secondaryActive?: boolean;
 }
 
 /** Botonera fija al pie de Quick Add/`ItemDetailSheet`: dos botones lado a
- * lado (Cancelar secundario + confirmar en `accent`), fuera del `ScrollView`
+ * lado (secundario + confirmar en `accent`), fuera del `ScrollView`
  * para que siempre estén a mano aunque el formulario sea largo. */
-export function SheetActions({ onCancel, onConfirm, confirmLabel, confirmDisabled }: SheetActionsProps) {
+export function SheetActions({
+  onCancel,
+  onConfirm,
+  confirmLabel,
+  confirmDisabled,
+  secondaryLabel,
+  secondaryIcon,
+  onSecondary,
+  secondaryActive,
+}: SheetActionsProps) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();
 
   return (
     <View style={styles.row}>
       <Pressable
-        onPress={onCancel}
-        style={[styles.btn, styles.secondary, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}
+        onPress={onSecondary ?? onCancel}
+        style={[
+          styles.btn,
+          styles.secondary,
+          {
+            backgroundColor: secondaryActive ? `${palette.accent}1A` : palette.surfaceLow,
+            borderColor: secondaryActive ? palette.accent : palette.border,
+          },
+        ]}
         accessibilityRole="button"
       >
-        <Icon name="close" size={18} color={palette.text} />
-        <Text style={{ fontFamily: font.semibold, fontSize: 15, color: palette.text }}>{t('cancel')}</Text>
+        <Icon name={onSecondary ? (secondaryIcon ?? 'check') : 'close'} size={18} color={secondaryActive ? palette.accent : palette.text} />
+        <Text
+          numberOfLines={1}
+          style={{ fontFamily: font.semibold, fontSize: 15, color: secondaryActive ? palette.accent : palette.text, flexShrink: 1 }}
+        >
+          {onSecondary ? secondaryLabel : t('cancel')}
+        </Text>
       </Pressable>
       <Pressable
         onPress={onConfirm}
