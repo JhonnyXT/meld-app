@@ -5,7 +5,7 @@ module.exports = {
   },
   testMatch: ['**/*.test.ts'],
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/$1',
+    '^@/(.*)$': '<rootDir>/src/$1',
     '^expo-crypto$': '<rootDir>/jest/expoCryptoMock.js',
     '^expo-sqlite$': '<rootDir>/jest/expoSqliteMock.js',
   },
