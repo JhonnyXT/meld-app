@@ -183,6 +183,41 @@ describe('spaces: leer y escribir', () => {
   });
 });
 
+describe('spaces: validación de tipos (mass assignment / corrupción)', () => {
+  it('un item vivo con campos del tipo equivocado se rechaza', async () => {
+    await seedSpace({ memberUids: ['ana', 'beto'] });
+    const db = as('beto');
+    await assertFails(setDoc(doc(db, 'spaces/s1/items/i3'), { title: 123, updatedAt: '2026-01-01T00:00:00.000Z', deletedAt: null }));
+    await assertFails(setDoc(doc(db, 'spaces/s1/items/i3'), { title: 'ok', updatedAt: 123, deletedAt: null }));
+    await assertFails(setDoc(doc(db, 'spaces/s1/items/i3'), { updatedAt: '2026-01-01T00:00:00.000Z', deletedAt: null }));
+  });
+
+  it('un tombstone (solo updatedAt+deletedAt) sigue permitido sin los demás campos', async () => {
+    await seedSpace({ memberUids: ['ana', 'beto'] });
+    const db = as('beto');
+    await assertSucceeds(setDoc(doc(db, 'spaces/s1/items/i1'), { updatedAt: '2026-01-02T00:00:00.000Z', deletedAt: '2026-01-02T00:00:00.000Z' }));
+  });
+
+  it('un completado de hábito/task con campos del tipo equivocado se rechaza', async () => {
+    await seedSpace({ memberUids: ['ana', 'beto'] });
+    const db = as('beto');
+    await assertFails(setDoc(doc(db, 'spaces/s1/habitCompletions/h2'), { habitId: 1, date: '2026-01-01', updatedAt: '2026-01-01T00:00:00.000Z' }));
+    await assertFails(setDoc(doc(db, 'spaces/s1/taskCompletions/t2'), { taskId: 't', date: 1, updatedAt: '2026-01-01T00:00:00.000Z' }));
+  });
+
+  it('config con un campo del tipo equivocado se rechaza', async () => {
+    await seedSpace({ memberUids: ['ana', 'beto'] });
+    const db = as('beto');
+    await assertFails(setDoc(doc(db, 'spaces/s1/config/category'), { label: 'Casa', icon: 'home', color: 123 }));
+  });
+
+  it('mi fila de member con un campo del tipo equivocado se rechaza', async () => {
+    await seedSpace({ memberUids: ['ana', 'beto'] });
+    const db = as('beto');
+    await assertFails(setDoc(doc(db, 'spaces/s1/members/beto'), { name: 123, updatedAt: '2026-01-01T00:00:00.000Z' }));
+  });
+});
+
 describe('spaces: unirse con código', () => {
   // Los códigos de este describe son de editor por defecto (sin `role`, ver seedSpace): unirse
   // también toca `editorUids`. Los casos de lector están en el describe de roles.

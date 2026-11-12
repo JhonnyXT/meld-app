@@ -68,6 +68,12 @@ service cloud.firestore {
     function changedOnly(keys) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
     }
+    // Un ítem/completado borrado se sube como tombstone (solo `updatedAt`+`deletedAt`, ver
+    // `tombstoneDoc` en mappers.ts) — reemplaza el documento entero (`batch.set` sin merge), así
+    // que la validación de forma de un documento VIVO no puede exigirse también ahí.
+    function isLiveWrite(data) {
+      return data.get('deletedAt', null) == null;
+    }
 
     match /spaces/{id} {
       // Incluye un espacio eliminado (deletedAt): así sus miembros se enteran.
@@ -136,35 +142,57 @@ service cloud.firestore {
       // editor. El dueño además puede tocar (y borrar) la de cualquiera, para quitar a alguien.
       match /members/{uid} {
         allow read: if isMember(id) || isOwner(id);
-        allow create: if canWrite(id) && uid == request.auth.uid;
-        allow update: if canWrite(id) && (uid == request.auth.uid || isOwner(id));
+        allow create: if canWrite(id) && uid == request.auth.uid
+          && request.resource.data.name is string
+          && request.resource.data.updatedAt is string;
+        allow update: if canWrite(id) && (uid == request.auth.uid || isOwner(id))
+          && request.resource.data.name is string
+          && request.resource.data.updatedAt is string;
         allow delete: if isOwner(id) || (canWrite(id) && uid == request.auth.uid);
       }
 
       // Lo compartido de la categoría: nombre, ícono, color.
       match /config/{doc} {
         allow read: if isMember(id) || isOwner(id);
-        allow create, update: if canEdit(id);
+        allow create, update: if canEdit(id)
+          && request.resource.data.label is string
+          && request.resource.data.icon is string
+          && request.resource.data.color is string;
         allow delete: if isOwner(id);
       }
 
       // Cualquier editor crea, edita o borra (lógico, con tombstone — mismo criterio que
       // users/{uid}/items) cualquier ítem/completado del espacio, sin importar quién lo creó; un
       // lector solo lee. Borrar de verdad (delete real de Firestore) solo el dueño, al eliminar
-      // el espacio entero.
+      // el espacio entero. Un documento VIVO (no tombstone) valida la forma mínima — mass
+      // assignment / corrupción de un cliente con bug no puede colarse como cualquier shape.
       match /items/{itemId} {
         allow read: if isMember(id) || isOwner(id);
-        allow create, update: if canEdit(id);
+        allow create, update: if canEdit(id) && (
+          !isLiveWrite(request.resource.data)
+          || (request.resource.data.title is string
+            && request.resource.data.updatedAt is string)
+        );
         allow delete: if isOwner(id);
       }
       match /habitCompletions/{cid} {
         allow read: if isMember(id) || isOwner(id);
-        allow create, update: if canEdit(id);
+        allow create, update: if canEdit(id) && (
+          !isLiveWrite(request.resource.data)
+          || (request.resource.data.habitId is string
+            && request.resource.data.date is string
+            && request.resource.data.updatedAt is string)
+        );
         allow delete: if isOwner(id);
       }
       match /taskCompletions/{cid} {
         allow read: if isMember(id) || isOwner(id);
-        allow create, update: if canEdit(id);
+        allow create, update: if canEdit(id) && (
+          !isLiveWrite(request.resource.data)
+          || (request.resource.data.taskId is string
+            && request.resource.data.date is string
+            && request.resource.data.updatedAt is string)
+        );
         allow delete: if isOwner(id);
       }
     }

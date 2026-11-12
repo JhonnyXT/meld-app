@@ -841,6 +841,12 @@ export function requestSync(opts: { pull: boolean }): Promise<void> {
         await syncOnce(who, next);
         next = again;
       }
+    } catch (e) {
+      // `syncOnce` ya captura todo lo suyo internamente — este catch es solo una red de
+      // seguridad para que un error inesperado (p. ej. agregado por un cambio futuro fuera del
+      // try/catch de `syncOnce`) nunca deje `running` como una promesa rechazada sin manejar:
+      // `startSync()` la dispara con `void syncNow()`, que la ignoraría en silencio.
+      console.warn('[sync] Error inesperado:', e);
     } finally {
       running = null;
     }
