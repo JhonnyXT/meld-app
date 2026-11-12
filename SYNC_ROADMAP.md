@@ -670,10 +670,23 @@ en modo avión aparece en la nube al volver la conexión.
     de Google que el dueño (reusada de la prueba anterior del respaldo) — las reglas correctamente
     rechazan "unirse" a quien ya es miembro. Nada que corregir en la app; documentado por si se
     repite la confusión en una prueba futura.
+  - **Bug real encontrado y corregido**: "Hoy" se sentía lento al abrir — `TodayScreen.tsx`
+    esperaba (`await`) un ciclo COMPLETO de `syncNow()` antes de ocultar el esqueleto de carga.
+    Contra el emulador local eso es casi instantáneo y nunca se notaba; contra Firebase real, con
+    categorías compartidas de por medio, tomaba varios segundos reales de red. Arreglado: el
+    esqueleto se quita apenas termina la carga LOCAL (SQLite), y el sync remoto sigue en segundo
+    plano, refrescando la lista si trae cambios sin volver a tapar el contenido ya visible.
+    Confirmado en dispositivo que "Hoy" carga mucho más rápido tras el fix.
+- [x] **Camino offline → online** (2026-11-12, S24 Ultra, variant `test` contra la nube real):
+  modo avión activado, se creó un ítem nuevo en la categoría compartida — sin crash, sin bloquear
+  la UI. Al desactivar el avión, el reintento automático (`OFFLINE_RETRY_MS`, 60s) sincronizó solo,
+  sin que el usuario tuviera que recargar la app ni tocar nada — confirmado que el ítem llegó al
+  Moto (el otro miembro del espacio).
 
 **Hecho cuando:** dos teléfonos con cuentas distintas comparten "Casa" (o cualquier categoría),
 los dos agregan y completan tareas y ven lo mismo — **confirmado 2026-11-06 en `dev`/emulador, y
-2026-11-12 en `test`/nube real**. Queda para después de esta fase: probar el camino offline.
+2026-11-12 en `test`/nube real, incluyendo el camino offline → online**. Con esto la Fase 4 queda
+sin pendientes de verificación.
 
 ### Fase 5 — Cobro real (RevenueCat) · M
 - [ ] RevenueCat + productos en Play Console (US$7.99/mes, US$59.99/año, prueba de 14 días).
