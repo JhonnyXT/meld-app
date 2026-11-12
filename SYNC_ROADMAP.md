@@ -6,12 +6,11 @@ rama `feature/pro-sync`; `main` sigue 100% local y es lo que va a los testers de
 Adaptado del diseño ya probado en `my-wallet-app` (`SYNC_ROADMAP.md` de ese repo). Decisiones de
 producto en `docs/decisions.md` (2026-10-27).
 
-**Estado:** Fase 3 completa. Fase 4 (categorías compartidas) sustancialmente completa
-(2026-11-06) — modelo de datos, motor de sync, "Compartir"/"Unirme con un código" y el gating de
-lector, verificados de punta a punta con dos cuentas de Google reales en dos teléfonos. Quedan
-sin construir: UI de roles por miembro existente / salir / quitar a alguien / eliminar el espacio,
-el indicador de "quién creó/completó esto", y probar en variant `test` contra la nube real (hoy
-solo verificado en `dev` contra el emulador).
+**Estado:** Fase 3 completa. Fase 4 (categorías compartidas) completa — modelo de datos, motor de
+sync, "Compartir"/"Unirme con un código", gestión de miembros (roles/salir/quitar/eliminar), el
+indicador de "quién completó" y las migraciones de SQLite, todo verificado de punta a punta con
+dos cuentas de Google reales en dos teléfonos, **y en variant `test` contra la nube real**
+(2026-11-12, ver el punto de abajo) — ya no solo contra el emulador.
 
 ---
 
@@ -653,15 +652,28 @@ en modo avión aparece en la nube al volver la conexión.
   hecha también (confirmado `status: 'done'` en `spaces/cat-work/items` por REST en ambos
   sentidos). Push, pull y el gating de UI ya verificados en pasos anteriores quedan así
   confirmados también con el flujo 100% real de punta a punta.
-  - **Pendiente, documentado a propósito**: no se probó todavía en variant `test` contra la nube
-    real (solo `dev` contra el emulador) — mismo código, infraestructura distinta; se deja para
-    antes de publicar. Tampoco se probó el camino offline (crear/completar sin internet y que
-    sincronice al volver la conexión) ni el de un LECTOR real en dos cuentas (el gating de lector
-    se verificó por separado, simulando el rol — ver el ítem de arriba).
+  - **Pendiente, documentado a propósito**: no se probó todavía el camino offline (crear/completar
+    sin internet y que sincronice al volver la conexión) ni el de un LECTOR real en dos cuentas (el
+    gating de lector se verificó por separado, simulando el rol — ver el ítem de arriba).
+- [x] **Variant `test` contra la nube real** (2026-11-12, S24 Ultra + Moto E7 Plus, proyecto real
+  `meld-test-b197c`, no el emulador): reglas de Firestore desplegadas (`firebase deploy --only
+  firestore:rules --project meld-test-b197c`) — los 32 tests de `firestore-tests/rules.test.ts`
+  ya pasaban contra el emulador con el mismo archivo. `npm run build:test` (`assembleRelease`) +
+  instalación limpia en ambos teléfonos (confirmado: sin seed, pantalla de onboarding — a
+  diferencia de `dev`). Login real con Google funcionando en los dos. El respaldo general de
+  ítems personales respeta el gate de Pro (plan Free no sincroniza nada, banner "El respaldo en la
+  nube es parte de Meld Pro" — correcto). Compartir categoría + unirse con código, verificado con
+  **dos cuentas reales distintas** contra Firestore real (confirmado en la consola de Firebase:
+  `memberUids`/`editorUids` con los dos uids tras el join).
+  - **Bug de diagnóstico encontrado en el camino, no del código**: el primer intento de unirse
+    falló con `PERMISSION_DENIED` porque el "invitado" había iniciado sesión con la MISMA cuenta
+    de Google que el dueño (reusada de la prueba anterior del respaldo) — las reglas correctamente
+    rechazan "unirse" a quien ya es miembro. Nada que corregir en la app; documentado por si se
+    repite la confusión en una prueba futura.
 
 **Hecho cuando:** dos teléfonos con cuentas distintas comparten "Casa" (o cualquier categoría),
-los dos agregan y completan tareas y ven lo mismo — **confirmado 2026-11-06**. Queda para después
-de esta fase: probar con y sin internet, y en `test` contra la nube real (ver el punto de arriba).
+los dos agregan y completan tareas y ven lo mismo — **confirmado 2026-11-06 en `dev`/emulador, y
+2026-11-12 en `test`/nube real**. Queda para después de esta fase: probar el camino offline.
 
 ### Fase 5 — Cobro real (RevenueCat) · M
 - [ ] RevenueCat + productos en Play Console (US$7.99/mes, US$59.99/año, prueba de 14 días).
