@@ -6,8 +6,6 @@ import type { IconName } from '@/domain/iconNames';
 import { newId } from '@/domain/id';
 import { emitLocalChange } from './localChanges';
 
-/** `updated_at` nulo = categoría de antes de la Fase 1 (sin backfill, ver `db.ts`) — ver el mismo
- * comentario en `dayItemRepository.ts`. */
 const EPOCH = '1970-01-01T00:00:00.000Z';
 
 export interface SyncVersion {
@@ -20,9 +18,6 @@ export interface PendingCategory {
   updatedAt: string;
   deletedAt: string | null;
   category: Category | null;
-  /** Fase 4 — mismo criterio que `PendingDayItem.spaceId`: `null` = `users/{uid}/categories`
-   * (personal, el caso de siempre); si no, `spaces/{spaceId}/config/category` en vez de ahí —
-   * `spaceId` es siempre igual al propio `id` (ver el comentario largo en `schema.ts`). */
   spaceId: string | null;
 }
 
@@ -75,11 +70,6 @@ export const categoryRepository = {
     emitLocalChange();
   },
 
-  /** Borrado lógico (SYNC_ROADMAP.md, Fase 1) — mismo criterio que
-   * `dayItemRepository.remove`. Los ítems que apuntaban a esta categoría
-   * conservan su texto copiado (`category`/`categoryColor`), exactamente
-   * como antes de esta migración (ver CLAUDE.md → "Categorías
-   * configurables"): se siguen mostrando con el nombre huérfano. */
   async remove(id: string): Promise<void> {
     const now = new Date().toISOString();
     await db
@@ -89,13 +79,6 @@ export const categoryRepository = {
     emitLocalChange();
   },
 
-  /** Liga/desliga esta categoría a un espacio compartido (SYNC_ROADMAP.md, Fase 4) — usado por
-   * los flujos de "Compartir"/"Unirme con un código" (todavía sin construir; esto solo prepara el
-   * dato local). No toca `sync_state`: el vínculo con el espacio no es algo que suba a
-   * `users/{uid}/categories/*` (vive en `spaces/{id}` mismo, ver `firestore.rules`), así que
-   * ligarla nunca debe disparar una subida de la categoría al respaldo personal. Para desligar
-   * (salir/que te saquen/se elimine el espacio) usar `unlinkSpace`, no esto con `null` — esa sí
-   * necesita volver a subir como categoría personal, ver su comentario. */
   async setSpaceLink(id: string, link: CategorySpaceLink): Promise<void> {
     await db
       .update(categories)
@@ -104,12 +87,6 @@ export const categoryRepository = {
     emitLocalChange();
   },
 
-  /** Crea o actualiza la categoría local de un espacio (`id` = `spaceId`, ver el comentario largo
-   * en `schema.ts`) a partir de lo traído de `spaces/{id}` + `config/category` — llamado por
-   * `src/sync/engine.ts` al descubrir un espacio del que soy miembro, exista ya la categoría acá
-   * o sea la primera vez que este teléfono se entera de él (entonces la crea, con un ícono/color
-   * de relleno si `config` todavía no bajó). `syncState: 'synced'`: nunca sube a
-   * `users/{uid}/categories` mientras siga ligada a un espacio. */
   async applySpaceUpsert(
     spaceId: string,
     role: SpaceRole,
@@ -147,13 +124,6 @@ export const categoryRepository = {
     emitLocalChange();
   },
 
-  /** Desliga la(s) categoría(s) locales de un espacio al que ya no pertenezco (salí, me sacaron,
-   * el dueño lo eliminó) — "quien pierde el acceso conserva la categoría como propia", así que
-   * queda `pending` para subir como categoría PERSONAL de ahí en más (antes vivía solo en
-   * `spaces/{id}`, nunca se había subido a `users/{uid}/categories`). Sus ítems/completados NO
-   * se tocan acá — `dayItemRepository`/`habitCompletionSyncRepository`/
-   * `taskCompletionSyncRepository` tienen su propio `unlinkSpace` para eso (mismo motivo:
-   * conservarlos, pero ya no intentar subirlos a un espacio del que no soy parte). */
   async unlinkSpace(spaceId: string): Promise<void> {
     await db
       .update(categories)
@@ -162,19 +132,11 @@ export const categoryRepository = {
     emitLocalChange();
   },
 
-  /** Las categorías locales ligadas a un espacio (Fase 4) — para que `src/sync/engine.ts` sepa
-   * qué espacios tocar en cada corrida sin tener que recorrer todo `categories`. */
   async listSpaceLinked(): Promise<Category[]> {
     const rows = await db.select().from(categories).where(and(notDeleted, isNotNull(categories.spaceId)));
     return rows.map(toDomain);
   },
 
-  // ─── Sync (SYNC_ROADMAP.md, Fase 3) — ver el mismo bloque en `dayItemRepository.ts` ──────────
-
-  // `sync_state IS NULL` = categoría de antes de la Fase 1, o las 3 default que `db.ts` inserta
-  // directo por SQL sin pasar por acá — tratarla como pendiente también, o nunca sube. Incluye
-  // categorías ligadas a un espacio (Fase 4): `src/sync/engine.ts` decide con `spaceId` si sube a
-  // `users/{uid}/categories` o a `spaces/{spaceId}/config/category` en vez de ahí.
   async listPendingSync(): Promise<PendingCategory[]> {
     const rows = await db
       .select()

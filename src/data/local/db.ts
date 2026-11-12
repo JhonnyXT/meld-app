@@ -6,30 +6,20 @@ const sqlite = openDatabaseSync('meld.db');
 
 export const db = drizzle(sqlite, { schema });
 
-/** Subconjunto de la API de `expo-sqlite` que `initDb` realmente usa — permite inyectar una
- * conexión distinta en tests (`better-sqlite3`, que habla SQLite real sin el runtime nativo de
- * Expo) sin duplicar ni un carácter del SQL de las migraciones. Ver `db.migrations.test.ts`. */
 export interface SqliteLike {
   execSync(sql: string): unknown;
   getFirstSync<T>(sql: string): T | null;
 }
 
-/** Agrega una columna si no existe. SQLite no soporta "ADD COLUMN IF NOT
- * EXISTS": el `catch` absorbe "duplicate column name", que es el caso
- * esperado en la mayoría de los arranques (ya corrió antes). Usado para
- * migrar dispositivos con datos previos; una instalación nueva ya la trae
- * en el `CREATE TABLE`. */
 function addColumnIfMissing(conn: SqliteLike, table: string, columnDdl: string) {
   try {
     conn.execSync(`ALTER TABLE ${table} ADD COLUMN ${columnDdl};`);
   } catch {
-    // Columna ya existe — no-op.
+    // no-op: la columna ya existe.
   }
 }
 
-/** `conn` solo se pasa en tests (`db.migrations.test.ts`) — en la app real siempre corre sobre
- * `sqlite` (el default), nunca se le pasa nada distinto desde `app/_layout.tsx` ni el resto de
- * call-sites. */
+// ver docs/adr/0009-orden-de-migraciones-sqlite.md
 export function initDb(conn: SqliteLike = sqlite) {
   conn.execSync(`
     CREATE TABLE IF NOT EXISTS day_items (
@@ -71,25 +61,12 @@ export function initDb(conn: SqliteLike = sqlite) {
   conn.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_status ON day_items(status);');
 
   addColumnIfMissing(conn, 'day_items', 'health_metric_target REAL');
-  // Sync (SYNC_ROADMAP.md, Fase 1) — dispositivos con datos previos a estas
-  // 3 columnas. `sync_state` necesita un DEFAULT porque la columna queda
-  // NOT NULL (SQLite exige uno para agregar NOT NULL a una tabla con filas).
-  // Tienen que ir ANTES del índice de `category_id`: en un dispositivo con
-  // datos previos, el `CREATE TABLE IF NOT EXISTS` de arriba es un no-op (la
-  // tabla ya existe sin esta columna), así que crear el índice antes de
-  // agregarla rompe con "no such column: category_id" (bug real, visto en
-  // dispositivo — `execSync` no está en try/catch como `addColumnIfMissing`,
-  // así que tiraba abajo `initDb()` entero sin tocar nada más).
   addColumnIfMissing(conn, 'day_items', 'category_id TEXT');
   addColumnIfMissing(conn, 'day_items', 'deleted_at TEXT');
   addColumnIfMissing(conn, 'day_items', "sync_state TEXT NOT NULL DEFAULT 'pending'");
   conn.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_category_id ON day_items(category_id);');
-  // Categorías compartidas (Fase 4) — ver el comentario largo en `schema.ts` →
-  // `dayItems.spaceId`/`categories.spaceId`.
   addColumnIfMissing(conn, 'day_items', 'space_id TEXT');
   conn.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_space_id ON day_items(space_id);');
-  // Indicador "quién completó esto" (Fase 4) — ver el comentario largo en `schema.ts` →
-  // `dayItems.completedByUid`.
   addColumnIfMissing(conn, 'day_items', 'completed_by_uid TEXT');
 
   conn.execSync(`
@@ -156,8 +133,6 @@ export function initDb(conn: SqliteLike = sqlite) {
   addColumnIfMissing(conn, 'categories', 'space_role TEXT');
   addColumnIfMissing(conn, 'categories', 'space_owner_uid TEXT');
 
-  // Caché local de nombres de miembros (Fase 4) — ver el comentario largo en `schema.ts` →
-  // `spaceMembers`.
   conn.execSync(`
     CREATE TABLE IF NOT EXISTS space_members (
       id TEXT PRIMARY KEY NOT NULL,
@@ -169,9 +144,6 @@ export function initDb(conn: SqliteLike = sqlite) {
   `);
   conn.execSync('CREATE INDEX IF NOT EXISTS idx_space_members_space_id ON space_members(space_id);');
 
-  // 3 categorías por default, una sola vez (tabla vacía = primer arranque o
-  // instalación nueva) — a partir de ahí son filas normales, el usuario
-  // puede renombrarlas/recolorearlas/borrarlas como a cualquier otra.
   const categoryCount = conn.getFirstSync<{ c: number }>('SELECT COUNT(*) as c FROM categories;');
   if (categoryCount && categoryCount.c === 0) {
     const now = new Date().toISOString();
@@ -183,11 +155,6 @@ export function initDb(conn: SqliteLike = sqlite) {
     `);
   }
 
-  // Backfill de `category_id` (SYNC_ROADMAP.md, Fase 1): ítems creados antes
-  // de esta columna solo tienen el texto copiado (`category`). Se resuelve
-  // por nombre contra la tabla de categorías — idempotente (una vez resuelto
-  // un ítem, `category_id IS NULL` deja de incluirlo en corridas futuras), y
-  // barato incluso en cada arranque dado el volumen de esta app.
   conn.execSync(`
     UPDATE day_items
     SET category_id = (SELECT id FROM categories WHERE categories.label = day_items.category LIMIT 1)
