@@ -119,11 +119,17 @@ export function TodayScreen() {
       setEnteringToday(true);
       (async () => {
         await Promise.all([reload(), reloadInbox()]);
+        // El esqueleto se quita apenas lo local está listo — no esperar acá a `syncNow()` (bug
+        // real, 2026-11-12: contra el emulador local es casi instantáneo y nunca se notaba, pero
+        // contra Firebase real la latencia de red de un ciclo completo de sync, sobre todo con
+        // categorías compartidas de por medio, se sentía como "Hoy tarda en cargar" en variant
+        // `test`). El sync remoto sigue en segundo plano; si trae cambios, otro `reload()` los
+        // refleja sin volver a tapar el contenido ya visible con el esqueleto.
+        setEnteringToday(false);
         if (sessionUser) {
           await syncNow().catch(() => undefined);
           await Promise.all([reload(), reloadInbox()]);
         }
-        setEnteringToday(false);
       })();
     }, [reload, reloadInbox, sessionUser]),
   );
