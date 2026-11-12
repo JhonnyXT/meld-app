@@ -5,7 +5,6 @@ import { toSessionUser, type SessionUser } from './session';
 
 interface SessionState {
   user: SessionUser | null;
-  /** false hasta que Firebase confirma si hay sesión guardada (evita parpadear "Iniciar sesión"). */
   ready: boolean;
 }
 
@@ -15,7 +14,6 @@ function currentState(): SessionState {
   return { user: user ? toSessionUser(user) : null, ready: user != null };
 }
 
-/** Sesión actual; se actualiza sola al iniciar/cerrar sesión. Funciona sin internet. */
 export function useSession(): SessionState {
   const [state, setState] = useState(currentState);
 

@@ -1,18 +1,4 @@
-/**
- * Errores de la cuenta, reducidos a lo que la UI necesita para elegir el mensaje. Sin imports de
- * Firebase ni Google Sign-In (se clasifican por su `code`), para poder probarlo en Jest.
- */
-
-export type AuthErrorKind =
-  /** El usuario cerró el selector de cuentas: no es un error, no se muestra nada. */
-  | 'cancelled'
-  /** Sin conexión. */
-  | 'offline'
-  /** Teléfono sin Google Play Services (o desactualizado). */
-  | 'unavailable'
-  /** Firebase pide un inicio de sesión reciente (borrar la cuenta). */
-  | 'recent-login'
-  | 'unknown';
+export type AuthErrorKind = 'cancelled' | 'offline' | 'unavailable' | 'recent-login' | 'unknown';
 
 export class AuthError extends Error {
   constructor(
@@ -23,9 +9,6 @@ export class AuthError extends Error {
   }
 }
 
-// Códigos reales en Android: google-signin rechaza con `statusCodes` (12501 = cancelado,
-// ASYNC_OP_IN_PROGRESS = doble toque, 7 = CommonStatusCodes.NETWORK_ERROR); Firebase con "auth/…".
-// Un doble toque se trata como cancelado: el primer intento sigue su curso.
 const CANCELLED = new Set(['12501', 'ASYNC_OP_IN_PROGRESS']);
 const OFFLINE = new Set(['auth/network-request-failed', '7']);
 const UNAVAILABLE = new Set(['PLAY_SERVICES_NOT_AVAILABLE']);
@@ -40,7 +23,6 @@ export function classifyAuthError(error: unknown): AuthErrorKind {
   return 'unknown';
 }
 
-/** Texto para el usuario; null = no mostrar nada. */
 export function authErrorMessage(kind: AuthErrorKind): string | null {
   switch (kind) {
     case 'cancelled':

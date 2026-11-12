@@ -1,5 +1,3 @@
-/** Persistencia de `SyncMeta` en AsyncStorage — separado de `meta.ts` (puro) para que ese quede
- * testeable sin React Native. */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { emptyMeta, type SyncMeta } from './meta';
 
