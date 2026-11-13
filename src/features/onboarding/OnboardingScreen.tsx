@@ -78,9 +78,7 @@ export function OnboardingScreen({ onDone }: OnboardingScreenProps) {
     if (withNotif) {
       try {
         await requestNotificationPermission();
-      } catch {
-        // permiso denegado / no disponible — se sigue igual
-      }
+      } catch {}
     }
     onDone();
   };
@@ -126,7 +124,6 @@ export function OnboardingScreen({ onDone }: OnboardingScreenProps) {
         ))}
       </Animated.ScrollView>
 
-      {/* Chrome superior: flecha atrás + barra de progreso segmentada */}
       <SafeAreaView edges={['top']} style={styles.topChrome} pointerEvents="box-none">
         <View style={styles.topRow} pointerEvents="box-none">
           {page > 0 ? (
@@ -146,7 +143,6 @@ export function OnboardingScreen({ onDone }: OnboardingScreenProps) {
         </View>
       </SafeAreaView>
 
-      {/* Botón inferior + enlace Saltar — ocultos en Planes (tiene sus propios botones) */}
       {page < LAST ? (
         <View style={[styles.bottomArea, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <LinearGradient
@@ -166,9 +162,6 @@ export function OnboardingScreen({ onDone }: OnboardingScreenProps) {
         </View>
       ) : null}
 
-      {/* Paso de Notificaciones — overlay opaco sobre el carrusel (no un
-          return aparte: desmontar el pager pierde su offset y, al volver con
-          "Atrás", el slide activo quedaba en blanco). */}
       {phase === 'notif' ? (
         <View style={StyleSheet.absoluteFill}>
           <NotificationsStep
@@ -206,9 +199,6 @@ const styles = StyleSheet.create({
   slide: { flex: 1 },
   slideInner: { flex: 1 },
   plansTopSpacer: { height: 92 },
-  // Bloque de texto de las slides con mockup: ocupa el hueco sobre el teléfono
-  // y centra el texto verticalmente ahí, para que no quede pegado arriba con
-  // un vacío enorme antes del mockup. El `mockArea` se lleva más peso.
   headerArea: {
     flex: 1,
     paddingHorizontal: 24,

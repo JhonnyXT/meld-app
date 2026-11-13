@@ -13,13 +13,6 @@ interface OnboardingProgressProps {
   pageWidth: number;
 }
 
-/**
- * Barra de progreso segmentada estilo "stories": un segmento por slide, todos
- * del mismo ancho repartidos en el espacio disponible (por eso los segmentos
- * son más largos cuantas menos slides haya). Los pasados quedan llenos, el
- * actual se rellena de izquierda a derecha siguiendo el scroll en vivo, los
- * futuros quedan vacíos.
- */
 export function OnboardingProgress({ count, scrollX, pageWidth }: OnboardingProgressProps) {
   return (
     <View style={styles.row} pointerEvents="none">

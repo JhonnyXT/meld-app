@@ -15,17 +15,9 @@ import type { MockSlide } from '../onboardingSlides';
 
 interface PhoneMockProps {
   slide: MockSlide;
-  /** true cuando esta slide es la que está centrada en pantalla. */
   active: boolean;
 }
 
-/**
- * Mockup enmarcado (PNG de shots.so, ya recortado al bbox alfa) que sangra por
- * detrás del botón inferior. `wide` = recorte ancho, llena a lo ancho y se
- * recorta un poco de los lados (`overflow:hidden`); `portrait` = dispositivo
- * completo, entra a lo ancho sin recorte. Encima flota un acento animado que
- * resalta la feature (posición aproximada, se lee como un realce de UI).
- */
 export function PhoneMock({ slide, active }: PhoneMockProps) {
   const [box, setBox] = useState<{ width: number; height: number } | null>(null);
   const float = useSharedValue(0);
@@ -54,30 +46,19 @@ export function PhoneMock({ slide, active }: PhoneMockProps) {
       : withTiming(0, { duration: 220 });
   }, [active, enter]);
 
-  // Mismo tamaño que el mockup del onboarding anterior (v1): `wide` sangra
-  // fuerte por los lados (factor 1.35 del ancho de pantalla, recorte con
-  // `overflow:hidden`), anclado abajo, por detrás del botón. `portrait`
-  // (dispositivo completo) entra casi a todo el ancho y se limita al alto del
-  // hueco si no cabe.
   const portrait = slide.framing === 'portrait';
   let width = 0;
   let height = 0;
   if (box) {
     if (portrait) {
-      // Dispositivo completo: entra a lo ancho con un sangrado lateral, anclado
-      // ARRIBA (el header "Momentos"/"Agosto" queda visible) y el pie sangra
-      // por detrás del botón (recorte con `overflow:hidden`).
       width = box.width * 1.24;
       height = width / slide.ratio;
     } else {
-      // Recorte ancho: sangra fuerte por los lados, anclado abajo.
       width = box.width * 1.35;
       height = width / slide.ratio;
     }
   }
 
-  // La opacidad de entrada/salida la maneja el `SlideFrame` del contenedor
-  // (parallax con el scroll); acá solo un leve rise + scale al activarse.
   const imageStyle = useAnimatedStyle(() => ({
     transform: [
       { translateY: float.value * 6 + (1 - enter.value) * 22 },
@@ -141,8 +122,6 @@ function MockAccent({ slide, active }: PhoneMockProps) {
       style={[
         styles.accentAnchor,
         {
-          // El punto x/y del slide es el CENTRO del acento: se compensa
-          // medio badge en cada eje para centrarlo ahí, no anclar su borde.
           left: `${slide.accent.x * 100}%`,
           top: `${slide.accent.y * 100}%`,
           marginLeft: -badge / 2,

@@ -16,23 +16,11 @@ import { toRowViewModel, formatDuration, initialDragMinutes } from './mapDayItem
 interface TodayItemRowProps {
   item: DayItem;
   onToggleComplete: (id: string) => void;
-  /** Por default borra vía `dayItemsStore` (ítems del día seleccionado en
-   * Today). Pasar un handler propio para reusar esta fila fuera de Today
-   * (p. ej. la agenda semanal de Calendario, con ítems de fechas distintas). */
   onDelete?: (id: string) => void;
   onClearVoiceMemoAudio?: (id: string) => void;
-  /** Solo aplica a hábitos — si ya se marcó hecho el día que se está viendo
-   * y el handler para alternarlo. Sin esto (p. ej. reusando esta fila fuera
-   * de Today) el ícono de hábito queda visual pero no tocable. */
   habitCompletedToday?: boolean;
   onToggleHabitComplete?: (id: string) => void;
-  /** Solo aplica a tasks QUE REPITEN (`repeatRule` no null) — si ya se marcó
-   * hecha el día que se está viendo (`dayItemsStore.taskCompletedMap`). Una
-   * task sin repetición sigue leyendo `item.status` directo, ignora esto. */
   taskCompletedToday?: boolean;
-  /** "Completado por X" (Fase 4) ya resuelto por el llamador — solo lo pasa `WeekAgendaView`
-   * (su propio mapa por rango de fechas, ver `useWeekAgenda`). Sin esto, se cae al mapa global
-   * de `dayItemsStore` (que solo cubre el día seleccionado de Today). */
   completedByUidOverride?: string | null;
 }
 
@@ -54,14 +42,8 @@ export function TodayItemRow({
   const draggingMinutes = useTimeDragStore((s) => s.currentMinutes);
   const coolHabitsEnabled = useSettingsStore((s) => s.coolHabitsEnabled);
   const readOnlyLabels = useCategoriesStore((s) => s.readOnlyLabels);
-  // Lector de una categoría compartida (SYNC_ROADMAP.md, Fase 4) — no puede completar, reagendar
-  // ni borrar acá; `onPress` sigue abriendo el detalle para VER (`ItemDetailSheet` bloquea el
-  // resto del formulario si corresponde).
   const readOnly = !!item.category && readOnlyLabels.has(item.category);
 
-  // Fase 4 — "completado por X": solo si alguien MÁS la completó (nunca para mis propios
-  // completados, sería ruido) — `completedByMap`/`memberNames` ya resueltos por `reload()`/
-  // `categoriesStore.load()`, sin `await` acá.
   const { user: sessionUser } = useSession();
   const completedByUidFromStore = useDayItemsStore((s) => s.completedByMap[item.id]);
   const completedByUid = completedByUidOverride !== undefined ? completedByUidOverride : completedByUidFromStore;

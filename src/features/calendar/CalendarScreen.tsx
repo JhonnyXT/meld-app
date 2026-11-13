@@ -38,24 +38,9 @@ export function CalendarScreen() {
   const [view, setView] = useState<CalendarView>('month');
   const today = useMemo(() => new Date(), []);
   const year = today.getFullYear();
-  // Ir al detalle de un día del grid de Mes (celda tocada) o de la
-  // `CalendarTodayCard` de abajo: reusa la misma pantalla Today que ya sabe
-  // mostrar "otro día" (DayBar, ver "Cambiar de día en Today" en CLAUDE.md) en
-  // vez de crear una pantalla de detalle de día nueva — Today ya trae la
-  // lista completa de ítems de esa fecha y la barra "Volver a hoy" cuando no
-  // es hoy. El día viaja por param de router (`?date=`, leído en
-  // `TodayScreen`) — escribir `dayItemsStore.selectedDateKey` directo NO
-  // alcanza, porque el estado real que pinta `DayBar`/el header de Today es
-  // local a ese componente (bug real: probado primero solo con el store y no
-  // navegaba al día tocado).
   const goToDay = (dateKey: string) => {
     router.push({ pathname: '/', params: { date: dateKey } });
   };
-  // Mes que se está navegando en la vista Mes — separado de `today` a
-  // propósito (agregado 2026-08-26): antes el grid de Mes SIEMPRE mostraba el
-  // mes actual, sin poder navegar a otro. El día del mes no importa, solo
-  // año/mes. La vista Año sigue anclada a `today.getFullYear()` — no está en
-  // el alcance de este cambio.
   const [viewedMonth, setViewedMonth] = useState(() => new Date());
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
 
@@ -66,10 +51,6 @@ export function CalendarScreen() {
   const [itemsByDate, setItemsByDate] = useState<Record<string, DayItem[]>>({});
   const calendarFilter = useCalendarFilterStore((s) => s.filter);
 
-  // Datos reales de completado de hábitos para el heatmap de Año (reemplaza
-  // el placeholder de hash determinístico — ver `domain/habit.ts` →
-  // `computeHeatmapDotState`). Si el filtro de Calendario es un hábito
-  // específico, el heatmap agrega solo ESE hábito; si no, agrega entre todos.
   const [habitHeatmapData, setHabitHeatmapData] = useState<{
     habits: { id: string; targetFrequency: string }[];
     completions: Map<string, Set<string>>;
@@ -123,11 +104,6 @@ export function CalendarScreen() {
     if (next) setView(next);
   };
 
-  // Umbral alto (40px / 600px/s) para no competir con el swipe-to-delete de
-  // las filas de Semana (`SwipeToDeleteCard`, activeOffsetX ±10) — al ser más
-  // exigente, el gesto de la fila gana siempre que el toque empieza sobre
-  // ella; este gesto de nivel pantalla solo captura el swipe cuando arranca
-  // en un área sin fila (grillas de Mes/Año, encabezados, huecos).
   const swipeViewGesture = Gesture.Pan()
     .activeOffsetX([-40, 40])
     .failOffsetY([-15, 15])
@@ -153,13 +129,6 @@ export function CalendarScreen() {
     });
   }, [view, monthGrid]);
 
-  // Estadísticas de HOY para `CalendarTodayCard` — siempre el día actual, sin
-  // importar qué mes esté mirando el grid. Tasks/Moments salen de
-  // `itemsByDate` (hoy siempre cae dentro del mes mostrado, `monthGrid` se
-  // arma con `today.getMonth()`); Habits necesita su propio cálculo de
-  // ocurrencias programadas (mismo patrón que `dayItemsStore.reload()` →
-  // `loadHabitOccurrences`) porque un hábito solo vive en `itemsByDate` en su
-  // fecha de creación, no en cada día que recurre.
   const todayKey = toDateKey(today);
   const [todayHabitStats, setTodayHabitStats] = useState({ done: 0, total: 0 });
 

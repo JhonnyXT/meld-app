@@ -19,9 +19,6 @@ export const ICON_BY_TYPE: Record<DayItem['type'], IconName> = {
   moment: 'photo-camera',
 };
 
-/** Inbox es captura rápida sin clasificar (el usuario decide el tipo real
- * recién al editar el ítem) — por eso la fila NO muestra un ícono de tipo,
- * a diferencia de Today/Search/Reminders que sí usan `ICON_BY_TYPE`. */
 export function toInboxRowViewModel(item: DayItem, lang: Language = 'es'): InboxRowViewModel {
   return {
     id: item.id,

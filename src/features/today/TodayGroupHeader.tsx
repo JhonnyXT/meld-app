@@ -10,11 +10,6 @@ interface TodayGroupHeaderProps {
   onToggle: () => void;
 }
 
-/** Encabezado de cada sección de la lista de Today cuando está agrupada por
- * tipo (toggle del ícono de filtro del header — ver `TodayScreen`). Etiqueta +
- * conteo a la izquierda, línea divisoria de guiones que ocupa el resto del
- * ancho, y un chevron a la derecha para desplegar/ocultar esa sección. Toda
- * la fila es tocable. */
 export function TodayGroupHeader({ label, count, collapsed, onToggle }: TodayGroupHeaderProps) {
   const { palette, font } = useTheme();
   return (

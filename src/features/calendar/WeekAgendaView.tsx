@@ -18,9 +18,6 @@ interface WeekAgendaViewProps {
   onSectionLayout: (dateKey: string, y: number) => void;
 }
 
-/** Agenda vertical por día — mismas filas y acciones que Today
- * (`TodayItemRow`), pero con handlers propios (`useWeekAgenda`) porque los
- * ítems acá abarcan varios días, no solo el día seleccionado de Today. */
 export function WeekAgendaView({
   days,
   itemsByDate,
@@ -38,13 +35,6 @@ export function WeekAgendaView({
     <View style={styles.wrap}>
       {days.map((day) => {
         const key = toDateKey(day);
-        // A diferencia de Today, acá SÍ se siguen mostrando las tasks
-        // completadas (tachadas) — "desaparece de la lista" es un
-        // comportamiento específico de Today; Calendar es justamente donde el
-        // registro completo debe seguir siendo visible (ver
-        // `dayItemsStore.toggleComplete`).
-        // Los Momentos viven en su propia pantalla — no se listan en la
-        // agenda semanal (sí siguen contando para la miniatura del grid de Mes).
         const dayItems = (itemsByDate[key] ?? []).filter(
           (item) => item.type !== 'moment' && matchesCalendarFilter(item, filter),
         );

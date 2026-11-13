@@ -15,13 +15,8 @@ export interface DayItemRowViewModel {
   completed: boolean;
 }
 
-/** Tope de badges informativos a la derecha de la fila antes de "saturar"
- * (decisión de producto 2026-08-31: 2 badges + la acción). El mapper corta
- * acá; el orden de `trailingBadgesFor` define quién sobrevive. */
 const MAX_TRAILING_BADGES = 2;
 
-/** Categoría compacta para la fila: primera palabra, ~12 chars. La etiqueta
- * completa sigue visible/editable en el detalle del ítem. */
 function shortCategory(label: string): string {
   const first = label.trim().split(/\s+/)[0] ?? label;
   return first.length > 12 ? `${first.slice(0, 11)}…` : first;
@@ -48,12 +43,6 @@ function timeMarkerFor(item: DayItem): TimeMarker {
   return { kind: 'time', ...parseTimeLabel(hhmm) };
 }
 
-/** Un hábito se ve/agrupa como "cool" si tiene Auto-registro de salud
- * (`colorStyle: 'cool'`, persistido) O si el toggle global "Cool Habits" de
- * Settings está prendido — ese ajuste extiende el mismo look a CUALQUIER
- * hábito, no solo a los de salud (a pedido explícito, spec sección 4.5).
- * Apagado por default, así que sin el toggle el comportamiento es idéntico
- * al de antes. */
 function isCoolHabit(item: DayItem, coolHabitsEnabled: boolean): boolean {
   return item.type === 'habit' && (item.colorStyle === 'cool' || coolHabitsEnabled);
 }
@@ -61,9 +50,6 @@ function isCoolHabit(item: DayItem, coolHabitsEnabled: boolean): boolean {
 function leadingFor(item: DayItem, habitCompletedToday: boolean, coolHabitsEnabled: boolean, taskCompletedToday: boolean): Leading {
   switch (item.type) {
     case 'task':
-      // Una task que repite (`repeatRule`) nunca toca `status` al marcarse
-      // hecha (completar es por día, ver `dayItemsStore.toggleComplete`) —
-      // el checkbox tiene que leer `taskCompletedToday`, no `status`.
       return { kind: 'checkbox', checked: item.repeatRule ? taskCompletedToday : item.status === 'done' };
     case 'event':
       return { kind: 'icon', name: 'calendar-today' as IconName };
@@ -74,33 +60,15 @@ function leadingFor(item: DayItem, habitCompletedToday: boolean, coolHabitsEnabl
     case 'moment':
       return { kind: 'icon', name: 'photo-camera' as IconName };
     case 'habit': {
-      // El check de completar sigue siendo el mismo ícono genérico
-      // (repeat/check) para CUALQUIER hábito — "de salud" (o "cool" por el
-      // toggle global) solo suma un ícono chico aparte con la métrica
-      // elegida en Auto-registro (footprints/bed/dumbbell/etc, ver
-      // domain/healthMetrics.ts, undefined si el hábito no tiene una
-      // asignada), nunca lo reemplaza, fiel a la referencia del usuario.
       const healthIcon = isCoolHabit(item, coolHabitsEnabled) ? findHealthMetricOption(item.healthMetric)?.icon : undefined;
       return { kind: 'habitIcon', name: 'sync-alt' as IconName, completed: habitCompletedToday, healthIcon };
     }
   }
 }
 
-/** Badges del cluster derecho, EN ORDEN de precedencia (mayor primero), ya
- * recortados a `MAX_TRAILING_BADGES`. La acción (reproducir audio / abrir
- * link) NO va acá — la maneja `DayItemRow` aparte y siempre se muestra.
- *
- * Precedencia: prioridad (media/alta) › subtareas (reservado, aún sin
- * modelo) › recurrencia › progreso/❤ de hábito › categoría. La categoría es
- * la primera en caerse si hay más de dos. */
 function trailingBadgesFor(item: DayItem, coolHabitsEnabled: boolean, completedByName?: string): TrailingBadge[] {
   const badges: TrailingBadge[] = [];
 
-  // Rollover de tareas (ver `dayItemsStore.reload`) — máxima precedencia,
-  // saber que algo quedó atrasado es lo primero que hay que ver. No aplica a
-  // tasks que repiten (`repeatRule`): para esas, que su `date` ancla quede
-  // en el pasado es normal (la recurrencia las trae de vuelta solas), no es
-  // un atraso real.
   if (item.type === 'task' && !item.repeatRule && item.status !== 'done' && item.date && item.date < toDateKey(new Date())) {
     badges.push({ kind: 'overdue' });
   }
@@ -108,8 +76,6 @@ function trailingBadgesFor(item: DayItem, coolHabitsEnabled: boolean, completedB
   if (item.priority === 'medium' || item.priority === 'high') {
     badges.push({ kind: 'priority', level: item.priority });
   }
-
-  // (subtareas: cuando exista el modelo, va acá — rank 2)
 
   if (item.type === 'task' && item.repeatRule) {
     badges.push({ kind: 'recurrence' });
@@ -119,10 +85,6 @@ function trailingBadgesFor(item: DayItem, coolHabitsEnabled: boolean, completedB
     badges.push(
       isCoolHabit(item, coolHabitsEnabled) ? { kind: 'favorite' } : { kind: 'habitProgress', label: item.progress },
     );
-    // Racha real (≥ 2 — "🔥 1" es ruido). `currentStreak` viene recalculado
-    // en memoria por `dayItemsStore.reload` para Today; en la agenda Semana
-    // de Calendar puede ser el snapshot de la DB (misma limitación que
-    // `progress`).
     if (item.currentStreak >= 2) {
       badges.push({ kind: 'streak', count: item.currentStreak });
     }
@@ -132,9 +94,6 @@ function trailingBadgesFor(item: DayItem, coolHabitsEnabled: boolean, completedB
     badges.push({ kind: 'category', color: item.categoryColor, label: shortCategory(item.category) });
   }
 
-  // Fase 4 — "completado por X" (categoría compartida, alguien más la completó): precedencia más
-  // baja, el primero en caerse. `completedByName` llega ya resuelto desde `TodayItemRow.tsx`
-  // (nunca para mis propios completados — eso se decide ahí, no acá).
   if (completedByName) {
     badges.push({ kind: 'completedBy', name: completedByName });
   }
@@ -142,11 +101,6 @@ function trailingBadgesFor(item: DayItem, coolHabitsEnabled: boolean, completedB
   return badges.slice(0, MAX_TRAILING_BADGES);
 }
 
-/** `habitCompletedToday` solo aplica a hábitos — indica si ya se marcó hecho
- * el día que se está mostrando (no necesariamente "hoy" literal, ver
- * `dayItemsStore.selectedDateKey`). Se ignora para el resto de tipos.
- * `coolHabitsEnabled` viene de `settingsStore` (toggle "Cool Habits") — ver
- * `isCoolHabit`. */
 export function toRowViewModel(
   item: DayItem,
   habitCompletedToday = false,
@@ -165,11 +119,6 @@ export function toRowViewModel(
   };
 }
 
-/** Reordena para que los hábitos "cool" (de salud, o cualquiera si el
- * toggle global está prendido) queden al final de la lista, sin importar su
- * hora — a pedido explícito del usuario, replicando su referencia (Strength
- * Training/10K Steps/Watch Rings/7hr sleep agrupados abajo del todo). El
- * resto de ítems conserva su orden relativo (sort estable). */
 export function sortWithHealthHabitsLast(items: DayItem[], coolHabitsEnabled = false): DayItem[] {
   return items
     .map((item, index) => ({ item, index }))
@@ -182,7 +131,6 @@ export function sortWithHealthHabitsLast(items: DayItem[], coolHabitsEnabled = f
     .map(({ item }) => item);
 }
 
-/** Punto de partida (minutos desde medianoche) al empezar a arrastrar la hora de un ítem. */
 export function initialDragMinutes(item: DayItem, nowMinutesValue: number): number {
   if (!item.reminderAt) return nowMinutesValue;
   const hhmm = item.reminderAt.slice(11, 16);

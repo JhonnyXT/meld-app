@@ -15,7 +15,6 @@ import { pickMomentPhotoForToday } from '@/services/pickMomentPhoto';
 import { useNavigateMenuStore } from '@/store/navigateMenuStore';
 import type { Moment } from '@/domain/dayItem';
 
-/** Ventana de días hacia atrás que se muestra en Momentos. */
 const RANGE_DAYS = 90;
 
 export function MomentsScreen() {
@@ -46,8 +45,6 @@ export function MomentsScreen() {
     if (saved) reload();
   };
 
-  // Agrupa por día y ordena los días de más reciente a más antiguo. El día de
-  // hoy SIEMPRE aparece (aunque no tenga fotos) para tener el "+" a mano.
   const days = useMemo(() => {
     const byDay = new Map<string, Moment[]>();
     for (const m of moments) {

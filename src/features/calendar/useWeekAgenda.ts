@@ -9,12 +9,6 @@ import { useUndoStore } from '@/store/undoStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { translate } from '@/i18n';
 
-/** Estado + mutaciones de la agenda semanal — separado de la UI para que el
- * selector de días (sticky, arriba) y la lista de secciones (dentro del
- * ScrollView) compartan exactamente los mismos datos y handlers. Los ítems
- * de acá pueden ser de cualquier día de la semana, por eso cada mutación
- * necesita `date` explícito (a diferencia de `dayItemsStore`, que asume un
- * único día seleccionado). */
 export function useWeekAgenda(referenceDate: Date) {
   const { start, end } = useMemo(() => getWeekRange(referenceDate), [referenceDate]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(start, i)), [start]);
@@ -32,13 +26,7 @@ export function useWeekAgenda(referenceDate: Date) {
         if (!item.date) continue;
         (grouped[item.date] ??= []).push(item);
       }
-      // "Completado por X" (Fase 4): acá los ítems abarcan varios días, a diferencia de
-      // `dayItemsStore` (un solo `selectedDateKey`) — este mapa es propio, no se puede reusar el
-      // de Today porque nunca recarga para días fuera del seleccionado ahí (bug real encontrado
-      // probando con dos cuentas reales, 2026-11-11: el badge no aparecía en la agenda Semana
-      // aunque el dato ya estaba sincronizado). Solo cubre tasks/eventos sin repetir (columna
-      // directa en `day_items`) — hábitos/tasks que repiten no recurren acá (ver "Simplificaciones
-      // conocidas"), así que no hace falta su propio mapa por fecha.
+      // ver docs/adr/0017-completedby-map-propio-en-week-agenda.md
       const completedBy = await dayItemRepository.getCompletedByUidMap(items.map((i) => i.id));
       setItemsByDate(grouped);
       setCompletedByMap(completedBy);

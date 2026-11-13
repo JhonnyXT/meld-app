@@ -32,8 +32,6 @@ import { syncNow, useSession } from '@/sync';
 
 const ROW_TRANSITION = LinearTransition.duration(220);
 
-// Orden de las secciones cuando la lista de Today está agrupada por tipo
-// (toggle del ícono de filtro en el header). Momentos no aparece en Today.
 const GROUP_ORDER = ['event', 'task', 'habit', 'note', 'voiceMemo'] as const;
 const GROUP_LABEL_KEY = {
   event: 'filterEvents',
@@ -48,12 +46,6 @@ export function TodayScreen() {
   const { t, lang } = useTranslation();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const isToday = toDateKey(selectedDate) === toDateKey(new Date());
-  // Ir a un día puntual desde otra pantalla (p. ej. tocar una celda del grid
-  // de Mes o la `CalendarTodayCard` en Calendar) pasa `?date=YYYY-MM-DD` por
-  // param de router en vez de tocar el store directo — `selectedDate` de acá
-  // es el estado real que pinta `DayBar`/el header, el store solo lo refleja
-  // (ver el `useEffect` de sync más abajo), así que solo escribir el store no
-  // alcanza para "saltar" a otro día.
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
   useEffect(() => {
     if (dateParam) setSelectedDate(fromDateKey(dateParam));
@@ -77,26 +69,12 @@ export function TodayScreen() {
   const closeSearch = useSearchStore((s) => s.close);
   const searchInputRef = useRef<TextInput>(null);
 
-  // Vista agrupada por tipo — solo dura la sesión (arranca plana, todo
-  // expandido; se resetea al reiniciar la app, decisión explícita).
   const [grouped, setGrouped] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
-  // Al entrar a Hoy (o volver a esta pestaña): trae cambios pendientes de subir/bajar
-  // (SYNC_ROADMAP.md, Fase 3) sin que el usuario tenga que cerrar y volver a abrir la app. Sin
-  // gesto custom — directo al entrar, usando el mismo placeholder (`ListSkeleton`) que el arranque
-  // inicial: `reload()` ya marca `loading` mientras consulta SQLite (ver `dayItemsStore.reload`),
-  // así que no hace falta nada especial para mostrarlo acá. `syncNow()` nunca rechaza (sin sesión
-  // no hace nada; sin conexión reintenta sola en segundo plano, ver `src/sync/engine.ts`) — un
-  // segundo `reload()` después de que termina trae lo que haya bajado.
   const { user: sessionUser } = useSession();
 
   useEffect(() => {
-    // Data de muestra SOLO en dev (iterar día a día necesita algo para ver) —
-    // test/prod deben instalar 100% vacíos, sin ítems de ejemplo, para que un
-    // build "limpio" (`npm run build:test`) realmente lo sea. Antes se
-    // llamaba sin condición y test/prod arrancaban con la misma data de
-    // Stitch que dev (bug real reportado, no reintroducirlo).
     (isDev ? seedIfEmpty() : Promise.resolve()).then(() => {
       setStoreDate(selectedDate);
       reloadInbox();
@@ -107,24 +85,14 @@ export function TodayScreen() {
     setStoreDate(selectedDate);
   }, [selectedDate]);
 
-  // El Stack de Expo Router no desmonta Today al navegar a otra pantalla: al volver, la lista
-  // vieja sigue en `items`, así que `loading && visibleRows.length === 0` (la condición de
-  // `ListSkeleton` del arranque) nunca se cumple y la recarga/sync de arriba pasaba en silencio
-  // detrás del contenido viejo — bug real, reportado en dispositivo ("se tarda un poco... no se ve
-  // el esqueleto"). `enteringToday` fuerza el mismo esqueleto del arranque también acá, sin
-  // depender de que la lista esté vacía.
+  // ver docs/adr/0019-today-entering-skeleton-forzado.md
   const [enteringToday, setEnteringToday] = useState(false);
   useFocusEffect(
     useCallback(() => {
       setEnteringToday(true);
       (async () => {
         await Promise.all([reload(), reloadInbox()]);
-        // El esqueleto se quita apenas lo local está listo — no esperar acá a `syncNow()` (bug
-        // real, 2026-11-12: contra el emulador local es casi instantáneo y nunca se notaba, pero
-        // contra Firebase real la latencia de red de un ciclo completo de sync, sobre todo con
-        // categorías compartidas de por medio, se sentía como "Hoy tarda en cargar" en variant
-        // `test`). El sync remoto sigue en segundo plano; si trae cambios, otro `reload()` los
-        // refleja sin volver a tapar el contenido ya visible con el esqueleto.
+        // ver docs/adr/0018-today-skeleton-no-espera-sync-remoto.md
         setEnteringToday(false);
         if (sessionUser) {
           await syncNow().catch(() => undefined);
@@ -141,12 +109,6 @@ export function TodayScreen() {
     }
   }, [searchActive]);
 
-  // Un hábito nunca cambia `status` al completarse (eso vive aparte, en
-  // `habitCompletedMap` — ver `dayItemsStore.toggleHabitComplete`), así que
-  // el conteo "X de Y hechos" de `DayBar` necesita leerlo distinto para no
-  // mostrar hábitos recurrentes como perpetuamente "no hechos".
-  // Los Momentos viven en su propia pantalla — no cuentan en "X de Y hechos"
-  // ni aparecen en la lista de Today (ver `visibleRows` abajo).
   const countableItems = items.filter((i) => i.type !== 'moment');
   const doneCount = countableItems.filter((i) => {
     if (i.type === 'habit') return habitCompletedMap[i.id];
@@ -154,17 +116,6 @@ export function TodayScreen() {
     return i.status === 'done';
   }).length;
   const isFiltering = searchActive && searchResults !== null;
-  // Maquetación gris de carga: solo mientras el store está cargando y todavía
-  // no hay nada que pintar (primera entrada). Al cambiar de día desde una
-  // lista con ítems, `items` conserva los anteriores hasta que llega la nueva
-  // tanda, así que no se muestra el skeleton (no parpadea).
-  // Una task completada, o un hábito (manual o "de salud") marcado hecho ese
-  // día, desaparecen de la lista (con animación de salida) pero el registro
-  // sigue en la DB tal cual — Calendar sigue viéndolo (el heatmap de Año lee
-  // `habit_completions` directo, sin importar si Today lo muestra u oculta) y
-  // la recurrencia (`isHabitScheduledOn`) lo vuelve a traer al día siguiente
-  // si corresponde. Ver CLAUDE.md → "Completar una task (desaparece de la
-  // lista)".
   const visibleRows = isFiltering
     ? searchResults
     : sortWithHealthHabitsLast(
@@ -177,14 +128,6 @@ export function TodayScreen() {
         coolHabitsEnabled,
       );
 
-  // Deslizar en cualquier parte de la lista cambia de día — mismo mecanismo
-  // que `swipeViewGesture` de Calendar (pedido explícito del usuario,
-  // 2026-09-16): umbral alto (40px/600px·s) para no competir con el
-  // swipe-to-delete de las filas (`SwipeToDeleteCard`, activeOffsetX ±10) —
-  // el gesto de la fila gana siempre que el toque arranca sobre ella, este
-  // solo captura el swipe cuando arranca en un hueco sin fila. `failOffsetY`
-  // deja pasar el scroll vertical. Se ignora mientras hay una búsqueda
-  // activa (no tiene sentido cambiar de día viendo resultados).
   const goToDay = (offset: number) => {
     if (isFiltering) return;
     setSelectedDate((d) => addDays(d, offset));

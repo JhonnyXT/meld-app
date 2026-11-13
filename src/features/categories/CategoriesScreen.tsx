@@ -16,11 +16,6 @@ import { JoinCategorySheet } from '@/components/settings/JoinCategorySheet';
 import type { Category } from '@/domain/category';
 import type { IconName } from '@/domain/iconNames';
 
-/** Pantalla real de Categorías (SYNC_ROADMAP.md, Fase 4) — hasta 2026-11-06 era un `Modal` global
- * (`CategoriesManagerSheet.tsx`) sin `FloatingBar`, pedido explícito del usuario para que se vea
- * igual que las demás pantallas principales (Today/Calendario/Ajustes): mismo patrón `Screen` +
- * `ScreenHeader` + `FloatingBar`, navegada como ruta real (`/categories`) en vez de un modal
- * aparte — así el menú ☰ y "atrás" bastan para salir, sin necesitar una "X" propia. */
 export function CategoriesScreen() {
   const { palette, font } = useTheme();
   const { t } = useTranslation();
@@ -41,9 +36,6 @@ export function CategoriesScreen() {
     load();
   }, [load]);
 
-  // Mientras la hoja de compartir está abierta, `shareCategory()` recarga `categories` (nueva
-  // categoría ligada al espacio recién creado) — refleja esa versión fresca en `sharing` para que
-  // `ShareCategorySheet` sepa que ya no hace falta volver a crear el espacio.
   useEffect(() => {
     if (!sharing) return;
     const updated = categories.find((c) => c.id === sharing.id);

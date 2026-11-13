@@ -87,10 +87,6 @@ export function SettingsScreen() {
       ? t('settingsPlanPro')
       : t('settingsPlanFree');
 
-  // Solo para saber si el diálogo nativo todavía puede aparecer al tocar
-  // "activar" — no gobierna el valor del toggle (ver `notificationsEnabled`,
-  // la preferencia LOCAL de la app). Se refresca en cada foco porque el
-  // usuario puede volver de Ajustes del sistema habiendo cambiado el permiso.
   useFocusEffect(
     useCallback(() => {
       getNotificationPermissionStatus().then((status) => {
@@ -99,13 +95,6 @@ export function SettingsScreen() {
     }, []),
   );
 
-  // Mismo patrón que "my-wallet-app" (`handleBudgetAlertToggle`): apagar es
-  // instantáneo y 100% local, nunca toca el SO — la app no puede revocar el
-  // permiso de todas formas. Prender sí intenta el diálogo nativo primero, y
-  // solo abre Ajustes del sistema si el permiso ya fue rechazado de forma
-  // permanente (el único caso sin salida dentro de la app).
-  // Solo dev/test: tarea real de hoy + recordatorio en 10 s, para probar
-  // "Marcar hecho" y el toque de la notificación sin esperar una hora puntual.
   const handleTestReminder = async () => {
     const now = new Date();
     const item = {
@@ -142,8 +131,6 @@ export function SettingsScreen() {
     if (status.granted) setNotificationsEnabled(true);
   };
 
-  // Cuenta (SYNC_ROADMAP.md, Fase 2): iniciar sesión es opcional, no bloquea nada de la app. Sin
-  // Firestore todavía (Fase 3) — por ahora solo abre/cierra sesión y permite borrar la cuenta.
   const { user: sessionUser } = useSession();
   const syncStatus = useSyncStatus();
   const syncStatusLabel = (() => {
@@ -165,8 +152,6 @@ export function SettingsScreen() {
   })();
   const [accountBusy, setAccountBusy] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-  // Cerrar sesión con Mantener/Borrar (SYNC_ROADMAP.md, Fase 3, T8): `null` = cerrado,
-  // `0`/`N` = abierto con la cantidad de cambios sin subir que decide qué botones mostrar.
   const [signOutPending, setSignOutPending] = useState<number | null>(null);
 
   const handleSignIn = async () => {
