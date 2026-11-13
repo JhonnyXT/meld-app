@@ -30,12 +30,6 @@ interface ShareCategorySheetProps {
   onClose: () => void;
 }
 
-/** Hoja de "Compartir categoría" (SYNC_ROADMAP.md, Fase 4) — mismo patrón visual que
- * `CategoryFormModal` (handle, header, CTA inferior). Cubre: convertir una categoría personal en
- * un espacio compartido (`shareCategory`, solo la primera vez) y generar un código de invitación
- * (`createCategoryInviteCode`, siempre que se abre con una categoría ya compartida donde soy
- * editor). Gatea en dos pasos ANTES de intentar nada: sesión iniciada (T3) y plan Pro (T9 — solo
- * quien comparte necesita Pro, no quien se une). */
 export function ShareCategorySheet({ visible, category, onClose }: ShareCategorySheetProps) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();
@@ -73,9 +67,7 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
     setMembersLoading(true);
     try {
       let list = await listCategoryMembers(spaceId);
-      // Autocura un espacio compartido de antes de que `shareCategory` empezara a crear la fila
-      // del dueño en `members/{uid}` (bug real: sin ella se mostraba el uid crudo en vez del
-      // nombre) — solo arregla la MÍA (ver el comentario de `ensureMyMemberRow`).
+      // ver docs/adr/0011-dueno-necesita-su-propia-fila-de-miembro.md
       if (isOwnerUid && !list.some((m) => m.uid === sessionUser?.uid && m.name !== m.uid)) {
         await ensureMyMemberRow(spaceId);
         list = await listCategoryMembers(spaceId);
@@ -197,11 +189,7 @@ export function ShareCategorySheet({ visible, category, onClose }: ShareCategory
                   message={t('shareCategorySignInMessage')}
                 />
               ) : !alreadyShared && plan !== 'pro' ? (
-                // T9: solo QUIEN COMPARTE (convierte una categoría personal en espacio) necesita
-                // Pro — un invitado, sea editor o lector, participa igual sin pagar nada. Antes
-                // este gate bloqueaba por plan sin mirar `alreadyShared`, así que un invitado
-                // Free ni siquiera podía VER la lista de miembros o salir de la categoría (bug
-                // real reportado por el usuario, 2026-11-06, probando con dos cuentas de verdad).
+                // ver docs/adr/0016-gate-de-plan-no-debe-bloquear-invitado.md
                 <EmptyNotice
                   icon="sparkles"
                   title={t('shareCategoryProOnlyTitle')}
@@ -428,9 +416,6 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, gap: 1 },
   closeButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   previewCircle: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  // Cada bloque (Miembros / rol a elegir / código) es su propia sección con etiqueta chica arriba
-  // — mismo lenguaje que `FieldSection` de Quick Add, para que el sheet se sienta agrupado en vez
-  // de una lista suelta de elementos (rediseño pedido por el usuario, 2026-11-11).
   section: { marginBottom: 20 },
   sectionLabel: { fontSize: 13, marginBottom: 10 },
   card: { borderRadius: 16, overflow: 'hidden' },

@@ -47,11 +47,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   left: { flexDirection: 'row', alignItems: 'center', gap: 16, flexShrink: 1 },
-  // Sin `flexShrink`, esta columna (título+subtítulo) ignora el ancho
-  // disponible y se dibuja a su ancho de contenido completo, superponiéndose
-  // con `right` (p. ej. el switch de "Hábitos Cool", con un subtítulo largo
-  // de 2 líneas) en vez de ajustar dónde hace wrap — bug real visto en
-  // dispositivo, no reintroducir.
+  // ver docs/adr/0015-settingrow-titleblock-flexshrink.md
   titleBlock: { flexShrink: 1 },
   iconCircle: {
     width: 32,

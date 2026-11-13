@@ -10,25 +10,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme } from '@/theme/ThemeProvider';
 
-/**
- * Maquetación en gris ("skeleton") de una lista mientras carga — evita el
- * parpadeo del estado vacío antes de que lleguen los datos reales. Pulsa la
- * opacidad para dar a entender que algo se está cargando. Llena toda el área
- * visible (no un número fijo de filas, que daría a entender "hay justo N
- * ítems").
- *
- * - `variant="rows"` (default): filas tipo Today/Inbox/agenda de Calendario
- *   (marca de hora + tarjeta con círculo + barra de título).
- * - `variant="tiles"`: bloques altos tipo Momentos (etiqueta + tarjeta de
- *   foto).
- */
 const ROW_BAR_WIDTHS = ['68%', '52%', '80%', '44%', '63%', '74%', '58%', '72%'] as const;
 const ROW_H = 80;
 const TILE_H = 200;
 
 interface ListSkeletonProps {
   variant?: 'rows' | 'tiles';
-  /** Forzar una cantidad fija; por defecto se calcula para llenar la pantalla. */
   count?: number;
 }
 
@@ -36,7 +23,6 @@ export function ListSkeleton({ variant = 'rows', count }: ListSkeletonProps) {
   const { palette } = useTheme();
   const { height } = useWindowDimensions();
   const unit = variant === 'tiles' ? TILE_H : ROW_H;
-  // Header + barra flotante + colchón; +2 para rebasar el borde inferior.
   const n = count ?? Math.max(variant === 'tiles' ? 4 : 8, Math.ceil((height - 240) / unit) + 2);
 
   const pulse = useSharedValue(0.55);

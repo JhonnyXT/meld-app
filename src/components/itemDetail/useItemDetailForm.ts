@@ -23,9 +23,6 @@ import {
 } from '@/domain/quickAdd';
 import type { DayItem, PriorityLevel } from '@/domain/dayItem';
 
-/** `reminderAt` -> minutos desde medianoche (`null` = sin recordatorio,
- * `ANY_TIME_MINUTES` = con recordatorio pero sin hora puntual), para
- * pre-poblar el estado editable de `TimeFieldRow` desde un ítem existente. */
 function reminderMinutesOrNull(reminderAt: string | null): number | null {
   if (!reminderAt) return null;
   const hhmm = reminderAt.slice(11, 16);
@@ -33,17 +30,12 @@ function reminderMinutesOrNull(reminderAt: string | null): number | null {
   return hour24ToMinutes(hhmm);
 }
 
-/** `minutes` (null = apagado, `ANY_TIME_MINUTES` = sin hora puntual, o
- * minutos reales) -> `reminderAt` para el `dateKey` dado. Sin fecha (ítem en
- * Inbox) no hay recordatorio posible. */
 function reminderAtFromMinutes(dateKey: string | null, minutes: number | null): string | null {
   if (dateKey === null || minutes === null) return null;
   const hhmm = minutes === ANY_TIME_MINUTES ? ANY_TIME_HHMM : minutesToHour24(minutes);
   return `${dateKey}T${hhmm}:00.000Z`;
 }
 
-/** Todo el estado y las acciones de `ItemDetailSheet` — separado del componente para que ese
- * archivo sea solo presentación (mismo patrón que `useWeekAgenda.ts` para la agenda semanal). */
 export function useItemDetailForm() {
   const { t, lang } = useTranslation();
   const itemId = useItemDetailStore((s) => s.itemId);
@@ -61,7 +53,6 @@ export function useItemDetailForm() {
   const [taskReminderMinutes, setTaskReminderMinutes] = useState<number | null>(null);
   const [taskRepeat, setTaskRepeat] = useState('Never');
 
-  // Link (task + event) — se conserva al alternar entre esos dos tipos.
   const [link, setLink] = useState('');
 
   const [eventStartMinutes, setEventStartMinutes] = useState(9 * 60);
@@ -81,20 +72,10 @@ export function useItemDetailForm() {
   const [habitHealthMetric, setHabitHealthMetric] = useState<string | null>(null);
   const [habitHealthMetricTarget, setHabitHealthMetricTarget] = useState<number | null>(null);
 
-  // "Marcar completada/hecho" (footer) — a diferencia de `status` (que sirve para una task SIN
-  // `repeatRule`), un hábito o una task QUE REPITE se completa por DÍA vía su propia tabla de
-  // completions (mismo patrón que `dayItemsStore`), nunca tocando `status`. Acá el día relevante
-  // es siempre HOY (`todayKey`) — este sheet no sabe en qué ocurrencia/día se tocó la fila que lo
-  // abrió, y la inmensa mayoría de las veces se abre desde Today (que opera sobre el día actual).
   const todayKey = toDateKey(new Date());
   const [habitCompletedToday, setHabitCompletedToday] = useState(false);
   const [taskCompletedToday, setTaskCompletedToday] = useState(false);
 
-  // Cambiar de tipo desde la hoja de detalle (p. ej. una task del Inbox que en
-  // realidad era un Event) resetea SOLO los campos específicos del tipo
-  // anterior a sus defaults — a diferencia de Quick Add, acá título/fecha/
-  // categoría/prioridad se conservan porque el usuario está editando algo que
-  // ya existe, no arrancando de cero.
   const handleTypeChange = (nextType: QuickAddType) => {
     if (nextType === type) return;
     setType(nextType);
@@ -134,8 +115,6 @@ export function useItemDetailForm() {
     dayItemRepository.getById(itemId).then((loaded) => {
       if (!loaded) return;
       setItem(loaded);
-      // Moments no se editan acá (nunca abren esta hoja, ver mapInboxItemToRow/
-      // ítems de Today) — el cast es seguro en la práctica.
       setType(loaded.type === 'moment' ? 'task' : loaded.type);
       setTitle(loaded.title);
       setStatus(loaded.status);
@@ -198,20 +177,11 @@ export function useItemDetailForm() {
   }, [itemId]);
 
   const readOnlyLabels = useCategoriesStore((s) => s.readOnlyLabels);
-  // Lector de una categoría compartida (SYNC_ROADMAP.md, Fase 4) — puede VER el ítem (esta hoja
-  // se sigue abriendo), pero no editar/completar/reclasificar nada. En vez de deshabilitar cada
-  // campo suelto (TimeFieldRow/DateFieldRow/etc. no tienen una prop `disabled` hoy), se envuelve
-  // todo el formulario editable en un `pointerEvents="none"` + opacidad — ningún cambio local
-  // importa de todos modos porque `confirmDisabled` bloquea "Actualizar" más abajo.
   const readOnly = !!item?.category && readOnlyLabels.has(item.category);
 
-  // `statusOverride` lo usa `handleMarkToggle` para una Task SIN `repeatRule` — evita el desfasaje
-  // de un closure viejo que tendría `setStatus(...)` seguido de `handleSave()` en el mismo
-  // handler (el `status` del render actual todavía no reflejaría el cambio).
   const handleSave = async (statusOverride?: 'inbox' | 'scheduled' | 'done') => {
     if (!item) return;
     if (item.type === 'moment') {
-      // Moments no se editan desde esta hoja.
       close();
       return;
     }
@@ -220,8 +190,6 @@ export function useItemDetailForm() {
     const categoryLabel = category?.label ?? null;
     const categoryColor = category?.color ?? null;
     const effectiveStatus = statusOverride ?? status;
-    // Si se saca de Inbox asignándole fecha, pasa a agendado; si se manda a Inbox
-    // (sin fecha), vuelve a 'inbox'. Un task ya marcado "done" no se reabre por esto.
     const finalStatus: 'inbox' | 'scheduled' | 'done' =
       dateKey === null ? 'inbox' : effectiveStatus === 'inbox' ? 'scheduled' : effectiveStatus;
     const base = {
@@ -237,11 +205,6 @@ export function useItemDetailForm() {
     };
     let updated: DayItem;
 
-    // Los campos específicos de un tipo distinto al que tenía el ítem antes
-    // de cambiarlo (ver `handleTypeChange`) se preservan del original cuando
-    // existen (p. ej. volver de Event a Task conserva `link` si lo tenía) y
-    // usan un default sensato cuando no (mismo criterio que la creación en
-    // Quick Add).
     if (type === 'task') {
       const reminderAt = reminderAtFromMinutes(dateKey, taskReminderMinutes);
       updated = {
@@ -309,9 +272,6 @@ export function useItemDetailForm() {
     close();
   };
 
-  /** Botón "Marcar completada/hecho" del footer (solo Tarea/Hábito) — guarda también cualquier
-   * otro campo editado en el formulario (reusa `handleSave`), así nunca se pierde una edición en
-   * curso al marcar. */
   const handleMarkToggle = async () => {
     if (!item) return;
     if (type === 'habit') {
@@ -330,9 +290,6 @@ export function useItemDetailForm() {
   const isDoneToday = type === 'habit' ? habitCompletedToday : type === 'task' && taskRepeat !== 'Never' ? taskCompletedToday : status === 'done';
 
   const meta = QUICK_ADD_META[type];
-  // Mismo criterio que QuickAddSheet: sin título (o sin grabación en nota de
-  // voz nueva) no se puede guardar. Un lector de categoría compartida (`readOnly`) nunca puede
-  // guardar, sin importar el resto.
   const saveDisabled = readOnly || !title.trim() || (type === 'voiceMemo' && !recordedUri);
 
   return {

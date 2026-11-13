@@ -16,55 +16,9 @@ const HOLD_END = 1150;
 const FADE_OUT_DURATION = 200;
 const EXPAND_DURATION = 620;
 const GLOW_SIZE = 260;
-const EXPAND_SCALE_TARGET = 5; // 260 * 5 = 1300px, cubre la diagonal de cualquier teléfono
+const EXPAND_SCALE_TARGET = 5;
 const ICON_SIZE = 160;
 
-/**
- * Splash animado propio, mostrado apenas monta React — reemplaza al splash
- * nativo estático (`app.config.ts` → plugin `expo-splash-screen`, mismo
- * logo/fondo) que ya se ocultó en `_layout.tsx` justo antes de renderizar
- * esto, así no hay un frame en blanco entre los dos. Ver CLAUDE.md → "Logo y
- * splash screen" para el porqué de este patrón (Expo no anima el splash
- * nativo por sí solo).
- *
- * Coreografía (pedido explícito del usuario, 2026-08-21, con referencia
- * visual propia — ícono apareciendo + el glow rojo alrededor "explotando"
- * para cubrir toda la pantalla y revelar Today, no un simple fundido):
- * 1) Entrada: el ÍCONO ARRANCA YA VISIBLE (`logoOpacity` fijo en 1, nunca
- *    anima) — solo tiene un rebote sutil de escala (1 → 1.08 → 1). Dos bugs
- *    reales corregidos acá, ambos reportados en dispositivo real:
- *    a) Opacidad: la primera versión hacía fundido 0→1 en el ícono, y esa
- *       fracción de segundo en la que el ícono nuevo (React) se solapaba
- *       semitransparente sobre el splash NATIVO estático (mismo ícono, ver
- *       `app.config.ts` → plugin `expo-splash-screen`) se veía como "dos
- *       íconos" superpuestos. Con opacidad fija en 1 nunca hay un instante
- *       en que ambos sean parcialmente transparentes a la vez.
- *    b) Posición: `iconWrap` NO puede ser un hijo más del `flex` vertical
- *       centrado junto con el wordmark/lema — aunque esos textos arranquen
- *       en opacity 0, siguen ocupando espacio real en el layout, así que el
- *       `justifyContent:'center'` del contenedor empuja al ícono hacia
- *       arriba para dejarles lugar debajo. El splash NATIVO centra el ícono
- *       en TODA la pantalla, sin nada más — ese desfase de posición (el
- *       ícono "sube" apenas monta React) se leía como si apareciera un
- *       segundo ícono en otro lugar. Fix: `iconWrap` y el bloque de texto
- *       son dos elementos `position:absolute` independientes, anclados los
- *       dos al centro real de la pantalla por separado — el ícono nunca se
- *       mueve un píxel al aparecer el texto.
- *    El glow ambiental sí puede fundirse desde 0 sin problema (no existe
- *    versión nativa de él, no hay nada con qué solaparse) pulsando detrás
- *    (`RadialGradient` real, no un disco plano), wordmark "Meld" y lema en
- *    cascada.
- * 2) Hold breve con todo visible.
- * 3) Expansión: el MISMO nodo del glow (no uno nuevo/duplicado — así el
- *    color es exactamente igual al que rodea el ícono, no una aproximación)
- *    crece con `Easing.in` hasta cubrir toda la pantalla mientras ícono/
- *    wordmark/lema se apagan rápido. Al ser un `RadialGradient` que se
- *    desvanece a transparente (no un color plano), incluso a tamaño
- *    completo la pantalla no queda pareja — el centro se ve más saturado y
- *    se difumina hacia los bordes, igual que el glow chico, solo que
- *    ocupando todo. Apenas termina de crecer, dispara `onFinish` — el corte
- *    a Today es la transición en sí, a propósito.
- */
 export function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
   const { t } = useTranslation();
 
@@ -78,13 +32,10 @@ export function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
   const taglineY = useSharedValue(8);
 
   useEffect(() => {
-    // Opacidad SIEMPRE en 1 durante la entrada — recién baja a 0 en la
-    // salida (ver arriba, por qué no puede animarse desde 0 al montar).
     logoOpacity.value = withDelay(
       HOLD_END,
       withTiming(0, { duration: FADE_OUT_DURATION, easing: Easing.in(Easing.quad) }),
     );
-    // Rebote sutil de escala como única señal de "aparición" del ícono.
     logoScale.value = withDelay(
       80,
       withSequence(
@@ -143,8 +94,6 @@ export function AnimatedSplash({ onFinish }: { onFinish: () => void }) {
 
   return (
     <View style={styles.container} pointerEvents="none">
-      {/* Anclado al centro real de la pantalla, independiente del bloque de
-          texto de abajo — nunca se mueve al aparecer/desaparecer el texto. */}
       <View style={styles.iconWrap}>
         <Animated.View style={[styles.glowWrap, glowStyle]}>
           <Svg width={GLOW_SIZE} height={GLOW_SIZE}>

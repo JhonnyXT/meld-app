@@ -9,7 +9,6 @@ import { buildMonthGrid } from '@/domain/calendarGrid';
 import { formatMonthYearLabel } from '@/domain/date';
 
 interface MonthCalendarPickerProps {
-  /** `null` = sin fecha seleccionada (p. ej. el ítem está en el Inbox). */
   selectedDateKey: string | null;
   onSelect: (dateKey: string) => void;
 }

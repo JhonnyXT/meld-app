@@ -21,8 +21,6 @@ import { formatLongDate, toDateKey } from '@/domain/date';
 
 const DRAWER_MAX_WIDTH = 320;
 const DRAWER_WIDTH_RATIO = 0.78;
-/** Cuánto se achica la pantalla empujada (1 → 0.92) — da la sensación de que
- * la app "se va hacia atrás" detrás del menú, como en la referencia. */
 const CONTENT_SCALE = 0.92;
 const CONTENT_RADIUS = 28;
 const OPEN_MS = 280;
@@ -34,9 +32,6 @@ type DrawerEntry =
   | { kind: 'route'; path: string; labelKey: TranslationKey; icon: IconName; badge?: 'inbox' }
   | { kind: 'divider'; id: string };
 
-/** Orden de la referencia: pantallas del día › organizar › ajustes. Hábitos no
- * tiene pantalla propia todavía (viven en Hoy), así que no figura. Categorías es una ruta real
- * desde 2026-11-06 (antes abría un Modal aparte) — mismo `goTo` que el resto. */
 const ENTRIES: DrawerEntry[] = [
   { kind: 'route', path: '/', labelKey: 'today', icon: 'view-day' },
   { kind: 'route', path: '/calendar', labelKey: 'calendar', icon: 'calendar-month' },
@@ -48,13 +43,6 @@ const ENTRIES: DrawerEntry[] = [
   { kind: 'route', path: '/settings', labelKey: 'settings', icon: 'settings' },
 ];
 
-/** Menú lateral de navegación: al abrirlo (botón ☰ de `FloatingBar` →
- * `navigateMenuStore`) la pantalla actual se desliza a la derecha, se achica
- * y redondea sus esquinas, y debajo aparece el menú a la izquierda (mini
- * calendario del mes + destinos). Tocar o arrastrar hacia la izquierda la
- * pantalla empujada lo cierra; el botón "atrás" de Android también. Envuelve
- * al `Stack` raíz — las hojas globales (Quick Add, detalle, etc.) quedan
- * fuera, por encima. */
 export function NavDrawerLayout({ children }: { children: React.ReactNode }) {
   const { palette } = useTheme();
   const { width } = useWindowDimensions();
@@ -77,9 +65,6 @@ export function NavDrawerLayout({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [visible, close]);
 
-  // Arrastrar la pantalla empujada hacia la izquierda la devuelve a su lugar.
-  // El cálculo va inline en el worklet (ver Gotchas en CLAUDE.md); solo
-  // `close` pasa por `runOnJS`.
   const dragClose = Gesture.Pan()
     .activeOffsetX([-10, 10])
     .onUpdate((e) => {
@@ -142,11 +127,8 @@ function NavDrawerMenu() {
   const inboxCount = useInboxStore((s) => s.items.length);
   const visible = useNavigateMenuStore((s) => s.visible);
 
-  // Se recalcula cada vez que se abre, por si cambió el día con la app abierta.
   const today = useMemo(() => new Date(), [visible]); // eslint-disable-line react-hooks/exhaustive-deps
   const todayKey = toDateKey(today);
-  // Semanas como filas explícitas de 7: con `flexWrap` + anchos en % el
-  // redondeo hacía saltar la 7ma celda a la fila siguiente.
   const weeks = useMemo(() => {
     const grid = buildMonthGrid(today.getFullYear(), today.getMonth(), today);
     return Array.from({ length: grid.length / 7 }, (_, w) => grid.slice(w * 7, w * 7 + 7));

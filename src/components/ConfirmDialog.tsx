@@ -12,12 +12,9 @@ interface ConfirmDialogProps {
   cancelLabel: string;
   onConfirm: () => void;
   onCancel: () => void;
-  /** `danger` (default) para acciones destructivas; `accent` para avisos. */
   tone?: 'danger' | 'accent';
 }
 
-/** Modal de confirmación propio del sistema de diseño de Meld — reemplaza el
- * `Alert.alert` nativo del sistema operativo para acciones destructivas. */
 export function ConfirmDialog({
   visible,
   icon = 'delete-outline',
@@ -109,8 +106,6 @@ const styles = StyleSheet.create({
   message: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 22 },
   buttons: { flexDirection: 'row', gap: 10, width: '100%' },
   btn: { flex: 1, paddingVertical: 13, borderRadius: 14, alignItems: 'center' },
-  // Un label largo ("Mantener en el teléfono"/"Borrar de este teléfono") envuelve a 2 líneas en
-  // un botón angosto — sin `textAlign: 'center'` la 2a línea queda pegada a la izquierda en vez
-  // de centrada bajo la 1a (bug real reportado por el usuario, 2026-11-06).
+  // ver docs/adr/0014-confirmdialog-texto-centrado-en-boton.md
   btnText: { fontSize: 15, textAlign: 'center' },
 });

@@ -16,21 +16,7 @@ const COUNT = QUICK_ADD_TYPES.length;
 const TRACK_PADDING = 6;
 const TRACK_GAP = 4;
 
-/** Switch de tipo — además de tocar un ícono, mantener presionado y arrastrar
- * a cualquier lado del track va seleccionando el tipo bajo el dedo en vivo
- * (agregado 2026-08-26 a pedido explícito, mismo espíritu que el swipe de
- * `DayBar` pero "de arrastre continuo" en vez de "de a un paso"). `minDistance(0)`
- * hace que el gesto arranque apenas se toca (no hace falta mover el dedo
- * primero) para que un toque simple siga funcionando igual que antes.
- *
- * La selección NO se pinta cambiando el `backgroundColor` de cada tab en
- * cada render (bug real reportado: durante el arrastre se veía "brusco" y el
- * pill activo perdía las esquinas redondeadas un frame sí y otro no, por el
- * recálculo de layout/estilo en cada índice). En cambio hay un único "Thumb"
- * (`Animated.View` absoluto, `pointerEvents="none"`) que se desliza con
- * `withTiming` a la posición del índice activo — mismo pill, misma forma,
- * solo se mueve. Los íconos van en una capa aparte encima, sin fondo propio,
- * solo cambian de color según estén debajo del thumb o no. */
+// ver docs/adr/0013-typetabs-thumb-unico-no-backgroundcolor-por-tab.md
 export function TypeTabs({ value, onChange }: TypeTabsProps) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();

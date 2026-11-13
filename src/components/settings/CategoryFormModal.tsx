@@ -13,19 +13,12 @@ import type { IconName } from '@/domain/iconNames';
 
 interface CategoryFormModalProps {
   visible: boolean;
-  /** `null` = modo creación; un `Category` existente = modo edición (precarga
-   * los campos y muestra el botón de eliminar). */
   initial: Category | null;
   onClose: () => void;
   onSave: (input: { label: string; icon: IconName; color: string }) => void;
   onDelete: () => void;
 }
 
-/** Hoja de crear/editar una categoría — mismo patrón visual que
- * `QuickAddSheet` (handle, header, `inputBox`/`configBox`, CTA inferior) para
- * quedar consistente con el resto del sistema de diseño. Se monta encima de
- * `CategoriesManagerSheet` (Modal sobre Modal, mismo patrón ya usado en el
- * resto de la app, p. ej. `DatePickerModal` dentro de `QuickAddSheet`). */
 export function CategoryFormModal({ visible, initial, onClose, onSave, onDelete }: CategoryFormModalProps) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();

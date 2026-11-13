@@ -32,23 +32,8 @@ function formatSeconds(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// Barras decorativas de "waveform" — mismo criterio que el resto de la app
-// (`DayItemRow`, ver "Reproducción de nota de voz" en CLAUDE.md): puramente
-// visual, sin leer amplitud real del audio.
 const WAVEFORM_BARS = [6, 14, 9, 18, 11, 16, 7, 13, 10, 15, 8, 12, 6, 14, 9];
 
-/** Fila de "Nota de voz" en Quick Add/`ItemDetailSheet` — 3 estados en un
- * solo componente (pedido explícito del usuario, 2026-09-11, con referencia
- * visual):
- * 1. Inactiva: "Toca para grabar" (ícono mic).
- * 2. Grabando: card con punto pulsante + timer + Pausar/Reanudar + Detener.
- * 3. Grabada: fila de reproducción (▶ + waveform decorativo + duración +
- *    eliminar), igual en espíritu a como se reproduce una nota de voz ya
- *    guardada (`useVoiceMemoPlayer`).
- * El manejo de pausa/resume vive local acá (no en el padre) — el padre solo
- * necesita el resultado final (`onRecorded`) y poder descartarlo
- * (`onDelete`); mismo criterio que el resto de los campos de Quick Add,
- * donde el padre es la fuente de verdad solo de lo que se persiste. */
 export function VoiceRecordRow({
   recorder,
   recordedUri,
@@ -176,8 +161,6 @@ export function VoiceRecordRow({
   );
 }
 
-/** Punto rojo pulsante — única señal de "grabando en vivo" además del timer.
- * Se congela (sin pulsar) mientras está en pausa. */
 function RecordingDot({ active, color }: { active: boolean; color: string }) {
   const pulse = useSharedValue(1);
 

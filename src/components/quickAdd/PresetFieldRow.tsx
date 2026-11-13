@@ -18,9 +18,6 @@ interface PresetFieldRowProps {
   showBorder?: boolean;
 }
 
-/** Fila icono + etiqueta + valor que, al tocarla, expande un acordeón inline
- * con la lista completa de presets — reemplaza el ciclo "tocar avanza al
- * siguiente valor" por selección directa. */
 export function PresetFieldRow({ icon, label, options, value, onChange, lang, showBorder = true }: PresetFieldRowProps) {
   const { palette, font } = useTheme();
   const [expanded, setExpanded] = useState(false);

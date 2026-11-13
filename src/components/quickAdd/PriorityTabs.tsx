@@ -13,10 +13,6 @@ interface PriorityTabsProps {
   onChange: (value: PriorityLevel) => void;
 }
 
-/** Fila-acordeón — colapsada por default, muestra la prioridad elegida +
- * chevron; tocarla expande los tabs debajo. Mismo patrón que
- * `PresetFieldRow`/`CategoryChips` (pedido explícito del usuario, 2026-08-26,
- * para no ocupar espacio permanente en Quick Add/`ItemDetailSheet`). */
 export function PriorityTabs({ value, onChange }: PriorityTabsProps) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();

@@ -8,16 +8,12 @@ import type { IconName } from '@/components/Icon';
 interface DateFieldRowProps {
   icon: IconName;
   label: string;
-  /** `null` = Inbox (sin fecha). */
   dateKey: string | null;
   onChange: (dateKey: string | null) => void;
   allowInbox?: boolean;
   showBorder?: boolean;
 }
 
-/** Fila icono + etiqueta + valor que, al tocarla, abre un modal de calendario
- * de mes — reemplaza el ciclo Hoy/Mañana (o Inbox/Hoy/Mañana) por selección
- * de cualquier día. */
 export function DateFieldRow({ icon, label, dateKey, onChange, allowInbox, showBorder = true }: DateFieldRowProps) {
   const { t, lang } = useTranslation();
   const [pickerVisible, setPickerVisible] = useState(false);

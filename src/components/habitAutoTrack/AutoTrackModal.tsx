@@ -21,12 +21,6 @@ const GROUP_LABEL_KEY: Record<HealthMetricGroup, 'autoTrackSectionActivity' | 'a
   workouts: 'autoTrackSectionWorkouts',
 };
 
-/** Modal de selección de Auto-registro (fiel al picker de referencia del
- * usuario: None + secciones Activity/Rings/Workouts, con stepper +/- inline
- * en la métrica de Actividad seleccionada). Elegir cualquier opción distinta
- * de "None" es lo que convierte un hábito en "de salud" (ícono según la
- * métrica + corazón, ver `mapDayItemToRow.ts`) — ver `autoTrackProNote` para
- * la nota de que el marcado automático real es de plan Pro. */
 export function AutoTrackModal({ visible, metricId, target, onCancel, onConfirm }: AutoTrackModalProps) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();

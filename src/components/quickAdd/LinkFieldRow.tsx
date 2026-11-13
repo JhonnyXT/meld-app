@@ -10,10 +10,6 @@ interface LinkFieldRowProps {
   showBorder?: boolean;
 }
 
-/** Campo de URL opcional para Task/Event (Quick Add y detalle). Icono +
- * input inline; si hay un valor, un botón "↗" para abrirlo al toque. El link
- * se muestra después como acción de acceso rápido en la fila de la lista
- * (ver `DayItemRow` → `hasLink`). */
 export function LinkFieldRow({ value, onChange, showBorder = true }: LinkFieldRowProps) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();

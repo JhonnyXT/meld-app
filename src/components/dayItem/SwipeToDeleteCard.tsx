@@ -24,16 +24,9 @@ interface SwipeToDeleteCardProps {
   onDelete: () => void;
   borderRadius?: number;
   style?: StyleProp<ViewStyle>;
-  /** Si se pasa, deslizar la fila hacia la DERECHA (desde el borde izquierdo)
-   * revela un botón verde "Hoy" que la agenda para hoy — usado en Inbox. */
   onScheduleToday?: () => void;
 }
 
-/** Envuelve una fila para que deslizar a la izquierda revele un botón de
- * eliminar a la derecha (mismo patrón que "my-wallet-app"), y opcionalmente
- * deslizar a la derecha revele un botón "Hoy" a la izquierda. Tocar el botón
- * de eliminar borra directo (sin confirmar antes) — la red de seguridad es el
- * snackbar "Deshacer" global (`useUndoStore`), no un diálogo previo. */
 export function SwipeToDeleteCard({ children, onDelete, borderRadius = 12, style, onScheduleToday }: SwipeToDeleteCardProps) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();
@@ -66,13 +59,6 @@ export function SwipeToDeleteCard({ children, onDelete, borderRadius = 12, style
     transform: [{ translateX: translateX.value }],
   }));
 
-  // El fondo (basura/"Hoy") es un hermano absoluto de la card animada, no un
-  // recorte de ella — sin esto queda potencialmente visible un frame antes de
-  // que `animatedCard` reciba su layout (flex:1 mide 0 en el primer frame),
-  // lo que se ve como un flash del ícono de basura al remontar filas (p. ej.
-  // al pasar rápido de día en día en Today). Atarle la opacidad al progreso
-  // real del swipe lo mantiene invisible hasta que el usuario desliza de
-  // verdad, sin depender de que la card ya la esté cubriendo.
   const deleteBgStyle = useAnimatedStyle(() => ({
     opacity: interpolate(translateX.value, [-DELETE_WIDTH, 0], [1, 0], Extrapolation.CLAMP),
   }));

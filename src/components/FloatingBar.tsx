@@ -37,40 +37,15 @@ interface FloatingBarProps {
   fabSize?: number;
   barRadius?: number;
   centerStyle?: StyleProp<ViewStyle>;
-  /** Ícono/color del botón izquierdo — por defecto "menu"/texto. Inbox lo
-   * cambia a "close" mientras hay selección múltiple activa (cancelar). */
   menuIcon?: IconName;
-  /** Ícono/color del FAB derecho — por defecto "add"/accent. Inbox lo cambia
-   * a "delete-outline"/danger mientras hay selección múltiple activa. */
   fabIcon?: IconName;
   fabColor?: string;
-  /** Labels de accesibilidad para los dos botones solo-ícono — por defecto
-   * "Navegar"/"Agregar elemento"; Inbox los pisa a "Cancelar"/"Eliminar
-   * elemento" durante la selección múltiple. */
   menuLabel?: string;
   fabLabel?: string;
-  /** Fila extra opcional que estira la card hacia arriba, mismo patrón que
-   * `TimeConfirmRow`/`UndoRow` (con las que es mutuamente excluyente — esas
-   * dos tienen prioridad si están activas). Hoy solo la usa `DayBar` para
-   * "Volver a hoy" cuando el día mostrado no es el actual. */
   topRow?: React.ReactNode;
-  /** Panel que se despliega DENTRO de la barra, por encima de las 3 piezas:
-   * con él la barra entera se vuelve una sola card que crece hacia arriba
-   * (hoy: el calendario de mes de `DayBar`, pedido explícito del usuario
-   * 2026-10-27 con referencia visual — en vez de abrir un modal). Mientras
-   * está abierto se ocultan `topRow`/Deshacer/Confirmar hora. */
   expandedPanel?: React.ReactNode;
 }
 
-/** Esqueleto compartido de la barra flotante inferior: 3 piezas separadas por un
- * hueco visible — menú (círculo), contenido central (card propia) y FAB
- * (círculo) — pedido explícito del usuario (2026-08-27, referencia visual con
- * las 3 piezas sueltas), reemplaza la versión anterior de una sola card
- * continua con las 3 cosas adentro. Menú y FAB quedan FIJOS (`sideSlot` con
- * altura constante `FLOATING_BAR_HEIGHT`, alineados al fondo del row) — solo
- * la card central crece hacia arriba mientras hay un arrastre de hora activo
- * (`useTimeDragStore`), un Undo visible, o una fila `topRow` (p. ej. "Volver a
- * hoy" de `DayBar`), sin mover ni separar más a menú/FAB de su lugar. */
 export function FloatingBar({
   center,
   onMenuPress,
@@ -97,10 +72,6 @@ export function FloatingBar({
   return (
     <View style={[styles.wrap, { bottom: Math.max(insets.bottom, FLOATING_BAR_MARGIN) }]} pointerEvents="box-none">
       {!expanded && (dragging || undoVisible || topRow) ? (
-        // Card flotante SEPARADA por encima de toda la barra (con hueco), a
-        // todo el ancho — no una card pegada al pill ni estirando la barra
-        // (pedido explícito 2026-08-29). Fondo/sombra propios porque las 3
-        // filas (Confirmar hora / Deshacer / Volver a hoy) no los traen.
         <View
           style={[
             styles.card,
@@ -130,8 +101,6 @@ export function FloatingBar({
             style={[
               styles.circleBtn,
               { backgroundColor: palette.surface },
-              // Dentro de la card abierta el menú queda como ícono plano
-              // (sin círculo ni sombra), igual que en la referencia.
               expanded && styles.circleBtnFlat,
             ]}
             hitSlop={8}
@@ -143,9 +112,6 @@ export function FloatingBar({
         </View>
 
         <View style={styles.centerColumn}>
-          {/* El pill de `center` flota solo — `DayBar`/`Inbox` ya dibujan su
-              propio pill con `pillSolid`, el resto de pantallas usa
-              `palette.pillSolid` directo en su `.pill`. */}
           <View style={[styles.bar, { paddingHorizontal: 0 }, centerStyle]}>{center}</View>
         </View>
 
@@ -204,11 +170,6 @@ const RING_RADIUS = 12;
 const RING_STROKE = 2.5;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
-/** Fila interna de "Deshacer" — mismo patrón que `TimeConfirmRow` (FloatingBar
- * se estira hacia arriba en vez de flotar una card aparte, ver CLAUDE.md →
- * "Undo real"). El anillo se rellena en sentido horario durante los mismos
- * `UNDO_DURATION_MS` que el snackbar queda visible, para que el usuario vea
- * cuánto tiempo le queda para tocar "Deshacer". */
 function UndoRow() {
   const { palette, font } = useTheme();
   const { t } = useTranslation();
@@ -295,10 +256,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 10,
   },
-  // Alto fijo = altura de la fila base (`bar`) sin ninguna fila extra encima —
-  // menú/FAB se centran ahí y quedan pegados al fondo del `row` (alignItems:
-  // 'flex-end'), así nunca se mueven aunque la card central crezca hacia
-  // arriba para mostrar Confirmar hora/Deshacer/Volver a hoy.
   sideSlot: { height: FLOATING_BAR_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   circleBtn: {
     width: 52,
@@ -315,8 +272,6 @@ const styles = StyleSheet.create({
   circleBtnFlat: { backgroundColor: 'transparent', shadowOpacity: 0, elevation: 0 },
   centerColumn: { flex: 1 },
   panelShell: { width: '100%', maxWidth: 420, alignItems: 'center' },
-  // La card abierta envuelve panel + barra: el padding lateral corre la barra
-  // hacia adentro, así que menú/pill/FAB quedan dentro del borde redondeado.
   panelOpen: { borderRadius: 32, paddingHorizontal: 10, paddingTop: 18 },
   panel: { width: '100%', paddingHorizontal: 8, paddingBottom: 6 },
   card: {

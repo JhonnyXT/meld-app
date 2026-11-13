@@ -8,26 +8,14 @@ import type { IconName } from '@/components/Icon';
 interface TimeFieldRowProps {
   icon: IconName;
   label: string;
-  /** Minutos desde medianoche, `null` cuando el campo está apagado, o
-   * `ANY_TIME_MINUTES` cuando el recordatorio está encendido sin hora
-   * puntual ("Cualquier hora"). */
   minutes: number | null;
   onChange: (minutes: number | null) => void;
-  /** Texto mostrado cuando `minutes` es `null` (p. ej. "Apagado"). */
   offLabel: string;
-  /** Cuando es `true`, muestra un botón "x" (mientras haya un valor) para
-   * volver el campo a `null` sin tener que abrir el picker. */
   clearable?: boolean;
-  /** Cuando es `true`, el picker ofrece la opción "Cualquier hora" además de
-   * elegir una hora puntual (solo tiene sentido en campos de recordatorio,
-   * no en horas reales como "Empieza" de Event). */
   allowAnyTime?: boolean;
   showBorder?: boolean;
 }
 
-/** Fila icono + etiqueta + valor que, al tocarla, abre un modal de wheel-picker
- * para elegir cualquier hora (reemplaza el ciclo/acordeón de presets fijos
- * para los campos que representan una hora real del día). */
 export function TimeFieldRow({
   icon,
   label,

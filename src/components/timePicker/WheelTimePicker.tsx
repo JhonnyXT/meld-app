@@ -9,12 +9,9 @@ const MINUTE_VALUES = Array.from({ length: 60 }, (_, i) => i);
 const twoDigits = (n: number) => String(n).padStart(2, '0');
 
 interface WheelTimePickerProps {
-  /** Minutos desde medianoche (0-1439), mismo formato que el resto del dominio (`domain/time.ts`). */
   valueMinutes: number;
   onCancel: () => void;
   onConfirm: (minutes: number) => void;
-  /** Cuando está presente, muestra el botón "Cualquier hora" — recordatorio
-   * sin hora puntual (ver `ANY_TIME_MINUTES`/`ANY_TIME_HHMM` en domain/time.ts). */
   onSelectAnyTime?: () => void;
 }
 

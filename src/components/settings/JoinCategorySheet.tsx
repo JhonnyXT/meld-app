@@ -22,14 +22,6 @@ const ERROR_KEY: Record<JoinCodeErrorKind, TranslationKey> = {
   denied: 'joinCategoryErrorDenied',
 };
 
-/** Hoja de "Unirme con un código" (SYNC_ROADMAP.md, Fase 4) — mismo patrón visual que
- * `CategoryFormModal`/`ShareCategorySheet`. Sin gate de plan (T9: un invitado Free participa
- * igual, solo quien comparte necesita Pro) ni de sesión en el render (a diferencia de
- * `ShareCategorySheet`, que sí lo gatea antes de mostrar el formulario): acá se intenta directo y
- * `joinCategoryWithCode` devuelve `JoinCodeError('no-session')` si hace falta, con su propio
- * mensaje — simplifica el componente sin perder el aviso. Al unirme, `src/sync/engine.ts` ya pide
- * una traída (`requestSync({ pull: true })`), así que la categoría nueva aparece sola en la lista
- * en cuanto `pullSpaces` la descubre — este sheet solo informa que se unió, no espera a verla. */
 export function JoinCategorySheet({ visible, onClose }: JoinCategorySheetProps) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();

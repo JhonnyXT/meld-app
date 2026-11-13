@@ -39,10 +39,6 @@ export const WheelColumn = memo(function WheelColumn({
     listRef.current?.scrollToIndex({ index, animated: true });
   }, []);
 
-  // `initialScrollIndex` a veces no aplica el offset correcto en el primer
-  // frame en Android — se re-aplica sin animación una vez que el contenido
-  // termina de medirse, para evitar que la columna aparezca vacía/desalineada
-  // al abrir el picker.
   const didInitialScroll = useRef(false);
   const onContentSizeChange = useCallback(() => {
     if (didInitialScroll.current) return;

@@ -21,12 +21,6 @@ interface AccentColorRowProps {
   onChange: (value: AccentId) => void;
 }
 
-/** Fila-acordeón de Settings para elegir el color de acento del tema —
- * mismo patrón de acordeón inline que `CategoryChips`/`PriorityTabs` en
- * Quick Add (colapsado por default, header tocable con el valor actual +
- * chevron, swatches debajo al expandir). `accentPalette`/`AccentId` ya
- * existían en `theme/tokens.ts` con efecto real en `ThemeProvider` — a esto
- * solo le faltaba una UI para elegirlos. */
 export function AccentColorRow({ value, onChange }: AccentColorRowProps) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();

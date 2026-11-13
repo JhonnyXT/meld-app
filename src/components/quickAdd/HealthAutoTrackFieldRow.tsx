@@ -14,10 +14,6 @@ interface HealthAutoTrackFieldRowProps {
   showBorder?: boolean;
 }
 
-/** Fila "Auto-registro" que, al tocarla, abre `AutoTrackModal` (picker de
- * métricas de salud tipo Apple Health) — elegir cualquier opción distinta de
- * "None" es lo que convierte el hábito en "de salud" al guardar (ver
- * `QuickAddSheet`/`ItemDetailSheet` → bloque `type === 'habit'`). */
 export function HealthAutoTrackFieldRow({ icon, label, metricId, target, onChange, showBorder = true }: HealthAutoTrackFieldRowProps) {
   const { t } = useTranslation();
   const [modalVisible, setModalVisible] = useState(false);

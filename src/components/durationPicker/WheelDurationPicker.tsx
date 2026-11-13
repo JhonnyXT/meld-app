@@ -9,16 +9,11 @@ const MINUTE_VALUES = [0, 15, 30, 45];
 const twoDigits = (n: number) => String(n).padStart(2, '0');
 
 interface WheelDurationPickerProps {
-  /** Duración total en minutos (no hora del día). */
   valueMinutes: number;
   onCancel: () => void;
   onConfirm: (minutes: number) => void;
 }
 
-/** Wheel-picker de DURACIÓN (horas 0-4 + minutos en pasos de 15) — mismo
- * patrón visual que `WheelTimePicker`, pero sin AM/PM porque no representa
- * una hora del día sino un lapso. Reemplaza el ciclo de presets fijos del
- * campo Duración de Event en Quick Add / ItemDetailSheet. */
 export function WheelDurationPicker({ valueMinutes, onCancel, onConfirm }: WheelDurationPickerProps) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();

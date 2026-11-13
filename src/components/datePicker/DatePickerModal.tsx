@@ -8,9 +8,7 @@ import { toDateKey } from '@/domain/date';
 
 interface DatePickerModalProps {
   visible: boolean;
-  /** `null` = Inbox (sin fecha). */
   selectedDateKey: string | null;
-  /** Cuando está presente, se muestra un chip "Bandeja" que selecciona `null`. */
   allowInbox?: boolean;
   onCancel: () => void;
   onSelect: (dateKey: string | null) => void;

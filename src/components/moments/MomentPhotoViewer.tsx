@@ -4,14 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 
 interface MomentPhotoViewerProps {
-  /** URI de la foto a mostrar a pantalla completa; `null` = cerrado. */
   uri: string | null;
   onClose: () => void;
 }
 
-/** Visor de foto a pantalla completa — se abre al tocar un Momento. Fondo
- * negro, la imagen entra completa (`contain`), tocar en cualquier parte o el
- * botón "X" cierra. Sin zoom por gesto todavía (necesitaría una lib aparte). */
 export function MomentPhotoViewer({ uri, onClose }: MomentPhotoViewerProps) {
   const insets = useSafeAreaInsets();
 

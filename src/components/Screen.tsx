@@ -4,9 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme/ThemeProvider';
 
 interface ScreenProps extends ViewProps {
-  /** Capa de fondo opcional — se renderiza detrás de todo, ocupando toda la
-   * pantalla; si se pasa, `palette.bg` se apaga (transparente) para que la
-   * capa se vea en vez de taparla. */
   background?: React.ReactNode;
 }
 

@@ -13,13 +13,6 @@ interface MonthDayCellProps {
   onPress?: (dateKey: string) => void;
 }
 
-/** Celda de la grilla de Mes:
- * puntos de color arriba del número (uno por ítem que NO sea Moment ese día,
- * coloreado con el color fijo de su TIPO — `typeColors`, no la categoría —
- * tope `MAX_DOTS`) y, debajo, la miniatura de
- * la foto del Moment de ese día si existe (mismo patrón de `Image` que
- * `MomentsDayRow`, no un color plano de placeholder). Tocar la celda navega
- * al día (`onPress`, opcional — sin él la celda queda solo visual). */
 export function MonthDayCell({ cell, items, onPress }: MonthDayCellProps) {
   const { palette, font } = useTheme();
 

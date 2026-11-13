@@ -57,7 +57,6 @@ const styles = StyleSheet.create({
   card: { flex: 1, borderRadius: 16, padding: 12, gap: 8, aspectRatio: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  // 7 columnas exactas, sin depender del ancho de la tarjeta (equivalente a grid-template-columns: repeat(7, 1fr)).
   dotCell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
   dot: { width: 4, height: 4, borderRadius: 2 },
 });

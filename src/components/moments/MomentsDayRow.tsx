@@ -9,16 +9,11 @@ const CARD_SIZE = { width: 132, height: 168 };
 interface MomentsDayRowProps {
   label: string;
   photos: Moment[];
-  /** Muestra el botón "+" al inicio de la tira (solo el día de hoy). */
   canAdd?: boolean;
   onAddPhoto?: () => void;
-  /** Tocar una foto la abre a pantalla completa. */
   onPressPhoto?: (m: Moment) => void;
 }
 
-/** Un día = un encabezado con la fecha + una tira horizontal de fotos. El
- * botón "+" va a la IZQUIERDA (solo en el día de hoy); se pueden agregar
- * varias fotos al mismo día. */
 export function MomentsDayRow({
   label,
   photos,

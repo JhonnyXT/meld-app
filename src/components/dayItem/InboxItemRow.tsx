@@ -11,8 +11,6 @@ interface InboxItemRowProps {
   onLongPress?: () => void;
   onDelete?: () => void;
   onScheduleToday?: () => void;
-  /** Selección múltiple activa (ver InboxScreen) — reemplaza el círculo
-   * punteado vacío por un checkbox real y desactiva el swipe-to-delete. */
   selectionMode?: boolean;
   selected?: boolean;
 }

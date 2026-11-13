@@ -16,19 +16,12 @@ import { MONTH_FULL } from '@/i18n/translations';
 interface DayBarProps {
   dateLabel: string;
   doneLabel: string;
-  /** Si el día mostrado no es hoy, `FloatingBar` se estira hacia arriba con
-   * una fila "Volver a hoy" (mismo patrón que Undo/confirmar hora) en vez de
-   * flotar una pill aparte. */
   isToday?: boolean;
   onMenuPress?: () => void;
   onPrevDay?: () => void;
   onNextDay?: () => void;
-  /** Día mostrado (`YYYY-MM-DD`) — lo marca el calendario desplegable. */
   selectedDateKey: string;
-  /** Tocar un día en el calendario desplegable. */
   onSelectDate: (dateKey: string) => void;
-  /** "Volver a hoy" — fila que aparece arriba de la barra cuando el día
-   * mostrado no es el actual. */
   onBackToToday?: () => void;
   onAddPress?: () => void;
 }
@@ -47,10 +40,6 @@ export function DayBar({
 }: DayBarProps) {
   const { palette, font } = useTheme();
   const { t, lang } = useTranslation();
-  // Tocar el pill despliega el calendario del mes DENTRO de la barra (la
-  // barra entera crece hacia arriba como una card), en vez del
-  // `DatePickerModal` — pedido explícito del usuario 2026-10-27 con
-  // referencia visual. Mientras está abierto, el pill pasa a navegar meses.
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [cursor, setCursor] = useState(() => monthStart(selectedDateKey));
 
@@ -73,12 +62,6 @@ export function DayBar({
   const prev = calendarOpen ? () => shiftMonth(-1) : onPrevDay;
   const next = calendarOpen ? () => shiftMonth(1) : onNextDay;
 
-  // Deslizar el pill de fecha cambia de día (izquierda = día siguiente,
-  // derecha = día anterior), además de los chevrons — mismo umbral chico que
-  // el resto de gestos horizontales dedicados (no compite con nada más acá,
-  // a diferencia del swipe de pantalla completa de Calendar). `runOnJS`
-  // porque el gesto corre en el hilo de UI y `onPrevDay`/`onNextDay` son
-  // callbacks JS comunes.
   const swipeGesture = Gesture.Pan()
     .activeOffsetX([-16, 16])
     .failOffsetY([-12, 12])
@@ -93,7 +76,6 @@ export function DayBar({
   return (
     <>
     {calendarOpen ? (
-      // Tocar fuera de la card cierra el calendario.
       <Pressable style={StyleSheet.absoluteFill} onPress={closeCalendar} accessibilityLabel={t('close')} />
     ) : null}
     <FloatingBar
@@ -165,10 +147,6 @@ function monthStart(dateKey: string): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-/** Calendario del mes que se despliega dentro de la barra. Los días de los
- * meses vecinos quedan en blanco (como en la referencia) y las semanas van
- * como filas explícitas de 7 (con `flexWrap` el redondeo de los % puede
- * mandar la 7ma celda a la fila siguiente — mismo motivo que el drawer). */
 function DayBarCalendar({
   cursor,
   selectedDateKey,
@@ -212,9 +190,6 @@ function DayBarCalendar({
   );
 }
 
-/** Fila interna de "Volver a hoy" — mismo patrón visual que `TimeConfirmRow`/
- * `UndoRow` de `FloatingBar` (altura `FLOATING_BAR_CONFIRM_ROW_HEIGHT`,
- * misma card, sin pill flotante aparte). */
 function BackToTodayRow({ onPress }: { onPress?: () => void }) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();

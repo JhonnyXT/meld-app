@@ -14,9 +14,6 @@ interface CalendarTodayCardProps {
   onViewDay: () => void;
 }
 
-/** Tarjeta resumen de "Hoy" debajo del grid de Mes. Muestra progreso del día actual sin
- * importar el mes que se esté mirando (siempre es HOY, no el día
- * seleccionado del grid — el grid en sí no tiene día "seleccionado" hoy). */
 export function CalendarTodayCard({
   dateLabel,
   tasksDone,

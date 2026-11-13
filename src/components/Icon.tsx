@@ -164,10 +164,6 @@ interface IconProps {
   style?: React.ComponentProps<LucideIcon>['style'];
 }
 
-/** Wrapper único sobre `lucide-react-native` — mantiene los mismos nombres
- * semánticos de ícono que se usaban con `MaterialIcons` (`name="check"`, etc.)
- * para minimizar el diff de la migración, pero desacopla el resto del código
- * de la librería de íconos concreta. */
 export function Icon({ name, size = 20, color, strokeWidth = 2, style }: IconProps) {
   const LucideComponent = ICON_MAP[name];
   return <LucideComponent size={size} color={color} strokeWidth={strokeWidth} style={style} />;

@@ -12,13 +12,6 @@ const STEP_MINUTES = 15;
 const PX_PER_STEP = 10;
 const RULER_TICKS = 40;
 
-/**
- * Solo captura el gesto de arrastre (deslizar en cualquier parte de la pantalla)
- * y dibuja el ruler del borde izquierdo. La barra de confirmación vive dentro de
- * `FloatingBar` (se estira hacia arriba) — por eso este overlay deja un hueco
- * abajo del tamaño de esa barra expandida, para que sus botones reciban el toque
- * en vez de que este overlay de pantalla completa se lo quede.
- */
 export function TimeDragOverlay() {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();

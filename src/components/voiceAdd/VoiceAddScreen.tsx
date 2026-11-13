@@ -25,11 +25,6 @@ const SILENCE_MS = 2000;
 
 type Status = 'listening' | 'processing' | 'error';
 
-/** Pantalla full-screen de dictado (long-press FAB → "Por voz"). Escucha con
- * `expo-speech-recognition`, muestra la transcripción en vivo, y a los 2s de
- * silencio (o al terminar la frase) corre `parseVoiceInput` y abre Quick Add
- * pre-llenado. El audio no se graba: solo la transcripción, en el
- * dispositivo. Montada una sola vez en `app/_layout.tsx`. */
 export function VoiceAddScreen() {
   const { palette, font } = useTheme();
   const { t, lang } = useTranslation();
@@ -82,7 +77,6 @@ export function VoiceAddScreen() {
     }
     setStatus('processing');
     statusRef.current = 'processing';
-    // Un respiro para que se vea el estado "Analizando…" antes de saltar.
     setTimeout(() => {
       const prefill = parseVoiceInput(text, lang);
       useQuickAddStore.getState().openWithPrefill(prefill);
@@ -117,7 +111,6 @@ export function VoiceAddScreen() {
     }
   }, [lang, t]);
 
-  // Arrancar/cortar la escucha al abrir/cerrar la pantalla.
   useEffect(() => {
     if (visible) {
       startListening();
@@ -210,8 +203,6 @@ export function VoiceAddScreen() {
   );
 }
 
-/** Orbe con dos anillos que laten mientras escucha + un glow radial detrás
- * (mismo patrón de `RadialGradient` que `AnimatedSplash`, no un disco plano). */
 function Orb({ active, accent }: { active: boolean; accent: string }) {
   const pulse1 = useSharedValue(1);
   const pulse2 = useSharedValue(1);

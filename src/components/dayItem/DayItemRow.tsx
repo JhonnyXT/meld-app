@@ -16,46 +16,19 @@ export type TimeMarker =
 export type Leading =
   | { kind: 'checkbox'; checked: boolean }
   | { kind: 'icon'; name: IconName }
-  /** Tocable para marcar "hecho hoy" (a diferencia de 'icon', que es
-   * decorativo en el resto de tipos) — ver `onToggleHabitComplete`.
-   * `completed` es "hecho el día que se está viendo", independiente del
-   * `completed` a nivel de fila (ese sigue significando "Task terminada",
-   * con su propio dim/strike de toda la fila, que NO aplica a hábitos).
-   * `healthIcon`, si está presente, se dibuja como un ícono chico aparte
-   * JUNTO a este (no en su lugar) — es el hábito "de salud" con Auto-
-   * registro, mostrando qué métrica es (footprints/bed/etc, ver
-   * `domain/healthMetrics.ts`), fiel a la referencia del usuario. */
   | { kind: 'habitIcon'; name: IconName; completed: boolean; healthIcon?: IconName };
 
-/** Badges informativos del borde derecho de la fila. `mapDayItemToRow` los
- * emite YA ordenados por precedencia y recortados al tope (2) — ver
- * CLAUDE.md → "Interacciones no obvias" / el rediseño de 2026-08-31. El
- * cluster derecho es, de izq. a der.: [badges…] [acción: audio | link].
- * Precedencia (mayor = sobrevive al recorte): priority › subtasks ›
- * recurrence › habitProgress/favorite › category. */
 export type TrailingBadge =
   | { kind: 'priority'; level: 'low' | 'medium' | 'high' }
   | { kind: 'recurrence' }
-  /** Tarea pendiente con fecha anterior a hoy, "adelantada" a Today sin
-   * tocar su `date` real (ver `dayItemsStore.reload` → rollover). Máxima
-   * precedencia — se antepone al resto en `trailingBadgesFor`. */
   | { kind: 'overdue' }
-  /** Reservado — el modelo de subtareas todavía no existe, ningún mapper lo
-   * emite. Dejar el caso listo para cuando se implemente. */
   | { kind: 'subtasks'; done: number; total: number }
   | { kind: 'habitProgress'; label: string }
-  /** Racha real del hábito (`Habit.currentStreak`, recalculada en memoria por
-   * `dayItemsStore.reload`). El mapper solo lo emite con racha ≥ 2. */
   | { kind: 'streak'; count: number }
   | { kind: 'favorite' }
   | { kind: 'category'; color: string; label: string }
-  /** Fase 4 — "completado por X" en un ítem de categoría compartida (nunca para mis propios
-   * completados, ver `trailingBadgesFor`). Precedencia más baja — el primero en caerse. */
   | { kind: 'completedBy'; name: string };
 
-/** Naranja "llama" para el badge de racha — no hay token para esto y no
- * debería mezclarse con `accent` (coral de marca) ni con el ámbar de
- * prioridad media. */
 const STREAK_COLOR = '#F59E0B';
 
 export interface TrailingPlayback {
@@ -76,13 +49,8 @@ interface DayItemRowProps {
   timeMarker: TimeMarker;
   leading: Leading;
   title: string;
-  /** Badges informativos (ver `TrailingBadge`) — ya ordenados y recortados
-   * por el mapper. */
   trailing?: TrailingBadge[];
-  /** Control de reproducción de la nota de voz (acción, va a la derecha del
-   * cluster, no cuenta contra el tope de badges). */
   playback?: TrailingPlayback;
-  /** Texto "Audio eliminado" cuando la nota de voz perdió su archivo. */
   audioDeletedLabel?: string;
   hasLink?: boolean;
   completed?: boolean;
@@ -91,11 +59,7 @@ interface DayItemRowProps {
   onToggleHabitComplete?: () => void;
   onLinkPress?: () => void;
   onDashPress?: () => void;
-  /** Cuando está presente, la card reemplaza icono+título por la barra de
-   * controles de reproducción (ver `onTogglePlay` en el trailing 'playback'). */
   playbackExpanded?: PlaybackExpanded;
-  /** Cuando está presente, deslizar la card a la izquierda revela un botón
-   * de eliminar a la derecha (no aplica mientras `playbackExpanded` está activo). */
   onDelete?: () => void;
 }
 
@@ -120,21 +84,12 @@ export function DayItemRow({
   const { t } = useTranslation();
   const listSpacing = useSettingsStore((s) => s.listSpacing);
   const completedItemStyle = useSettingsStore((s) => s.completedItemStyle);
-  // Ajustes de Apariencia (Settings): `completedItemStyle` decide CÓMO se ve
-  // un ítem ya hecho — 'fade' atenúa toda la fila (comportamiento original,
-  // opacity 0.6), 'strikethrough' solo tacha el título sin atenuar la fila,
-  // 'checkmarkOnly' no cambia nada del texto/fila, el check relleno es la
-  // única señal. `listSpacing` ('compact'/'comfortable') achica alto/padding
-  // de la fila para listas más densas.
   const fadeCompleted = completed && completedItemStyle === 'fade';
   const strikeCompleted = completed && completedItemStyle === 'strikethrough';
   const dimCompletedText = completed && completedItemStyle !== 'checkmarkOnly';
   const compact = listSpacing === 'compact';
 
   return (
-    // needsOffscreenAlphaCompositing evita que, en Android, la opacity de una fila
-    // completada "transparente" el botón de eliminar detrás de la card cuando hay
-    // swipe (RN aplica alpha por-capa en vez de componer el subárbol primero).
     <View
       style={[styles.row, compact && styles.rowCompact, fadeCompleted && styles.rowCompleted]}
       needsOffscreenAlphaCompositing={fadeCompleted}
@@ -451,7 +406,6 @@ function TrailingBadgeView({
       </View>
     );
   }
-  // habitProgress
   return <Text style={{ fontFamily: font, fontSize: 12, color: dim }}>{badge.label}</Text>;
 }
 

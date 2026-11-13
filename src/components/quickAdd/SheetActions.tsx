@@ -10,21 +10,12 @@ interface SheetActionsProps {
   onConfirm: () => void;
   confirmLabel: string;
   confirmDisabled?: boolean;
-  /** Reemplaza el botón "Cancelar" por una acción real — usado por `ItemDetailSheet` en
-   * Tarea/Hábito para "Marcar completada/hecho" en vez de solo cerrar (pedido explícito del
-   * usuario: la "X" del header ya cierra sin guardar, así que "Cancelar" ahí era redundante).
-   * Sin `onSecondary`, el botón sigue siendo "Cancelar" (comportamiento de siempre). */
   secondaryLabel?: string;
   secondaryIcon?: IconName;
   onSecondary?: () => void;
-  /** Tinta el botón secundario en `accent` — indica que el ítem YA está marcado (toggle, no una
-   * acción de un solo sentido). */
   secondaryActive?: boolean;
 }
 
-/** Botonera fija al pie de Quick Add/`ItemDetailSheet`: dos botones lado a
- * lado (secundario + confirmar en `accent`), fuera del `ScrollView`
- * para que siempre estén a mano aunque el formulario sea largo. */
 export function SheetActions({
   onCancel,
   onConfirm,

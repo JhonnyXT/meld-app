@@ -9,16 +9,10 @@ interface FieldRowProps {
   value: string;
   onPress: () => void;
   showBorder?: boolean;
-  /** Cuando está presente, muestra un chevron que indica si la fila puede
-   * expandirse (ver `PresetFieldRow`) — undefined omite el chevron. */
   expanded?: boolean;
-  /** Cuando está presente, muestra un botón "x" para volver el campo a su
-   * estado apagado/sin valor (ver `TimeFieldRow`) — solo debe pasarse cuando
-   * el campo tiene actualmente un valor que tenga sentido borrar. */
   onClear?: () => void;
 }
 
-/** Fila icono + etiqueta + valor; tocar el valor lo cicla al siguiente preset. */
 export function FieldRow({ icon, label, value, onPress, showBorder = true, expanded, onClear }: FieldRowProps) {
   const { palette, font } = useTheme();
 

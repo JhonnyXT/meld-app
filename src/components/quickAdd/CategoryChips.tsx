@@ -7,27 +7,15 @@ import { useTranslation } from '@/i18n';
 import { useCategoriesStore } from '@/store/categoriesStore';
 import { ACCORDION_LAYOUT, ACCORDION_ENTER, ACCORDION_EXIT } from './accordionMotion';
 
-/** Con más de esta cantidad de categorías los chips pasan a una sola fila con
- * scroll horizontal en vez de envolverse en varias filas (pedido explícito del
- * usuario) — así la sección no crece en alto con cada categoría nueva. */
 const MAX_WRAPPED_CATEGORIES = 3;
 
 interface CategoryChipsProps {
   value: string | null;
   onChange: (label: string, color: string) => void;
-  /** Cuando es `true`, agrega un divisor debajo (mismo patrón que las filas de
-   * campo) para separar visualmente de la sección siguiente (p. ej. Prioridad). */
   showBorder?: boolean;
 }
 
-/** Fila-acordeón — colapsada por default, muestra la categoría elegida (nada
- * si ninguna) + chevron; tocarla expande los chips debajo. Mismo patrón que
- * `PresetFieldRow` (acordeón inline), aplicado acá para no ocupar espacio
- * permanente en Quick Add/`ItemDetailSheet` con algo que se usa poco (pedido
- * explícito del usuario, 2026-08-26). El divisor va en el header cuando está
- * colapsado, y se mueve al pie de los chips cuando está expandido — nunca en
- * los dos lugares a la vez, o el espacio antes de Prioridad queda doble
- * (bug real reportado el mismo día, no reintroducirlo). */
+// ver docs/adr/0012-divisor-categorychips-un-solo-lugar.md
 export function CategoryChips({ value, onChange, showBorder }: CategoryChipsProps) {
   const { palette, font } = useTheme();
   const { t } = useTranslation();
@@ -36,10 +24,6 @@ export function CategoryChips({ value, onChange, showBorder }: CategoryChipsProp
   const readOnlyLabels = useCategoriesStore((s) => s.readOnlyLabels);
   const loaded = useCategoriesStore((s) => s.loaded);
   const selected = categoryList.find((cat) => cat.label === value);
-  // Nunca ofrecer para elegir una categoría donde soy lector (SYNC_ROADMAP.md, Fase 4) — ni para
-  // crear un ítem nuevo ahí, ni para reclasificar uno existente. Si el ítem en edición YA
-  // pertenece a una, `selected` la sigue mostrando en el header (vía `categoryList` completa);
-  // `ItemDetailSheet` es quien bloquea el resto del formulario en ese caso.
   const selectableCategories = categoryList.filter((cat) => !readOnlyLabels.has(cat.label));
   const scrollable = selectableCategories.length > MAX_WRAPPED_CATEGORIES;
 
@@ -127,8 +111,6 @@ const styles = StyleSheet.create({
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   rowWrap: { paddingTop: 2 },
   row: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
-  // Sangra hasta el borde de la card (`FieldSection` tiene paddingHorizontal
-  // 16) para que los chips no se corten secos en el padding al deslizar.
   scroller: { marginHorizontal: -16 },
   scrollRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16 },
   chip: {

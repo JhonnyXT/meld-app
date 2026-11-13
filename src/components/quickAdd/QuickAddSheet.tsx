@@ -55,10 +55,8 @@ import {
 import type { DayItem, PriorityLevel } from '@/domain/dayItem';
 import { newId } from '@/domain/id';
 
-const DEFAULT_EVENT_START_MINUTES = 16 * 60 + 30; // 4:30 PM, mismo default que antes
+const DEFAULT_EVENT_START_MINUTES = 16 * 60 + 30;
 
-/** `minutes` (null = apagado, `ANY_TIME_MINUTES` = sin hora puntual, o
- * minutos reales) -> `reminderAt` para el `dateKey` dado. */
 function reminderAtFromMinutes(dateKey: string, minutes: number | null): string | null {
   if (minutes === null) return null;
   const hhmm = minutes === ANY_TIME_MINUTES ? ANY_TIME_HHMM : minutesToHour24(minutes);
@@ -80,34 +78,25 @@ export function QuickAddSheet() {
   const dictation = useVoiceDictation(lang, setTitle);
   const [category, setCategory] = useState<{ label: string; color: string } | null>(null);
   const [priority, setPriority] = useState<PriorityLevel>('none');
-  // Fecha del ítem — vale para los 6 tipos, default hoy, elegible con el
-  // calendario. Quick Add nunca manda al Inbox (sin `allowInbox`); para eso
-  // está el campo de captura rápida de `InboxScreen`.
   const [dateKey, setDateKey] = useState(toDateKey(new Date()));
 
-  // Task
   const [taskReminderMinutes, setTaskReminderMinutes] = useState<number | null>(null);
   const [taskRepeat, setTaskRepeat] = useState(REPEAT_OPTIONS[0]);
 
-  // Link (task + event)
   const [link, setLink] = useState('');
 
-  // Event
   const [eventStartMinutes, setEventStartMinutes] = useState(DEFAULT_EVENT_START_MINUTES);
   const [eventDurationMinutes, setEventDurationMinutes] = useState(60);
   const [eventEarlyAlert, setEventEarlyAlert] = useState('10 min before');
 
-  // Voice memo
   const [voiceReminderMinutes, setVoiceReminderMinutes] = useState<number | null>(null);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
   const [recordedSeconds, setRecordedSeconds] = useState(0);
   const recorder = useVoiceRecorder();
 
-  // Note
   const [noteReminderMinutes, setNoteReminderMinutes] = useState<number | null>(null);
   const [richTextBody, setRichTextBody] = useState('');
 
-  // Habit
   const [habitSchedule, setHabitSchedule] = useState(HABIT_SCHEDULE_OPTIONS[0]);
   const [habitPreferredTime, setHabitPreferredTime] = useState(HABIT_PREFERRED_TIME_OPTIONS[0]);
   const [habitHealthMetric, setHabitHealthMetric] = useState<string | null>(null);
@@ -139,10 +128,6 @@ export function QuickAddSheet() {
   useEffect(() => {
     if (!visible) return;
     resetForm(initialType);
-    // `prefill` viene del comando de voz/texto (`quickAddStore.openWithPrefill`
-    // → `parseVoiceInput`). Se aplica DESPUÉS de `resetForm` para pisar solo
-    // los campos detectados; el resto queda en su default y el usuario
-    // confirma. Ver `domain/voiceParser.ts`.
     if (prefill) {
       setTitle(prefill.title);
       if (prefill.dateKey) setDateKey(prefill.dateKey);
@@ -298,11 +283,6 @@ export function QuickAddSheet() {
 
   const meta = QUICK_ADD_META[type];
   const readOnlyLabels = useCategoriesStore((s) => s.readOnlyLabels);
-  // Deshabilitado hasta que haya al menos un título (y, para nota de voz,
-  // también una grabación) — antes se podía guardar un ítem vacío. `CategoryChips` ya no ofrece
-  // categorías de solo lectura para elegir (SYNC_ROADMAP.md, Fase 4), pero un prefill de Agregar
-  // por voz podría igual asignar una por nombre (`voiceParser.ts` matchea texto libre) — este
-  // chequeo extra es la defensa real contra ESE camino.
   const saveDisabled = !title.trim() || (type === 'voiceMemo' && !recordedUri) || (!!category && readOnlyLabels.has(category.label));
 
   return (
@@ -463,10 +443,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     maxHeight: '88%',
   },
-  // Área de agarre más alta que la barrita visual en sí (`handle`) — mismo
-  // criterio que cualquier target táctil chico (hitSlop): el gesto de
-  // arrastrar-para-cerrar necesita más superficie que 4px de alto para ser
-  // usable con el dedo.
   handleGrabArea: { paddingTop: 12, paddingBottom: 16, alignItems: 'center' },
   handle: { width: 36, height: 4, borderRadius: 2 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
