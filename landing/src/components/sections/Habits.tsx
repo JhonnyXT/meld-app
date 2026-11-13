@@ -4,8 +4,7 @@ import { InlineChip, SectionHead } from './shared';
 
 const WEEKS = 36;
 
-/** Mapa del año de ejemplo: pseudoaleatorio con semilla fija para que el HTML
- * del servidor y el del cliente coincidan siempre. */
+// ver docs/adr/0003-seed-fija-en-heatmap-de-ejemplo.md
 function sampleYear(): ('done' | 'missed' | 'none')[] {
   let seed = 11;
   const rand = () => {

@@ -1,8 +1,5 @@
 import type { CategoryId, HabitSchedule, ItemType, PriorityLevel, SeedTitles } from './model';
 
-// Textos de la demo interactiva (la pantalla Hoy dentro del teléfono). Mismo
-// vocabulario que la app (`src/i18n/translations.ts`), español neutro.
-
 const es = {
   phoneLabel: 'Demo interactiva de la pantalla Hoy de Meld',
   hint: 'Pruébalo: es la app de verdad. Agrega, completa, desliza…',

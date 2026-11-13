@@ -9,10 +9,6 @@ const PAD = 6;
 const GAP = 4;
 const COUNT = QUICK_ADD_TYPES.length;
 
-/** Switch de tipo (réplica de `TypeTabs`): un solo "thumb" que se desliza a
- * la posición del tipo activo, con los 5 íconos encima. En la app el thumb
- * también sigue el dedo mientras se arrastra por el track; acá alcanza con
- * el toque directo de cada ícono (suficiente para una demo web). */
 export function TypeTabs({ s, value, onChange }: { s: DemoStrings; value: ItemType; onChange: (type: ItemType) => void }) {
   const index = QUICK_ADD_TYPES.indexOf(value);
   return (

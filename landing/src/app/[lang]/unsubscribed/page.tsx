@@ -4,10 +4,7 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { getDictionary, hasLocale } from '@/i18n/config';
 
-/** Página a la que llega `/api/unsubscribe` tras procesar la baja. No tiene
- * un formulario propio en el sitio (no expone "escribe tu email para darte
- * de baja" — eso invitaría a que cualquiera dé de baja a cualquiera); solo
- * confirma el resultado de un enlace que llegó dentro de un email. */
+// ver docs/adr/0006-sin-formulario-de-baja-autoservicio.md
 export default async function Page({ params, searchParams }: PageProps<'/[lang]/unsubscribed'>) {
   const { lang } = await params;
   if (!hasLocale(lang)) notFound();

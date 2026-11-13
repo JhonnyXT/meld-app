@@ -1,6 +1,4 @@
-// Textos de la landing en español (idioma por defecto). `en.ts` debe tener
-// exactamente la misma forma — el tipo `Dictionary` sale de este archivo.
-// Español neutro, sin voseo ("elige", "únete"), igual que la app.
+// ver docs/adr/0007-es-ts-es-la-fuente-del-tipo-dictionary.md
 
 export const es = {
   meta: {

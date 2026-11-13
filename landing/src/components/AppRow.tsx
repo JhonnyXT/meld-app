@@ -39,11 +39,6 @@ function TimeColumn({ time }: { time: RowTime }) {
   );
 }
 
-/** Réplica de una fila de la pantalla Hoy de la app (`DayItemRow`): columna de
- * hora + tarjeta con el cuadro del tipo, título y un detalle a la derecha.
- * Con `onToggle` el cuadro es un botón (marcar hecho); con `onPress` la
- * tarjeta entera lo es (p. ej. reproducir una nota de voz); `progress`
- * (0–1) dibuja una barra de reproducción al pie de la tarjeta. */
 export function AppRow({
   time,
   type,

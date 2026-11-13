@@ -13,7 +13,6 @@ interface Cell {
   isWeekend: boolean;
 }
 
-// Grilla lunes-primero, igual que `buildMonthGrid` de la app.
 function buildMonthGrid(year: number, month: number, todayKey: string): Cell[] {
   const first = new Date(year, month, 1);
   const lead = (first.getDay() + 6) % 7;
@@ -29,8 +28,6 @@ function buildMonthGrid(year: number, month: number, todayKey: string): Cell[] {
   });
 }
 
-/** Calendario de mes (réplica de `DatePickerModal`/`MonthCalendarPicker` de
- * la app): chip "Hoy" + grilla lunes-primero, con navegación de mes. */
 export function DatePickerModal({
   s,
   selectedKey,

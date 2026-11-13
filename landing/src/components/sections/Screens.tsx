@@ -8,11 +8,7 @@ import { SectionHead } from './shared';
 
 const SRC = ['/img/screen-today.png', '/img/screen-inbox.png', '/img/screen-calendar.png', '/img/screen-moments-v2.png'];
 
-/** Carrusel centrado: la tarjeta activa queda en el medio y las demás se ven
- * a los lados, más chicas y apagadas. El relleno lateral de media pantalla
- * hace que SIEMPRE haya algo que desplazar (antes, en pantallas anchas, las 4
- * tarjetas entraban completas y las flechas no movían nada). Flechas, puntos,
- * teclado (← →) y deslizar mueven el mismo scroll con snap. */
+// ver docs/adr/0005-relleno-lateral-del-carrusel-de-pantallas.md
 export function Screens({ t }: { t: Dictionary['screens'] }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);

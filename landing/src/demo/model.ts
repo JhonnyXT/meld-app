@@ -1,7 +1,4 @@
-// Modelo de la demo interactiva de la pantalla Hoy. Es una versión reducida
-// del `DayItem` de la app (`src/domain/dayItem.ts`), solo en memoria: al
-// recargar la página vuelve a los ítems de ejemplo (decisión explícita).
-
+// ver docs/adr/0011-modelo-de-demo-reducido-y-en-memoria.md
 export type Language = 'es' | 'en';
 export type PriorityLevel = 'none' | 'low' | 'medium' | 'high';
 export type ItemType = 'task' | 'event' | 'habit' | 'note' | 'voiceMemo';
@@ -11,7 +8,6 @@ export type HabitPreferredTime = 'Anytime' | 'Morning' | 'Afternoon' | 'Evening'
 export type RepeatOption = 'Never' | 'Daily' | 'Weekly' | 'Monthly';
 export type EarlyAlert = 'Off' | '10 min before' | '30 min before' | '1 hr before';
 
-/** Mismos valores canónicos (en inglés) que la app; lo traducido es la etiqueta. */
 export const QUICK_ADD_CATEGORIES: { label: CategoryId; color: string }[] = [
   { label: 'Work', color: '#4F84FF' },
   { label: 'Personal', color: '#A55CFF' },
@@ -24,43 +20,33 @@ export const HABIT_PREFERRED_TIMES: HabitPreferredTime[] = ['Anytime', 'Morning'
 export const REPEAT_OPTIONS: RepeatOption[] = ['Never', 'Daily', 'Weekly', 'Monthly'];
 export const EARLY_ALERT_OPTIONS: EarlyAlert[] = ['Off', '10 min before', '30 min before', '1 hr before'];
 export const QUICK_ADD_TYPES: ItemType[] = ['task', 'event', 'voiceMemo', 'note', 'habit'];
-/** Orden de las secciones en la vista agrupada (igual que `GROUP_ORDER` de la app). */
 export const GROUP_ORDER: ItemType[] = ['event', 'task', 'habit', 'note', 'voiceMemo'];
 
 export interface DemoItem {
   id: string;
   type: ItemType;
   title: string;
-  /** Día del ítem ("YYYY-MM-DD"). En un hábito es la fecha de creación. */
   date: string;
-  /** Minutos desde medianoche: recordatorio (tarea/nota/voz) o inicio (evento). */
   time: number | null;
   priority: PriorityLevel;
   category: CategoryId | null;
-  /** Solo tareas. */
   done: boolean;
   durationMin?: number;
-  /** Task y Event comparten el campo (misma columna que en la app). */
   link?: string;
   repeat?: RepeatOption;
   earlyAlert?: EarlyAlert;
   schedule?: HabitSchedule;
   preferredTime?: HabitPreferredTime;
-  /** `null` = "Ninguna" (auto-registro apagado). Ver `HEALTH_METRIC_OPTIONS`. */
   healthMetric?: string | null;
   healthMetricTarget?: number | null;
-  /** Días en que el hábito se marcó hecho. */
   completed?: string[];
-  /** Racha previa a la demo, para que los hábitos de ejemplo no arranquen en 0. */
   streakBase?: number;
   health?: boolean;
   body?: string;
-  /** URL local (blob:) de una grabación real hecha en la demo. */
   audioUrl?: string | null;
   durationSec?: number;
 }
 
-// ─── Fechas ────────────────────────────────────────────────────────────────
 export function toDateKey(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -91,7 +77,6 @@ export const inputToMinutes = (value: string) => {
   return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null;
 };
 
-// ─── Hábitos (misma regla que `isHabitScheduledOn` de la app) ───────────────
 export function isHabitScheduledOn(item: DemoItem, key: string): boolean {
   if (item.date > key) return false;
   if (item.schedule === 'Weekdays') {
@@ -100,9 +85,6 @@ export function isHabitScheduledOn(item: DemoItem, key: string): boolean {
   }
   return true;
 }
-/** Días seguidos cumplidos, contando hasta hoy (o hasta ayer si hoy todavía
- * no se marcó: el día en curso no rompe la racha). `streakBase` suma la
- * racha "previa" de los hábitos de ejemplo. */
 export function habitStreak(item: DemoItem, todayKey: string): number {
   const done = new Set(item.completed ?? []);
   let key = done.has(todayKey) ? todayKey : shiftKey(todayKey, -1);
@@ -114,9 +96,6 @@ export function habitStreak(item: DemoItem, todayKey: string): number {
   return run === 0 ? 0 : run + (item.streakBase ?? 0);
 }
 
-/** Ítems visibles en Hoy para un día: los propios del día + los hábitos
- * programados, sin las tareas hechas ni los hábitos ya marcados ese día (en
- * la app desaparecen al completarse, con Deshacer). */
 export function visibleFor(items: DemoItem[], key: string): DemoItem[] {
   const rows = items.filter((i) => {
     if (i.type === 'habit') return isHabitScheduledOn(i, key) && !(i.completed ?? []).includes(key);
@@ -124,11 +103,9 @@ export function visibleFor(items: DemoItem[], key: string): DemoItem[] {
   });
   const timed = rows.filter((i) => i.time !== null).sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
   const untimed = rows.filter((i) => i.time === null);
-  // Hábitos de salud al final, como en la app (`sortWithHealthHabitsLast`).
   return [...timed, ...untimed.filter((i) => !i.health), ...untimed.filter((i) => i.health)];
 }
 
-/** "X de Y hechos" del día (misma cuenta que `DayBar`). */
 export function dayProgress(items: DemoItem[], key: string): { done: number; total: number } {
   let done = 0;
   let total = 0;
@@ -145,7 +122,6 @@ export function dayProgress(items: DemoItem[], key: string): { done: number; tot
   return { done, total };
 }
 
-// ─── Datos de ejemplo ───────────────────────────────────────────────────────
 export type SeedTitles = {
   q3: string;
   dentist: string;
@@ -200,9 +176,6 @@ export function seedItems(titles: SeedTitles, today: Date): DemoItem[] {
   ];
 }
 
-// ─── Etiquetas de presets (copia de `PRESET_LABELS_ES`/`presetLabel` de la
-// app) — el valor interno siempre queda en inglés, esto solo traduce lo
-// visible. ───────────────────────────────────────────────────────────────
 const PRESET_LABELS_ES: Record<string, string> = {
   Anytime: 'Cualquier hora',
   Off: 'Apagado',

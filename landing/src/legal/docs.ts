@@ -1,11 +1,4 @@
-// Textos de Privacidad y Términos. Reflejan cómo funciona Meld HOY (plan
-// Free 100% local, sin cuenta, sin analíticas; dictado vía el reconocedor
-// del sistema; Pro todavía sin lanzar). Si cambia algo de eso (sync en la
-// nube, pagos, analíticas, proveedor de la lista de espera), actualizar
-// estos textos y `UPDATED`.
-//
-// Los valores entre [CORCHETES] los completa el dueño del proyecto antes de
-// publicar. No es asesoría legal: conviene que lo revise un profesional.
+// ver docs/adr/0008-textos-legales-deben-reflejar-el-producto-actual.md
 
 import type { Locale } from '@/i18n/config';
 

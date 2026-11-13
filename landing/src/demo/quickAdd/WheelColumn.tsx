@@ -7,9 +7,6 @@ const VISIBLE = 5;
 export const WHEEL_HEIGHT = ITEM_H * VISIBLE;
 const PAD = (ITEM_H * (VISIBLE - 1)) / 2;
 
-/** Columna de rueda con scroll-snap (equivalente web de `WheelColumn` de la
- * app, que usa un `FlatList` con paginación por ítem). Al soltar el dedo/
- * scroll, el valor centrado se confirma con `onSelect`. */
 export function WheelColumn<T extends string | number>({
   values,
   selectedValue,
@@ -27,7 +24,6 @@ export function WheelColumn<T extends string | number>({
   const settled = useRef(Math.max(0, values.indexOf(selectedValue)));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Centrar en el valor inicial al montar, sin animación.
   useEffect(() => {
     ref.current?.scrollTo({ top: settled.current * ITEM_H });
   }, []);
@@ -43,8 +39,7 @@ export function WheelColumn<T extends string | number>({
 
   const onScroll = () => {
     if (timer.current) clearTimeout(timer.current);
-    // Espera a que el scroll se detenga (no hay evento "scrollend" fiable en
-    // todos los navegadores) antes de confirmar el valor centrado.
+    // ver docs/adr/0012-wheelcolumn-sin-evento-scrollend.md
     timer.current = setTimeout(() => {
       const el = ref.current;
       if (el) settle(Math.round(el.scrollTop / ITEM_H));

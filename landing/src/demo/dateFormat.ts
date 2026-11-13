@@ -1,7 +1,4 @@
-// Formato de fecha compartido por `DemoPhone` y `QuickAddSheet` — en un
-// archivo propio (en vez de vivir dentro de `DemoPhone.tsx`) para que
-// `QuickAddSheet.tsx` pueda importarlo sin crear un import circular entre
-// los dos (`DemoPhone` renderiza `QuickAddSheet`).
+// ver docs/adr/0009-dateformat-archivo-propio-por-import-circular.md
 import { fromDateKey, shiftKey } from './model';
 import type { DemoStrings } from './strings';
 

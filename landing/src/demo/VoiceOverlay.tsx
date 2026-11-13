@@ -7,7 +7,7 @@ import type { Prefill } from './QuickAddSheet';
 import type { DemoStrings } from './strings';
 import { parseVoiceInput } from './voiceParser';
 
-// La Web Speech API no está en los tipos de TypeScript; solo lo que se usa.
+// ver docs/adr/0014-web-speech-api-tipos-a-mano.md
 export type Recognition = {
   lang: string;
   interimResults: boolean;
@@ -27,7 +27,6 @@ export function getSpeechRecognition(): RecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-/** Convierte el resultado del parser de la app en lo que entiende Quick Add. */
 function toPrefill(text: string, lang: Language): Prefill {
   const p = parseVoiceInput(text, lang);
   return {
@@ -41,16 +40,12 @@ function toPrefill(text: string, lang: Language): Prefill {
   };
 }
 
-/** "Agregar por voz" (réplica de `VoiceAddScreen`): escucha una frase, la
- * muestra en vivo y al terminar abre Quick Add pre-llenado. */
 export function VoiceOverlay({ s, lang, onResult, onClose }: { s: DemoStrings; lang: Language; onResult: (p: Prefill) => void; onClose: () => void }) {
   const [text, setText] = useState('');
   const [status, setStatus] = useState<'listening' | 'nothing' | 'error'>(() => (getSpeechRecognition() ? 'listening' : 'error'));
   const rec = useRef<Recognition | null>(null);
   const textRef = useRef('');
 
-  /** Arranca el reconocedor. No toca el estado de React de forma síncrona:
-   * solo desde los callbacks del reconocedor. */
   const begin = () => {
     const Ctor = getSpeechRecognition();
     if (!Ctor) return;
@@ -87,7 +82,6 @@ export function VoiceOverlay({ s, lang, onResult, onClose }: { s: DemoStrings; l
   useEffect(() => {
     begin();
     return () => rec.current?.abort();
-    // Arranca a escuchar una sola vez al abrir.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

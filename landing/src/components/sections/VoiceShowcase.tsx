@@ -14,21 +14,16 @@ const subscribeReducedMotion = (onChange: () => void) => {
   return () => mq.removeEventListener('change', onChange);
 };
 
-const WORD_MS = 230; // cada palabra "dictada"
-const CHIP_MS = 260; // cada dato que "entiende" Meld
-const HOLD_MS = 2600; // pausa con el resultado completo antes del siguiente ejemplo
+const WORD_MS = 230;
+const CHIP_MS = 260;
+const HOLD_MS = 2600;
 
-/** La tarjeta de "Dilo, y queda agendado" en movimiento: el micrófono late
- * mientras la frase aparece palabra por palabra (como en el dictado real),
- * después se van sumando los datos que entendió el parser y pasa al
- * siguiente ejemplo. Solo corre con la tarjeta en pantalla; con "reducir
- * movimiento" muestra el primer ejemplo completo, quieto. */
 export function VoiceShowcase({ t }: { t: Dictionary['voice'] }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const reduced = useSyncExternalStore(subscribeReducedMotion, () => reducedMotionQuery().matches, () => false);
   const [example, setExample] = useState(0);
-  const [step, setStep] = useState(0); // palabras mostradas + datos mostrados
+  const [step, setStep] = useState(0);
 
   const ex = t.examples[example];
   const words = ex.quote.split(' ');
@@ -78,7 +73,6 @@ export function VoiceShowcase({ t }: { t: Dictionary['voice'] }) {
         </div>
       </div>
 
-      {/* Barras de sonido: se mueven mientras "escucha". */}
       <div className="flex h-6 items-center gap-1" aria-hidden>
         {[0, 1, 2, 3, 4, 5, 6].map((i) => (
           <span
@@ -112,7 +106,6 @@ export function VoiceShowcase({ t }: { t: Dictionary['voice'] }) {
         </div>
       </div>
 
-      {/* Indicador del ejemplo actual */}
       <div className="flex gap-1.5" aria-hidden>
         {t.examples.map((e, i) => (
           <span key={e.quote} className={`h-1.5 rounded-sm transition-all duration-300 ${i === example ? 'w-[18px] bg-ink' : 'w-1.5 bg-[#4a4a50]'}`} />

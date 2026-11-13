@@ -9,10 +9,6 @@ import { useDemo } from './useDemo';
 
 const widgetBox = 'flex flex-col gap-3.5 rounded-[28px] bg-surface px-[22px] py-5 text-left shadow-[0_30px_60px_rgba(0,0,0,0.6)]';
 
-/** Portada interactiva: la pantalla Hoy funcionando dentro del teléfono y, en
- * pantallas anchas, los widgets Hoy y Hábitos leyendo el mismo estado (como
- * en la app, se puede marcar desde el widget). Nada se guarda: al recargar
- * vuelve a los datos de ejemplo. */
 export function DemoHero({ locale, widgetsNote }: { locale: Locale; widgetsNote: string }) {
   const s = demoStrings[locale];
   const api = useDemo(s.seed);
@@ -93,7 +89,6 @@ export function DemoHero({ locale, widgetsNote }: { locale: Locale; widgetsNote:
         </div>
       </div>
 
-      {/* Teléfono: 380×780, escalado al 80% en móvil. */}
       <div className="h-[624px] w-[304px] sm:h-[780px] sm:w-[380px]">
         <div className="relative h-[780px] w-[380px] origin-top-left scale-[0.8] overflow-hidden rounded-[58px] border-8 border-[#2a2a2e] bg-[#0a0a0b] shadow-[0_40px_90px_rgba(0,0,0,0.7),inset_0_0_0_2px_#3a3a3f] sm:scale-100">
           <div className="pointer-events-none absolute top-3.5 left-[122px] z-40 h-[34px] w-[120px] rounded-[20px] bg-black" />

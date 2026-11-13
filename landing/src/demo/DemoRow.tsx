@@ -5,7 +5,7 @@ import { useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { CATEGORY_COLOR, clock12, PRIORITY_COLOR, type DemoItem } from './model';
 import type { DemoStrings } from './strings';
 
-const OPEN = 76; // ancho del botón de borrar que revela el swipe
+const OPEN = 76;
 
 function TimeCol({ time }: { time: number | null }) {
   if (time === null) {
@@ -31,9 +31,6 @@ export const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60)
 
 const ICON = { event: Calendar, note: FileText, voiceMemo: AudioLines } as const;
 
-/** Fila de la pantalla Hoy (réplica de `DayItemRow` + `SwipeToDeleteCard`):
- * el cuadro de tarea/hábito completa, tocar la fila abre el detalle y
- * deslizar a la izquierda revela el botón de borrar. */
 export function DemoRow({
   item,
   s,

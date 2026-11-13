@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 
-/** Ícono o texto encajado dentro de un título ("Seis cosas, [↻] una sola línea"). */
 export function InlineChip({ children }: { children: ReactNode }) {
   return (
     <span className="mx-1 inline-flex h-[38px] items-center rounded-[10px] border border-line bg-surface-2 px-2.5 align-middle sm:mx-1.5 sm:h-14 sm:rounded-[14px] sm:px-3.5">

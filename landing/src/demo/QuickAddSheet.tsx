@@ -30,16 +30,14 @@ import {
 import type { DemoStrings } from './strings';
 import { getSpeechRecognition, type Recognition } from './VoiceOverlay';
 
-/** Lo que Quick Add sabe pre-llenar (desde el dictado por voz). */
 export type Prefill = Partial<Pick<DemoItem, 'type' | 'title' | 'date' | 'time' | 'priority' | 'category' | 'schedule'>>;
 
-const DEFAULT_EVENT_START = 16 * 60 + 30; // 4:30 PM, mismo default que la app
+const DEFAULT_EVENT_START = 16 * 60 + 30;
 
 function labelsFor(lang: Language, options: readonly string[]): Record<string, string> {
   return Object.fromEntries(options.map((o) => [o, presetLabel(o, lang)]));
 }
 
-// ─── Dictado del título (réplica de `useVoiceDictation`) ────────────────────
 function useTitleDictation(lang: Language, setTitle: (value: string) => void) {
   const [listening, setListening] = useState(false);
   const rec = useRef<Recognition | null>(null);
@@ -74,7 +72,6 @@ function useTitleDictation(lang: Language, setTitle: (value: string) => void) {
   return { listening, toggle, supported };
 }
 
-// ─── Nota de voz — 3 estados (réplica de `VoiceRecordRow`) ──────────────────
 const WAVEFORM = [6, 14, 9, 18, 11, 16, 7, 13, 10, 15, 8, 12];
 
 function VoiceRecordField({
@@ -219,13 +216,7 @@ function VoiceRecordField({
   );
 }
 
-// ─── Hoja de Quick Add / detalle ─────────────────────────────────────────────
-// Fiel al diseño real de `QuickAddSheet`/`ItemDetailSheet` de la app: switch
-// de tipo con thumb deslizante, caja de título con dictado, UNA sola tarjeta
-// de configuración con filas divididas (no varias cajas sueltas), acordeones
-// para Categoría/Prioridad/presets, y pickers de rueda para hora/duración y
-// un calendario de mes para el día. La "X" solo cierra — nunca borra (borrar
-// un ítem existente es deslizar la fila en la lista, no un botón acá).
+// ver docs/adr/0013-x-de-quickaddsheet-solo-cierra.md
 export function QuickAddSheet({
   s,
   lang,

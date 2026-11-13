@@ -36,14 +36,13 @@ import { getSpeechRecognition, VoiceOverlay } from './VoiceOverlay';
 
 const TYPE_ICON: Record<ItemType, LucideIcon> = { task: Check, event: Calendar, habit: Repeat, note: FileText, voiceMemo: AudioLines };
 const NAV_ICONS: LucideIcon[] = [CalendarCheck, Inbox, CalendarDays, ImageIcon, Settings];
-const SIM_PLAY_MS = 7000; // las notas de ejemplo (sin audio real) se "reproducen" aceleradas
+const SIM_PLAY_MS = 7000;
 
 const noopSubscribe = () => () => {};
 
 type Sheet = { editing: DemoItem | null; prefill: Prefill | null } | null;
 
 
-/** La pantalla Hoy de la app, funcionando en el navegador. */
 export function DemoPhone({ s, lang, api }: { s: DemoStrings; lang: Language; api: DemoApi }) {
   const { state, dispatch } = api;
   const { items, todayKey, selectedKey, undo } = state;
@@ -63,7 +62,7 @@ export function DemoPhone({ s, lang, api }: { s: DemoStrings; lang: Language; ap
   const simRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const simProgress = useRef(0);
 
-  // El dictado depende del navegador; en el servidor se asume que no hay.
+  // ver docs/adr/0010-dictado-necesita-fallback-de-servidor.md
   const voiceSupported = useSyncExternalStore(
     noopSubscribe,
     () => getSpeechRecognition() !== null,
@@ -76,7 +75,6 @@ export function DemoPhone({ s, lang, api }: { s: DemoStrings; lang: Language; ap
     return () => clearTimeout(id);
   }, [toast]);
 
-  // ─── Reproducción de notas de voz ──────────────────────────────────────────
   const stopPlayback = useCallback(() => {
     audioRef.current?.pause();
     audioRef.current = null;
@@ -107,7 +105,6 @@ export function DemoPhone({ s, lang, api }: { s: DemoStrings; lang: Language; ap
     setPlaying({ id: item.id, progress: 0 });
   };
 
-  // ─── Derivados ─────────────────────────────────────────────────────────────
   const rows = visibleFor(items, selectedKey);
   const { done, total } = dayProgress(items, selectedKey);
   const q = query.trim().toLowerCase();
@@ -139,7 +136,6 @@ export function DemoPhone({ s, lang, api }: { s: DemoStrings; lang: Language; ap
     />
   );
 
-  // Recordatorios próximos (⋯): desde ahora en adelante, en orden.
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const upcoming = remindersOpen
@@ -158,7 +154,6 @@ export function DemoPhone({ s, lang, api }: { s: DemoStrings; lang: Language; ap
 
   return (
     <div role="region" aria-label={s.phoneLabel} className="relative h-full w-full overflow-hidden text-left">
-      {/* Encabezado (TopAppBar) */}
       <div className="flex flex-col gap-3 px-4 pt-[70px]">
         <div className="flex items-start justify-between px-1">
           <div className="flex flex-col gap-0.5">
@@ -208,7 +203,6 @@ export function DemoPhone({ s, lang, api }: { s: DemoStrings; lang: Language; ap
         )}
       </div>
 
-      {/* Lista */}
       <div className="mt-3 flex h-[calc(100%-160px)] flex-col gap-2.5 overflow-y-auto px-4 pb-44 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {results ? (
           results.length === 0 ? (
@@ -276,10 +270,8 @@ export function DemoPhone({ s, lang, api }: { s: DemoStrings; lang: Language; ap
         )}
       </div>
 
-      {/* Fondo oscuro del speed-dial del + */}
       {fabOpen && <div className="absolute inset-0 z-10 bg-black/55" onClick={() => setFabOpen(false)} />}
 
-      {/* Barra flotante (FloatingBar + DayBar) */}
       <div className="absolute right-3.5 bottom-[26px] left-3.5 z-20 flex flex-col gap-2.5">
         {fabOpen && (
           <div className="flex flex-col items-end gap-2.5 pr-0.5">
@@ -416,7 +408,6 @@ export function DemoPhone({ s, lang, api }: { s: DemoStrings; lang: Language; ap
         </div>
       </div>
 
-      {/* Próximos recordatorios (⋯) */}
       {remindersOpen && (
         <div className="absolute inset-0 z-30 flex flex-col justify-end bg-black/50" onClick={() => setRemindersOpen(false)}>
           <div
@@ -473,7 +464,6 @@ export function DemoPhone({ s, lang, api }: { s: DemoStrings; lang: Language; ap
           onSave={(item) => {
             setSheet(null);
             dispatch({ type: 'save', item });
-            // Si se agendó en otro día, ir a ese día para verlo (los hábitos recurren desde hoy).
             if (item.type !== 'habit' && item.date !== selectedKey) dispatch({ type: 'setDay', key: item.date });
           }}
         />

@@ -1,10 +1,5 @@
 import type { Locale } from '@/i18n/config';
 
-/**
- * Monograma JB de Joblan Studio, vectorial (fuente: ../../joblan/brand/jb.svg, el mismo que usa
- * joblan-web en su header/footer). `fill="currentColor"` para seguir el tema claro/oscuro del sitio
- * donde se use, sin depender de un PNG ni de la paleta de otra marca.
- */
 function JbMark({ className = '' }: { className?: string }) {
   return (
     <svg viewBox="0 0 1392 876" className={className} aria-hidden>
@@ -17,7 +12,6 @@ function JbMark({ className = '' }: { className?: string }) {
   );
 }
 
-/** Crédito al final de la página: enlaza al inicio de joblanstudio.com en el mismo idioma. */
 export function MadeByJoblan({ label, locale }: { label: string; locale: Locale }) {
   return (
     <a

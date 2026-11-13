@@ -9,8 +9,6 @@ const MINUTES = [0, 15, 30, 45];
 const two = (n: number) => String(n).padStart(2, '0');
 const nearestStep = (m: number) => MINUTES.reduce((c, v) => (Math.abs(v - m) < Math.abs(c - m) ? v : c));
 
-/** Wheel-picker de DURACIÓN (0-4 h + minutos de 15 en 15), sin AM/PM porque
- * es un lapso, no una hora del día — réplica de `WheelDurationPicker`. */
 export function DurationPickerModal({
   s,
   minutes,

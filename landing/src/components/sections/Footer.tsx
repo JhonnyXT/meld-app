@@ -3,8 +3,6 @@ import Link from 'next/link';
 import type { Dictionary, Locale } from '@/i18n/config';
 import { MadeByJoblan } from '../MadeByJoblan';
 
-// TODO(dueño del proyecto): el enlace de Soporte sigue vacío hasta tener un
-// email/página de contacto real.
 export function Footer({ t, locale }: { t: Dictionary['footer']; locale: Locale }) {
   return (
     <footer className="mx-auto flex w-[calc(100%-40px)] max-w-[760px] flex-col items-center gap-3 border-t border-line pt-8 pb-7 sm:gap-3.5 sm:pt-10 sm:pb-12">

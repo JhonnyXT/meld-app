@@ -1,7 +1,4 @@
-// Copia de `HEALTH_METRIC_OPTIONS` (`src/domain/healthMetrics.ts` de la app),
-// solo que acá el ícono es directamente el componente de lucide-react en vez
-// de un `IconName` semántico (la demo no tiene la capa de mapeo `Icon.tsx`).
-
+// ver docs/adr/0011-modelo-de-demo-reducido-y-en-memoria.md
 import {
   Activity,
   Award,
@@ -26,7 +23,6 @@ export interface HealthMetricOption {
   id: string;
   group: HealthMetricGroup;
   icon: LucideIcon;
-  /** Clave dentro de `DemoStrings['qa']['health']['metrics']`. */
   key: string;
   defaultTarget?: number;
   unitKey?: 'steps' | 'min' | 'cal' | 'hours';

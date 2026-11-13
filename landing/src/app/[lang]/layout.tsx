@@ -4,13 +4,10 @@ import { notFound } from 'next/navigation';
 import { getDictionary, hasLocale, locales } from '@/i18n/config';
 import '../globals.css';
 
-// Mismas fuentes que la app (Plus Jakarta Sans + JetBrains Mono); Caveat solo
-// para las notas "escritas a mano".
 const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-jakarta' });
 const jetbrains = JetBrains_Mono({ subsets: ['latin'], weight: ['500', '700'], variable: '--font-jetbrains' });
 const caveat = Caveat({ subsets: ['latin'], weight: ['600'], variable: '--font-caveat' });
 
-// Solo /es y /en existen; cualquier otro prefijo es 404.
 export const dynamicParams = false;
 export function generateStaticParams() {
   return locales.map((lang) => ({ lang }));

@@ -11,7 +11,6 @@ type State = {
   items: DemoItem[];
   todayKey: string;
   selectedKey: string;
-  /** Solo un Deshacer pendiente a la vez, como en la app (`undoStore`). */
   undo: { kind: UndoKind; previous: DemoItem[]; at: number } | null;
 };
 
@@ -45,7 +44,6 @@ function reducer(state: State, action: Action): State {
       const item = state.items.find((i) => i.id === action.id);
       if (!item) return state;
       const items = state.items.map((i) => (i.id === action.id ? { ...i, done: !i.done } : i));
-      // Completar muestra Deshacer; desmarcar (p. ej. desde el widget) no.
       return item.done ? { ...state, items } : withUndo(state, 'task', items);
     }
     case 'toggleHabit': {
@@ -67,8 +65,7 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-/** Estado de la demo, compartido entre el teléfono y los widgets de la
- * portada. Solo en memoria: al recargar vuelve a los datos de ejemplo. */
+// ver docs/adr/0011-modelo-de-demo-reducido-y-en-memoria.md
 export function useDemo(seed: SeedTitles) {
   const [state, dispatch] = useReducer(reducer, seed, (titles) => {
     const today = new Date();
@@ -76,7 +73,6 @@ export function useDemo(seed: SeedTitles) {
     return { items: seedItems(titles, today), todayKey: key, selectedKey: key, undo: null } satisfies State;
   });
 
-  // El Deshacer se cierra solo a los 4 s (`UNDO_DURATION_MS` de la app).
   const undoAt = state.undo?.at;
   useEffect(() => {
     if (!undoAt) return;

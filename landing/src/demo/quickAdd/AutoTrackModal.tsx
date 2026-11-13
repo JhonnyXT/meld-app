@@ -8,9 +8,6 @@ import type { DemoStrings } from '../strings';
 
 const GROUPS: HealthMetricGroup[] = ['activity', 'rings', 'workouts'];
 
-/** Hoja modal (no un picker compacto — es una lista larga, ver
- * "Auto-registro real" en CLAUDE.md): "Ninguna" + 3 grupos de métricas. Tocar
- * una de Actividad muestra un stepper +/- inline en esa fila. */
 function AutoTrackModal({
   s,
   metricId,
@@ -103,9 +100,6 @@ function AutoTrackModal({
   );
 }
 
-/** Fila "Auto-registro" (réplica de `HealthAutoTrackFieldRow`) — abre
- * `AutoTrackModal`. Elegir cualquier métrica (no "Ninguna") es lo que
- * convierte el hábito en "de salud" al guardar. */
 export function HealthAutoTrackFieldRow({
   s,
   metricId,

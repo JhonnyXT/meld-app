@@ -6,9 +6,6 @@ import { useEffect, useState } from 'react';
 type Section = { id: string; label: string };
 type Labels = { openMenu: string; closeMenu: string; prev: string; next: string; join: string };
 
-/** Barra flotante fija abajo, calcada de la DayBar de la app: ☰ abre la
- * lista de secciones, la cápsula del centro dice en qué sección estás (‹ ›
- * para moverte) y el botón coral lleva al formulario de la lista de espera. */
 export function DockBar({ sections, labels }: { sections: Section[]; labels: Labels }) {
   const [current, setCurrent] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -22,7 +19,6 @@ export function DockBar({ sections, labels }: { sections: Section[]; labels: Lab
           if (i >= 0) setCurrent(i);
         }
       },
-      // Cuenta como "sección actual" la que cruza la franja media de la pantalla.
       { rootMargin: '-45% 0px -50% 0px' },
     );
     for (const s of sections) {

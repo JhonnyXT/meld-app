@@ -8,9 +8,6 @@ const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
 const MINUTES = Array.from({ length: 60 }, (_, i) => i);
 const two = (n: number) => String(n).padStart(2, '0');
 
-/** Wheel-picker de hora (réplica de `WheelTimePicker`/`TimePickerModal` de la
- * app): horas 1-12 + minutos 0-59 + AM/PM, con "Cualquier hora" opcional
- * para campos de recordatorio. `minutes` = minutos desde medianoche. */
 export function TimePickerModal({
   s,
   minutes,

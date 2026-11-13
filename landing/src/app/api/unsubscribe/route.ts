@@ -3,9 +3,7 @@ import { defaultLocale, hasLocale } from '@/i18n/config';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-// GET, no POST: este endpoint se llega haciendo clic en el link "darte de
-// baja" de un email (no hay formulario propio en el sitio), así que tiene
-// que responder a una navegación normal del navegador.
+// ver docs/adr/0001-baja-es-opt-out-de-topic-no-global.md
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const email = (url.searchParams.get('email') ?? '').trim().toLowerCase();

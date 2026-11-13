@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { CATEGORY_COLOR, PRIORITY_COLOR, type CategoryId, type PriorityLevel } from '../model';
 import type { DemoStrings } from '../strings';
 
-// ─── Fila base (réplica de `FieldRow`) ──────────────────────────────────────
 export function FieldRow({
   icon: Icon,
   label,
@@ -60,7 +59,6 @@ export function FieldRow({
   );
 }
 
-// ─── Acordeón de presets fijos (réplica de `PresetFieldRow`) ────────────────
 export function PresetAccordion({
   icon,
   label,
@@ -107,7 +105,6 @@ export function PresetAccordion({
   );
 }
 
-// ─── Categoría (réplica de `CategoryChips`) ─────────────────────────────────
 export function CategoryAccordion({
   s,
   value,
@@ -162,7 +159,6 @@ export function CategoryAccordion({
   );
 }
 
-// ─── Prioridad (réplica de `PriorityTabs`) ──────────────────────────────────
 export function PriorityAccordion({ s, value, onChange }: { s: DemoStrings; value: PriorityLevel; onChange: (value: PriorityLevel) => void }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -204,7 +200,6 @@ export function PriorityAccordion({ s, value, onChange }: { s: DemoStrings; valu
   );
 }
 
-// ─── Enlace (réplica de `LinkFieldRow`) — Task y Event ──────────────────────
 export function LinkFieldRow({ s, value, onChange, showBorder = true }: { s: DemoStrings; value: string; onChange: (value: string) => void; showBorder?: boolean }) {
   const trimmed = value.trim();
   return (

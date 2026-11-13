@@ -3,9 +3,7 @@ import type { CSSProperties } from 'react';
 import type { Dictionary } from '@/i18n/config';
 import { InlineChip, SectionHead } from './shared';
 
-// Fotos de Wikimedia Commons, descargadas y recortadas a 4:5 en /public/img.
-// Dos son CC BY-SA 4.0 (exigen crédito, ver `CREDITS`) y dos de dominio
-// público. Si se cambia una foto, actualizar también su crédito.
+// ver docs/adr/0004-creditos-de-fotos-de-wikimedia.md
 const CARDS = [
   { src: '/img/place-santorini.jpg', rot: -9, x: 0, y: 26 },
   { src: '/img/place-kyoto.jpg', rot: -3, x: 150, y: 4 },
@@ -35,7 +33,6 @@ export function Moments({ t }: { t: Dictionary['moments'] }) {
         }
         subtitle={t.subtitle}
       />
-      {/* El abanico se diseña a 640×320 y se escala en móvil. */}
       <div className="h-[175px] w-[350px] sm:h-[320px] sm:w-[640px]">
         <div className="group relative h-[320px] w-[640px] origin-top-left scale-[0.547] sm:scale-100">
           {CARDS.map((c, i) => (

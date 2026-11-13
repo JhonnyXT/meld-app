@@ -1,14 +1,6 @@
-// Baja de la lista de espera de Meld (topic `Meld — Lanzamiento` en Resend). Las altas viven en
-// joblan (joblanstudio.com/?app=…#avisame), que escribe en el mismo segmento y topic de
-// siempre, en la cuenta que comparte con `my-wallet-app/landing`.
-//
-// Variables de entorno: RESEND_API_KEY (obligatoria) y RESEND_TOPIC_ID (opcional, default abajo).
-// Sin RESEND_API_KEY: en desarrollo solo se loguea; en producción se lanza
-// `WaitlistNotConfiguredError` en vez de fingir que se procesó la baja.
-
+// ver docs/adr/0001-baja-es-opt-out-de-topic-no-global.md
 const RESEND_BASE = 'https://api.resend.com/contacts';
 
-// Topic creado a mano en el dashboard el 2026-09-24; sobreescribible por env var.
 const DEFAULT_TOPIC_ID = '53887fa0-e713-48da-91d3-80974e28e3fb';
 
 export class WaitlistNotConfiguredError extends Error {}
@@ -36,15 +28,6 @@ async function parseError(res: Response): Promise<string> {
   return `Resend ${res.status}: ${body?.name ?? ''} ${body?.message ?? ''}`.trim();
 }
 
-/** Baja de la lista de espera de Meld — opt_out del topic
- * `Meld — Lanzamiento`, NO `unsubscribed: true` del contacto (eso sería una
- * baja global de la cuenta de Resend, y sacaría a la persona también de
- * MyWallet si comparte el mismo email). Usado por `/api/unsubscribe`,
- * pensado para el link "darte de baja" de un futuro email de lanzamiento
- * (todavía no existe ese email: esto es la infraestructura, lista para
- * cuando se envíe). Si el contacto no existe, Resend responde 404 — se
- * trata igual como éxito: el resultado que le importa a quien hace clic es
- * "ya no estás en la lista", y eso ya es cierto. */
 export async function unsubscribeEmail(email: string): Promise<void> {
   if (!process.env.RESEND_API_KEY && process.env.NODE_ENV !== 'production') {
     console.log(`[waitlist] (dev, sin RESEND_API_KEY) baja: ${email}`);
