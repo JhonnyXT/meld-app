@@ -8,7 +8,6 @@ import type { Habit } from '@/domain/dayItem';
 export interface HabitWidgetRow {
   id: string;
   title: string;
-  /** "5/7" (progreso semanal) — mismo criterio que `computeWeekProgress`. */
   progress: string;
   streak: number;
   completedToday: boolean;
@@ -22,17 +21,6 @@ export interface HabitsWidgetData {
 
 const MAX_HABIT_ROWS = 10;
 
-/** Datos del widget "Hábitos" — solo hábitos programados HOY
- * (`isHabitScheduledOn`), con su progreso semanal real y racha (mismo
- * cálculo que `dayItemsStore` → `loadHabitOccurrences`, reimplementado acá
- * sin depender del store para poder correr también desde el headless task
- * de Android). Respeta el toggle "Hábitos en Hoy" de Settings — si está
- * apagado, el widget queda vacío en vez de mostrar datos que la propia app
- * decidió no mostrar en Today. Los hábitos ya marcados hoy se filtran de
- * `rows` (siguen contando para `doneCount`) — mismo comportamiento que
- * Today, donde un hábito marcado desaparece de la lista (ver CLAUDE.md →
- * "Completar un hábito"), y en el widget además libera lugar para el
- * siguiente hábito pendiente. */
 export async function getHabitsWidgetData(): Promise<HabitsWidgetData> {
   if (!useSettingsStore.getState().habitsInTodayEnabled) {
     return { rows: [], doneCount: 0, totalCount: 0 };

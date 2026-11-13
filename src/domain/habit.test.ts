@@ -47,7 +47,6 @@ describe('computeStreak', () => {
   });
 
   it('"Weekdays": un fin de semana sin marcar no rompe la racha', () => {
-    // Viernes 13, lunes 16 completados; sábado/domingo entre medio no cuentan.
     const monday = fromDateKey('2026-11-16');
     const done = new Set(['2026-11-16', '2026-11-13']);
     expect(computeStreak('Weekdays', done, monday)).toBe(2);

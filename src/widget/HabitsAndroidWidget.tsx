@@ -19,17 +19,6 @@ interface HabitsAndroidWidgetProps {
   height?: number;
 }
 
-/** Widget "Hábitos" — lista de solo lectura de los hábitos programados HOY
- * con su progreso semanal ("x/y") y racha (🔥N), separado de tareas/eventos
- * (ver `habitsWidgetData.ts`). Mismo patrón de tamaño adaptable que el
- * widget "Hoy": `androidWidgetTree.ts` → `pickVisibleItemCount` decide
- * cuántas filas entran, y `widgetContentScale` (mismo factor) agranda
- * tipografía/íconos/gaps según el tamaño real que le dio el launcher —
- * ambos van de la mano (filas más grandes → entran menos). El ícono de
- * cada fila es interactivo de verdad: márcala hecha hoy ahí mismo, sin
- * abrir la app (`clickAction="TOGGLE_HABIT"`, ver `widgetActions.ts` y
- * `registerWidgetTask.ts` → `WIDGET_CLICK`) — mismo pedido explícito que
- * `TodayAndroidWidget.tsx`. */
 export function HabitsAndroidWidget({ data, emptyLabel, habitsLabel, width, height }: HabitsAndroidWidgetProps) {
   const scale = widgetContentScale(width, height);
   const headerFontSize = Math.round(17 * scale);
@@ -80,11 +69,7 @@ export function HabitsAndroidWidget({ data, emptyLabel, habitsLabel, width, heig
               key={row.id}
               style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: 'match_parent' }}
             >
-              {/* `flex: 1` en el contenedor (no en el `TextWidget`, que no
-                  soporta esa prop) — es el patrón correcto de Android para
-                  "tomar el resto de la fila", no un fix de un bug puntual
-                  (el truncado de títulos largos es esperado, ver CLAUDE.md
-                  → "Widget de pantalla de inicio"). */}
+              {/* ver docs/adr/0021-peculiaridades-layout-android-widget.md */}
               <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', flexGap: rowGap, flex: 1 }}>
                 <FlexWidget
                   clickAction="TOGGLE_HABIT"

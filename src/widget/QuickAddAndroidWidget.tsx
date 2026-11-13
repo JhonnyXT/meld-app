@@ -14,17 +14,6 @@ interface QuickAddAndroidWidgetProps {
   height?: number;
 }
 
-/** Widget "Agregar rápido" — sin datos (no necesita refrescarse por cambios
- * en la DB), pero SÍ de tamaño fijo desde la config (`resizeMode: 'none'`
- * en `app.config.ts`) — lo que NO es fijo es cuánto espacio real le da el
- * launcher del usuario a ese tamaño "chico" (cada launcher usa su propia
- * grilla; Samsung One UI, por ejemplo, da celdas bastante más grandes que
- * el mock de referencia). `widgetContentScale` agranda el círculo del FAB
- * para que no quede perdido en una caja más grande de lo esperado — bug
- * real reportado por el usuario. Tocar el círculo coral arma una deep link
- * con `Linking.createURL` (resuelve al scheme real del variant, nunca
- * hardcodeado) que `app/_layout.tsx` escucha para abrir Quick Add directo,
- * sin pasar por Today. */
 export function QuickAddAndroidWidget({ label, width, height }: QuickAddAndroidWidgetProps) {
   const scale = widgetContentScale(width, height);
   const fabSize = Math.round(52 * scale);
@@ -45,10 +34,7 @@ export function QuickAddAndroidWidget({ label, width, height }: QuickAddAndroidW
       }}
     >
       <TextWidget text={label} style={{ fontSize: 15, fontWeight: '700', color: TEXT }} />
-      {/* `FlexWidget` apila en columna por default (como `View` de RN) — sin
-          `flexDirection: 'row'` acá, `justifyContent`/`alignItems` actúan
-          sobre el eje vertical, no el horizontal, y el círculo terminaba
-          pegado a la izquierda en vez de centrado. */}
+      {/* ver docs/adr/0021-peculiaridades-layout-android-widget.md */}
       <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', justifyContent: 'center' }}>
         <FlexWidget
           style={{

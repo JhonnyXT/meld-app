@@ -4,12 +4,6 @@ import type { TodayWidgetData } from './todayWidgetData';
 import { widgetIconSvgFor, WIDGET_SUN_ICON_SVG } from './androidIcons';
 import { widgetContentScale } from './widgetScale';
 
-// Paleta fija (dark), no depende de `theme/tokens.ts` a propósito — el
-// widget se dibuja fuera del árbol de React de la app (headless task o
-// llamada directa desde `requestWidgetUpdate`), sin `ThemeProvider` ni
-// acceso al `accent` elegido en Settings. Coincide con los tokens dark base
-// (`darkBase`/coral) para que combine visualmente con el resto de la app.
-// Ver CLAUDE.md → "Widgets de pantalla de inicio".
 const BG = '#1C1C1E';
 const TEXT = '#FFFFFF';
 const TEXT_DIM = '#8E8E93';
@@ -25,20 +19,6 @@ interface TodayAndroidWidgetProps {
   height?: number;
 }
 
-/** Widget "Hoy" — tocar el fondo/título abre la app (`clickAction=
- * "OPEN_APP"` en la raíz), pero el checkbox de cada TASK es interactivo de
- * verdad: márcala hecha ahí mismo, sin abrir nada (`clickAction=
- * "TOGGLE_TASK"`, manejado en `registerWidgetTask.ts` → `WIDGET_CLICK`,
- * ver `widgetActions.ts`) — pedido explícito del usuario, un widget que
- * solo abre la app "no tiene sentido" si eso es todo lo que hace. El resto
- * de tipos (event/note/voiceMemo/habit/moment) no tienen acción propia
- * todavía, tocarlos cae al comportamiento de fondo (abrir la app). Sin
- * pantalla de configuración (ver spec Free § "Un widget de pantalla de
- * inicio"), pero SÍ se adapta al tamaño real que le dio el launcher
- * (`widgetContentScale`) — tipografía, íconos y gaps escalan junto con la
- * cantidad de filas (`androidWidgetTree.ts` → `pickVisibleItemCount`, usa
- * el mismo factor), para que un widget grande se vea con contenido cómodo
- * y prolijo en vez de texto chico perdido en una caja grande. */
 export function TodayAndroidWidget({ data, emptyLabel, todayLabel, width, height }: TodayAndroidWidgetProps) {
   const scale = widgetContentScale(width, height);
   const headerFontSize = Math.round(17 * scale);
@@ -125,10 +105,7 @@ export function TodayAndroidWidget({ data, emptyLabel, todayLabel, width, height
                 text={item.timeLabel}
                 style={{ fontSize: timeFontSize, fontWeight: '600', color: ACCENT, width: timeWidth }}
               />
-              {/* `TextWidget` no tiene prop `flex` (solo `FlexWidget` la
-                  soporta) — envolverlo en un `FlexWidget` con `flex: 1` le da
-                  el resto exacto de la fila, sea cual sea el tamaño real del
-                  widget. */}
+              {/* ver docs/adr/0021-peculiaridades-layout-android-widget.md */}
               <FlexWidget style={{ flex: 1 }}>
                 <TextWidget
                   text={item.title}

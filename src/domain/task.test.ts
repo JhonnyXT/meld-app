@@ -23,7 +23,6 @@ describe('isTaskScheduledOn', () => {
   it('"Monthly" solo recurre el mismo día del mes, nunca se corre al último día disponible', () => {
     const anchor = fromDateKey('2026-01-31');
     expect(isTaskScheduledOn('Monthly', anchor, fromDateKey('2026-03-31'))).toBe(true);
-    // Febrero 2026 no tiene 31 — no recurre ese mes, no se mueve al 28.
     expect(isTaskScheduledOn('Monthly', anchor, fromDateKey('2026-02-28'))).toBe(false);
   });
 

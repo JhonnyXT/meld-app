@@ -14,9 +14,7 @@ export interface SqliteLike {
 function addColumnIfMissing(conn: SqliteLike, table: string, columnDdl: string) {
   try {
     conn.execSync(`ALTER TABLE ${table} ADD COLUMN ${columnDdl};`);
-  } catch {
-    // no-op: la columna ya existe.
-  }
+  } catch {}
 }
 
 // ver docs/adr/0009-orden-de-migraciones-sqlite.md

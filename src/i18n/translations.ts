@@ -1,43 +1,28 @@
 export type Language = 'es' | 'en';
 
-/**
- * Diccionario plano — claves por pantalla/componente. `{param}` se interpola
- * con `t(key, { param: valor })`. Agregar una clave nueva acá y en AMBOS
- * idiomas (TypeScript rompe si falta una en `en` gracias a `Record<Keys, ...>`
- * en `index.ts`).
- */
 export const es = {
-  // Splash animado
   appTagline: 'Todo tu día. Una sola app.',
 
-  // Onboarding — carrusel de 6 slides + paso de notificaciones (ver
-  // src/features/onboarding/).
   onboardingSkip: 'Saltar',
   onboardingNext: 'Siguiente',
   onboardingStart: 'Empezar',
   onboardingDone: 'Ir a mi día',
 
-  // 1· Bienvenida
   onbWelcomeTitle: 'Bienvenido a Meld',
   onbWelcomeSubtitle: 'Tareas, eventos, hábitos, notas y fotos — todo tu día en una sola vista.',
 
-  // 2· Hoy
   onbTodayTitle: 'Tu día, en el orden en que pasa',
   onbTodaySubtitle: 'No una lista de pendientes: una línea de tiempo con lo que viene ahora.',
 
-  // 3· Hábitos
   onbHabitsTitle: 'Hábitos que de verdad se sostienen',
   onbHabitsSubtitle: 'Marca el día, mira tu racha crecer y no pierdas el ritmo.',
 
-  // 4· Momentos
   onbCaptureTitle: 'Una foto para cada día',
   onbCaptureSubtitle: 'Momentos guarda tus fotos en el día que pasaron, sin que las busques después.',
 
-  // 5· Calendario
   onbCalendarTitle: 'El mes entero de un vistazo',
   onbCalendarSubtitle: 'Mes, semana y año. Toca un día y salta directo a él.',
 
-  // 6· Planes
   onbPlansTitle: 'Elige cómo empezar',
   onbPlansSubtitle: 'Meld es gratis para siempre. Pro suma lo avanzado cuando lo necesites.',
   onbPlanFreeName: 'Free',
@@ -62,20 +47,17 @@ export const es = {
   onbPlansProSoon: 'Las funciones Pro llegan pronto',
   onbBack: 'Atrás',
 
-  // Paso final· Notificaciones
   onbNotifTitle: 'Que no se te pase nada',
   onbNotifSubtitle: 'Te avisamos justo a la hora de cada recordatorio. Puedes cambiarlo cuando quieras en Ajustes.',
   onbNotifEnable: 'Activar recordatorios',
   onbNotifSkip: 'Ahora no',
 
-  // Widget de pantalla de inicio
   widgetEmpty: 'Nada agendado',
   widgetQuickAddLabel: 'Agregar',
   widgetProgressSubLabel: 'hechas hoy',
   widgetHabitsLabel: 'Hábitos',
   widgetNoHabits: 'Sin hábitos hoy',
 
-  // TopAppBar / navegación general
   today: 'Hoy',
   calendar: 'Calendario',
   inbox: 'Bandeja',
@@ -83,7 +65,6 @@ export const es = {
   settings: 'Ajustes',
   navigate: 'Navegar',
 
-  // Accesibilidad — labels de controles solo-ícono (VoiceOver/TalkBack)
   a11ySearch: 'Buscar',
   a11yGroupByType: 'Agrupar por tipo',
   todayGroupHabits: 'Hábitos',
@@ -121,20 +102,16 @@ export const es = {
   a11yPreviousDay: 'Día anterior',
   a11yNextDay: 'Día siguiente',
 
-  // DayBar / FloatingBar
   confirm: 'Confirmar',
 
-  // TodayScreen
   doneOfTotal: '{done} de {total} hechos',
 
-  // InboxScreen
   inboxQuickCapturePlaceholder: '¿Qué tienes en mente?',
   waiting: '{count} pendientes',
   justNow: 'Ahora mismo',
   hoursAgo: 'hace {hours}h',
   yesterday: 'Ayer',
 
-  // QuickAdd — tipos
   typeTask: 'Tarea',
   typeEvent: 'Evento',
   typeVoiceNote: 'Nota de voz',
@@ -142,7 +119,6 @@ export const es = {
   typeHabit: 'Hábito',
   typeMoment: 'Momento',
 
-  // QuickAdd — títulos de hoja / placeholders / CTA
   newTask: 'Nueva tarea',
   newEvent: 'Nuevo evento',
   newVoiceNote: 'Nueva nota de voz',
@@ -169,7 +145,6 @@ export const es = {
   untitledNote: 'Nota sin título',
   untitledHabit: 'Hábito sin título',
 
-  // QuickAdd — campos
   fieldTime: 'Hora',
   fieldRemindMe: 'Recordarme',
   fieldRepeat: 'Repetir',
@@ -186,7 +161,6 @@ export const es = {
   fieldCategory: 'Categoría',
   fieldPriority: 'Prioridad',
 
-  // Presets (ciclos de valores)
   anytime: 'Cualquier hora',
   off: 'Apagado',
   on: 'Encendido',
@@ -206,7 +180,6 @@ export const es = {
   tomorrow: 'Mañana',
   appleHealth: 'Apple Health',
 
-  // Auto-registro (modal de métricas de salud, ver domain/healthMetrics.ts)
   autoTrackModalTitle: 'Auto-registro',
   autoTrackProNote: 'Con el plan Pro, al conectar Apple Health o Google Fit este check se marca solo apenas cumplas la meta ahí. Por ahora, márcalo a mano.',
   autoTrackNoneLabel: 'Ninguno',
@@ -234,18 +207,15 @@ export const es = {
   healthUnitCal: 'kcal',
   healthUnitHours: 'h',
 
-  // Categorías
   categoryWork: 'Trabajo',
   categoryPersonal: 'Personal',
   categoryHealth: 'Salud',
 
-  // Prioridad
   priorityNone: 'Ninguna',
   priorityLow: 'Baja',
   priorityMed: 'Media',
   priorityHigh: 'Alta',
 
-  // Voice record row
   tapToRecord: 'Toca para grabar',
   recording: 'Grabando… {time}',
   recorded: 'Grabado',
@@ -265,16 +235,13 @@ export const es = {
   anytimeLabel: 'Cualquier hora',
   offLabel: 'Apagado',
 
-  // Item detail
   itemDetailAnytime: 'Cualquier hora',
 
-  // Calendar
   calendarYearSubtitle: 'Un año de días que\nvale la pena guardar',
   viewWeek: 'Semana',
   viewMonth: 'Mes',
   viewYear: 'Año',
 
-  // CalendarFilterSheet
   filterLabel: 'Filtro',
   filterEverything: 'Todo',
   filterTasks: 'Tareas',
@@ -290,7 +257,6 @@ export const es = {
   calendarTodayCardHabitsDone: 'Hábitos hechos',
   calendarTodayCardMoments: 'Momentos',
 
-  // Moments
   momentsTitle: 'Momentos',
   momentsSubtitle: 'Tus fotos, guardadas en el día que pasaron',
   weekNumber: 'Semana {n}',
@@ -298,7 +264,6 @@ export const es = {
   momentsEmptyMessage: 'Agrega una foto de hoy con el botón "+" para empezar tu colección.',
   momentsEmptyCta: 'Agregar una foto',
 
-  // Settings
   settingsSubtitle: 'Tuyo, en este dispositivo',
   settingsSectionGeneral: 'General',
   settingsSectionAppearance: 'Apariencia',
@@ -331,26 +296,21 @@ export const es = {
   settingsCoolHabits: 'Hábitos Cool',
   settingsCoolHabitsSubtitle: 'Mismo estilo de los hábitos de salud para todos los hábitos',
 
-  // Notificaciones
   notificationBody: 'Meld · recordatorio',
   notificationMarkDone: 'Marcar hecho',
 
-  // SearchOverlay
   close: 'Cerrar',
   searchPlaceholder: 'Buscar tareas, eventos, notas…',
   searchEmpty: 'Escribe para buscar en Meld',
   searchNoResults: 'Sin resultados para "{query}"',
 
-  // RemindersSheet
   remindersTitle: 'Próximos recordatorios',
   remindersEmpty: 'No tienes recordatorios próximos',
   anyTime: 'Cualquier hora',
 
-  // BackToTodayBar
   backToTodayLabel: 'Estás viendo otro día',
   backToTodayCta: 'Volver a hoy',
 
-  // Estados vacíos
   todayEmptyTitle: 'Un día despejado',
   todayEmptyMessage: 'Nada está agendado todavía. Agrega algo que haga que hoy valga la pena.',
   todayEmptyCta: 'Agregar una tarea',

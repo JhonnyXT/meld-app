@@ -40,16 +40,6 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 function RootStack() {
   const { palette, scheme } = useTheme();
 
-  // El permiso de notificaciones ya NO se pide al arrancar: se pide con
-  // contexto al final del onboarding (`NotificationsStep`). Ver CLAUDE.md.
-
-  // Deep link del widget "Agregar rápido" de Android/iOS (ver
-  // `src/widget/QuickAddAndroidWidget.tsx` / `TodayWidget.swift` →
-  // `QuickAddWidget`): tocarlo arma una URI con `Linking.createURL('/', {
-  // queryParams: { openQuickAdd: 'task' } })` — se resuelve al scheme real
-  // del variant (no hardcodeado). Acá se escucha esa URI tanto en frío (app
-  // cerrada, `getInitialURL`) como en caliente (app ya abierta, evento
-  // `url`) y se abre Quick Add directo, sin pasar por ninguna pantalla.
   const handleDeepLink = useCallback((url: string | null) => {
     if (!url) return;
     const { queryParams } = Linking.parse(url);
@@ -64,19 +54,10 @@ function RootStack() {
     return () => sub.remove();
   }, [handleDeepLink]);
 
-  // Tocar una notificación (o su botón "Marcar hecho") — ver
-  // `services/notifications.ts` → `registerNotificationResponseHandling`,
-  // mismo patrón que el deep link de arriba (evento en caliente + chequeo
-  // en frío al arrancar).
   useEffect(() => registerNotificationResponseHandling(() => useDayItemsStore.getState().reload()), []);
 
-  // Respaldo en la nube (SYNC_ROADMAP.md, Fase 3): sin sesión no hace nada hasta que la haya
-  // (ver `src/sync/engine.ts` → `startSync`).
   useEffect(startSync, []);
 
-  // "Marcar hecho" desde la notificación con la app en segundo plano lo
-  // resuelve la tarea headless directo en la DB: al volver a primer plano se
-  // recarga Hoy para no mostrar la tarea como pendiente.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') useDayItemsStore.getState().reload();
@@ -126,8 +107,6 @@ export default function RootLayout() {
     initDb();
     useCategoriesStore.getState().load();
     setDbReady(true);
-    // Contador de tareas pendientes en el ícono: al abrir y cada vez que la
-    // app vuelve a primer plano (p. ej. al pasar la medianoche cambia "hoy").
     refreshAppBadge();
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') refreshAppBadge();
@@ -137,13 +116,6 @@ export default function RootLayout() {
 
   const ready = dbReady && fontsLoaded;
 
-  // El splash nativo estático (mismo logo/fondo, ver app.config.ts) se oculta
-  // apenas React pinta el primer frame con `AnimatedSplash` — directo en un
-  // efecto, SIN esperar un evento `onLayout` de por medio (patrón de
-  // `my-wallet-app`). Depender de `onLayout` de `SafeAreaProvider` llegó a
-  // tardar 27s en dispositivo real en una sesión de pruebas larga — con
-  // `hideAsync()` disparado apenas el componente monta, no hay esa
-  // indirección.
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
@@ -152,17 +124,6 @@ export default function RootLayout() {
     return <View style={{ flex: 1, backgroundColor: '#121212' }} />;
   }
 
-  // Un solo árbol de CONTENIDO a la vez (splash O app, nunca los dos
-  // superpuestos) — se probó como overlay encima de RootStack y no cubría
-  // toda la pantalla de forma confiable (bug real: el glow quedaba flotando
-  // sobre Today). Pero `GestureHandlerRootView`/`SafeAreaProvider` se montan
-  // SIEMPRE, una sola vez — `AnimatedSplash` usa `react-native-svg`
-  // (`Circle`/`RadialGradient` del glow), y ese árbol necesita el mounting
-  // manager de Fabric ya inicializado por esos providers para poder pintar
-  // (sin ellos, el SVG
-  // queda mudo: los props nunca llegan a la vista nativa aunque Reanimated
-  // siga corriendo del lado JS — bug real visto en dispositivo, el splash
-  // "terminaba" a tiempo pero nunca se veían ni el glow ni el texto).
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

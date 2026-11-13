@@ -1,9 +1,6 @@
 import Database from 'better-sqlite3';
 import { initDb, type SqliteLike } from './db';
 
-/** Adaptador mínimo: `better-sqlite3` habla SQLite real (sin el runtime nativo de Expo), así que
- * corre el MISMO SQL que `initDb` ejecuta en el dispositivo — estos tests no duplican ni
- * reinterpretan las migraciones, las corren tal cual. */
 function wrap(raw: Database.Database): SqliteLike {
   return {
     execSync: (sql: string) => raw.exec(sql),
@@ -27,8 +24,6 @@ describe('initDb — instalación nueva', () => {
       expect.arrayContaining(['day_items', 'habit_completions', 'task_completions', 'categories', 'space_members']),
     );
 
-    // Columnas de Fase 4 (sync/compartir) tienen que estar desde el CREATE TABLE de una
-    // instalación nueva, no solo llegar vía ALTER TABLE.
     expect(columns(raw, 'day_items')).toEqual(expect.arrayContaining(['space_id', 'completed_by_uid', 'category_id']));
     expect(columns(raw, 'habit_completions')).toEqual(expect.arrayContaining(['space_id', 'completed_by_uid']));
     expect(columns(raw, 'task_completions')).toEqual(expect.arrayContaining(['space_id', 'completed_by_uid']));
@@ -56,10 +51,6 @@ describe('initDb — instalación nueva', () => {
 });
 
 describe('initDb — dispositivo con datos previos (esquema viejo, sin las columnas de Fase 4)', () => {
-  /** Reconstruye el estado de `day_items`/`categories` ANTES de que existieran `space_id`/
-   * `completed_by_uid`/etc. — el caso real que `addColumnIfMissing` existe para cubrir: un
-   * dispositivo instalado hace meses, que actualiza la app y corre `initDb()` de nuevo sobre una
-   * base que ya tiene filas. */
   function seedLegacySchema(raw: Database.Database) {
     raw.exec(`
       CREATE TABLE day_items (
@@ -98,7 +89,6 @@ describe('initDb — dispositivo con datos previos (esquema viejo, sin las colum
     expect(columns(raw, 'day_items')).toEqual(expect.arrayContaining(['space_id', 'completed_by_uid', 'category_id']));
     const row = raw.prepare('SELECT * FROM day_items WHERE id = ?;').get('legacy-1') as Record<string, unknown>;
     expect(row.title).toBe('Tarea vieja');
-    // No se re-siembran las 3 default porque `categories` ya tenía filas (solo 'Work').
     const categoryCount = raw.prepare('SELECT COUNT(*) as c FROM categories;').get() as { c: number };
     expect(categoryCount.c).toBe(1);
 
@@ -116,10 +106,7 @@ describe('initDb — dispositivo con datos previos (esquema viejo, sin las colum
     raw.close();
   });
 
-  it('crear el índice de category_id no rompe aunque la tabla sea vieja (bug real ya corregido)', () => {
-    // Regresión: antes el índice se creaba ANTES del `addColumnIfMissing`, y sobre una tabla vieja
-    // (`CREATE TABLE IF NOT EXISTS` es un no-op) tiraba "no such column: category_id" sin try/catch,
-    // abortando `initDb()` entero. Ver el comentario en `db.ts` junto al índice.
+  it('crear el índice de category_id no rompe aunque la tabla sea vieja (ver docs/adr/0009-orden-de-migraciones-sqlite.md)', () => {
     const raw = new Database(':memory:');
     seedLegacySchema(raw);
     expect(() => initDb(wrap(raw))).not.toThrow();

@@ -1,8 +1,3 @@
-/**
- * Guardia estática de la Regla #3 de SYNC_ROADMAP.md: la red (Firebase / Google Sign-In) solo
- * vive en `src/sync/`. Pantallas, stores, hooks, repositorios y utilidades importan la API de
- * `@/sync`, nunca Firebase directo.
- */
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative } from 'path';
 

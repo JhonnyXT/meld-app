@@ -16,13 +16,6 @@ interface ProgressAndroidWidgetProps {
   height?: number;
 }
 
-/** Widget "Progreso del día" — tamaño fijo desde la config
- * (`resizeMode: 'none'`), solo el conteo grande de hoy (mismo
- * `doneCount`/`totalCount` que ya calcula `todayWidgetData.ts` para el
- * header del widget "Hoy" — ver la misma simplificación conocida ahí: no
- * inyecta ocurrencias recurrentes de hábitos). `widgetContentScale` agranda
- * la fracción según el tamaño real que le dio el launcher del usuario
- * (mismo bug/fix que `QuickAddAndroidWidget.tsx`). Tocar abre la app. */
 export function ProgressAndroidWidget({
   doneCount,
   totalCount,

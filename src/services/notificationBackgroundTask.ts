@@ -6,9 +6,6 @@ import { completeItemFromNotification, MARK_DONE_ACTION } from './notificationAc
 
 const TASK_NAME = 'meld-notification-actions';
 
-/** Con la app cerrada el payload llega serializado por Android: en vez de
- * `content.data` trae `content.dataString` (el JSON de `data`, al mismo nivel
- * que `title`/`body`, no adentro de `data`). Se aceptan las dos formas. */
 function itemIdFromContent(content: unknown): string | null {
   if (!content || typeof content !== 'object') return null;
   const record = content as { data?: { itemId?: unknown } | null; dataString?: unknown };
@@ -24,20 +21,6 @@ function itemIdFromContent(content: unknown): string | null {
   return null;
 }
 
-/**
- * "Marcar hecho" SIN abrir la app (pedido explícito del usuario, "como
- * WhatsApp"). Con `opensAppToForeground: false`, Android no trae la app al
- * frente y, si está en segundo plano o cerrada, `expo-notifications` corre
- * esta tarea de `expo-task-manager` en un proceso JS headless — así el botón
- * funciona aunque Android haya matado la app. Con la app en primer plano la
- * tarea NO corre: ahí lo atiende el listener de
- * `registerNotificationResponseHandling`. Solo Android: en iOS la acción
- * sigue llegando al listener.
- *
- * Definida y registrada en el scope del módulo, importado desde `index.js`
- * antes que nada (igual que el headless task del widget), porque el proceso
- * headless no monta ningún componente.
- */
 if (Platform.OS === 'android') {
   TaskManager.defineTask<Notifications.NotificationTaskPayload>(TASK_NAME, async ({ data, error }) => {
     if (error || !data || !('actionIdentifier' in data)) return;

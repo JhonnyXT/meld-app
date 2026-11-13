@@ -16,12 +16,9 @@ export interface Palette {
   surface: string;
   surfaceLow: string;
   surfaceHigh: string;
-  /** Pill/etiqueta contextual sólida (ej. Inbox en la barra flotante). */
   pillSolid: string;
   text: string;
-  /** Texto secundario: fechas, íconos inactivos, etiquetas de categoría, time labels. */
   textDim: string;
-  /** Texto de ítems completados (tachado). */
   textFaint: string;
   border: string;
   accent: string;
@@ -90,24 +87,18 @@ export function getPalette(scheme: 'light' | 'dark', accent: AccentId): Palette 
   return withAccent(lightBase, a, soft, ink);
 }
 
-/** Colores fijos de categoría (independientes del acento), tal como en el diseño. */
 export const categoryColors = {
   work: '#4F84FF',
   personal: '#A55CFF',
 } as const;
 
-/** Color fijo por TIPO de ítem (independiente del acento y del tema) — un
- * color conocido por tipo, elegido por afinidad. Se usa para los puntos del
- * grid de Mes en Calendario, para identificar de un vistazo qué tipo de
- * cosas pasaron cada día. No confundir con `categoryColors` (Trabajo/
- * Personal/Salud, que es una etiqueta que elige el usuario). */
 export const typeColors = {
-  task: '#3B82F6', // azul — "to-do" clásico
-  event: '#EF4444', // rojo — evento de calendario
-  habit: '#22C55E', // verde — racha / progreso
-  note: '#EAB308', // amarillo — sticky note
-  voiceMemo: '#8B5CF6', // morado — onda de sonido
-  moment: '#F97316', // naranja — foto / recuerdo
+  task: '#3B82F6',
+  event: '#EF4444',
+  habit: '#22C55E',
+  note: '#EAB308',
+  voiceMemo: '#8B5CF6',
+  moment: '#F97316',
 } as const;
 
 export const spacing = {

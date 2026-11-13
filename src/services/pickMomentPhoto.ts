@@ -5,16 +5,7 @@ import { getISOWeek } from '@/domain/week';
 import { newId } from '@/domain/id';
 import type { Moment } from '@/domain/dayItem';
 
-/**
- * Abre el picker de fotos y guarda el resultado como un Momento del día de
- * HOY. Se pueden guardar varias fotos por día (id único por foto). MVP: se
- * guarda la URI que entrega el picker directamente (no se copia a
- * almacenamiento propio todavía).
- */
 export async function pickMomentPhotoForToday(): Promise<Moment | null> {
-  // Sin pedir permiso: en Android abre el Photo Picker del sistema (el usuario
-  // elige una foto y solo esa se comparte) — Google Play no permite pedir
-  // acceso a toda la galería para esto.
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     quality: 0.8,

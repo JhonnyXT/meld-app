@@ -1,7 +1,5 @@
 import { parseVoiceInput } from './voiceParser';
 
-// Miércoles 11 de noviembre de 2026 — fecha de referencia fija para que los tests sean
-// deterministas (detectDate calcula "mañana"/"el lunes"/etc. relativo a `now`).
 const NOW = new Date(2026, 10, 11);
 
 describe('parseVoiceInput — tipo', () => {

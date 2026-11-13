@@ -2,18 +2,9 @@ import { existsSync, readFileSync } from 'fs';
 import type { ExpoConfig } from 'expo/config';
 import { webClientIdFrom } from './firebase/googleServices';
 
-// ─── Build variants ─────────────────────────────────────────────────────────
-// Patrón portado de my-wallet-app / habit-tracker (ver CLAUDE.md → Build variants).
-// Cada variant tiene su propio applicationId — se instalan una al lado de la
-// otra en el mismo dispositivo, cada una con su propia base de datos SQLite.
 type Variant = 'dev' | 'test' | 'prod';
 
 const variants = {
-  // Rebranding Anchor → Trove (2026-08-21) → Meld (2026-08-27): cada rename
-  // migró el applicationId a un namespace nuevo a propósito (decisión
-  // explícita del usuario, sabiendo que esto reinstala como app nueva y
-  // pierde los datos de prueba que tenía el variant dev con el package
-  // viejo) — ver CLAUDE.md → "Build variants" para el historial completo.
   dev: {
     name: 'Meld (Dev)',
     package: 'app.meld.mobile',
@@ -40,28 +31,15 @@ function resolveVariant(): Variant {
 const variant = resolveVariant();
 const current = variants[variant];
 
-// App Group para compartir datos entre la app y el widget de iOS (WidgetKit
-// no puede leer la DB SQLite de la app directo — la app escribe un JSON
-// resumido acá vía `ExtensionStorage`, ver `src/widget/refreshTodayWidget.ts`).
-// Uno por variant, como el resto del aislamiento entre dev/test/prod.
 const widgetAppGroup = `group.${current.package}.widget`;
 
-// ─── Firebase (SYNC_ROADMAP.md, T6) ─────────────────────────────────────────
-// dev y test comparten el proyecto meld-test-b197c: dev lo usa solo para el cliente OAuth del
-// login (sus datos van al Firebase Emulator, ver src/sync/firebase.ts), no a la nube real. prod →
-// meld-prod-d6b61, proyecto aparte.
 const googleServicesFile =
   variant === 'prod' ? './firebase/google-services.prod.json' : './firebase/google-services.test.json';
 
-// Google Sign-In (versión gratis) no detecta el webClientId: se saca del mismo JSON al compilar.
-// Sin el archivo (clon nuevo) la config sigue resolviendo; el build nativo sí lo exige.
 const googleWebClientId = existsSync(googleServicesFile)
   ? webClientIdFrom(JSON.parse(readFileSync(googleServicesFile, 'utf8')), current.package)
   : undefined;
 
-// `newArchEnabled` es válida en el schema de app.json/app.config pero todavía
-// no está en el tipo `ExpoConfig` de este SDK — se extiende el tipo acá en vez
-// de perder el chequeo de tipos del resto de la config con un `as any`.
 const config: ExpoConfig & { newArchEnabled?: boolean } = {
   name: current.name,
   slug: 'meld-app',
@@ -86,11 +64,6 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
   android: {
     package: current.package,
     googleServicesFile,
-    // El ícono es el logo tal cual, igual en los 3 variants (a pedido
-    // explícito — antes cada variant teñía el fondo con su propio color y el
-    // logo quedaba "encajonado"). `backgroundImage` es el degradado negro
-    // del propio logo, `foregroundImage` el círculo con el check; los 3 PNG
-    // salen de `assets/logo.png`. `backgroundColor` es solo el respaldo.
     adaptiveIcon: {
       backgroundColor: '#050508',
       foregroundImage: './assets/android-icon-foreground.png',
@@ -98,15 +71,7 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
       monochromeImage: './assets/android-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
-    // SCHEDULE_EXACT_ALARM: sin esto, expo-notifications cae a alarmas NO
-    // exactas (AlarmManagerCompat.setAndAllowWhileIdle en vez de
-    // setExactAndAllowWhileIdle) y Doze mode puede demorar un recordatorio
-    // con hora puntual varios minutos — ver CLAUDE.md → "Doze mode".
     permissions: ['RECORD_AUDIO', 'POST_NOTIFICATIONS', 'SCHEDULE_EXACT_ALARM'],
-    // Google Play restringe el acceso amplio a fotos: Momentos usa el Photo
-    // Picker del sistema, que no necesita permiso. Se bloquean para que
-    // ninguna librería los vuelva a agregar al manifest. La cámara no se usa
-    // (`cameraPermission: false` en expo-image-picker la bloquea también).
     blockedPermissions: [
       'android.permission.READ_MEDIA_IMAGES',
       'android.permission.READ_MEDIA_VIDEO',
@@ -152,13 +117,6 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
         backgroundColor: '#121212',
       },
     ],
-    // Widget básico "Hoy" (Fase 2 del roadmap Free, ver CLAUDE.md → "Roadmap").
-    // Android: `react-native-android-widget` (Glance/Jetpack, real y probado
-    // en dispositivo). iOS: `@bacons/apple-targets` genera el target de
-    // WidgetKit — este entorno no tiene Xcode/macOS, así que el lado iOS
-    // queda SIN VERIFICAR (no se pudo compilar ni ver funcionando acá,
-    // decisión explícita del usuario de agregarlo igual) — ver
-    // `targets/widget/`.
     [
       'react-native-android-widget',
       {
@@ -172,22 +130,11 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
             targetCellWidth: 4,
             targetCellHeight: 2,
             resizeMode: 'horizontal|vertical',
-            // El contenido se adapta al tamaño real (ver `androidWidgetTree.ts`
-            // → `pickVisibleItemCount`, corrige el espacio vacío que quedaba
-            // al agrandar el widget), pero igual conviene un techo — sin esto
-            // Android permite arrastrarlo casi a pantalla completa.
             maxResizeWidth: '400dp',
             maxResizeHeight: '400dp',
-            // Mínimo permitido por la librería (30 min) — además de esto, la
-            // app dispara una actualización inmediata en foreground cada vez
-            // que cambian los ítems de hoy (`refreshWidgets`), así que este
-            // período es solo el respaldo para cuando la app está cerrada.
             updatePeriodMillis: 1800000,
           },
           {
-            // Widget chico y estático — abre Quick Add directo (deep link,
-            // ver `app/_layout.tsx` → `handleDeepLink`), nunca necesita
-            // refrescarse por datos, así que sin `updatePeriodMillis`.
             name: 'QuickAddWidget',
             label: 'Meld — Agregar rápido',
             description: 'Un toque para agregar algo, sin abrir la app primero.',
@@ -231,13 +178,7 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
     [
       'expo-build-properties',
       {
-        // El default de Expo (2.0.21) no compila contra Kotlin 2.2.20, que ya aparecía como
-        // constraint resuelto en el árbol de dependencias antes de fijarla acá explícito.
-        // (El bug real que bloqueaba el build — "Module was compiled with an incompatible
-        // version of Kotlin", metadata 2.4.0 vs. 2.1.0 esperado, en el AAR de firebase-auth de
-        // @react-native-firebase/auth 27.x — se resolvió bajando a 26.0.0, que usa firebase-bom
-        // 34.15.0 en vez de 35.0.2; ver package.json. Esta versión de Kotlin se deja igual,
-        // ya la pedía el resto del árbol.)
+        // ver docs/adr/0022-kotlin-version-fijada-por-firebase-auth.md
         android: { kotlinVersion: '2.2.20' },
       },
     ],
@@ -249,10 +190,6 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
     appVariant: variant,
     widgetAppGroup,
     googleWebClientId,
-    // Proyecto de EAS (creado en expo.dev). Como `app.config.ts` es dinámico,
-    // `eas init` no puede escribir esto solo — va acá a mano. El mismo
-    // projectId sirve para los 3 variants (dev/test/prod); lo que los separa
-    // sigue siendo el `applicationId` de cada uno.
     eas: {
       projectId: '0bdd091e-25d8-4d30-9f44-94544b38c6ea',
     },
