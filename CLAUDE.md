@@ -298,9 +298,7 @@ React. El idioma vive en `settingsStore.language` (persistido).
       → `useItemDetailStore.open`), para los 6 tipos. En frío se lee con
       `getLastNotificationResponse()` (síncrona; la versión `Async` está
       deprecada) + `clearLastNotificationResponse()` para no reabrirlo.
-    - **Probar sin esperar una hora real**: Ajustes → "Probar recordatorio"
-      (solo `dev`/`test`) crea una "Tarea de prueba" para hoy y la notifica
-      a los 10 s (`scheduleTestReminder`). Para simular "app matada" usar
+    - **Para simular "app matada"** al probar un recordatorio real, usar
       `adb shell am kill app.meld.mobile` con la app en segundo plano —
       **nunca `am force-stop`**: cancela las alarmas de la app y la
       notificación no llega.

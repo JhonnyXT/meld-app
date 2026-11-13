@@ -219,25 +219,3 @@ export function registerNotificationResponseHandling(onItemCompleted?: () => voi
   const sub = Notifications.addNotificationResponseReceivedListener(handle);
   return () => sub.remove();
 }
-
-export async function scheduleTestReminder(item: DayItem): Promise<boolean> {
-  const granted = await ensurePermission();
-  if (!granted) return false;
-  await ensureAndroidChannel();
-  await ensureCategories();
-  await Notifications.scheduleNotificationAsync({
-    identifier: item.id,
-    content: {
-      title: item.title,
-      body: translate(useSettingsStore.getState().language, 'notificationBody'),
-      data: { itemId: item.id },
-      categoryIdentifier: COMPLETABLE_CATEGORY,
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: 10,
-      channelId: ANDROID_CHANNEL_ID,
-    },
-  });
-  return true;
-}

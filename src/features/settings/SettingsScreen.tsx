@@ -32,13 +32,9 @@ import {
   type CompletedItemStyle,
 } from '@/store/settingsStore';
 import { useNavigateMenuStore } from '@/store/navigateMenuStore';
-import { getNotificationPermissionStatus, requestNotificationPermission, scheduleTestReminder } from '@/services/notifications';
-import { dayItemRepository } from '@/data/local/dayItemRepository';
-import { useDayItemsStore } from '@/store/dayItemsStore';
-import { toDateKey } from '@/domain/date';
+import { getNotificationPermissionStatus, requestNotificationPermission } from '@/services/notifications';
 import { trialDaysLeft } from '@/domain/trial';
 import { isDev, isTest } from '@/constants/appVariant';
-import { newId } from '@/domain/id';
 
 const THEME_LABEL_KEY: Record<ThemePreference, TranslationKey> = {
   system: 'themeSystem',
@@ -94,28 +90,6 @@ export function SettingsScreen() {
       });
     }, []),
   );
-
-  const handleTestReminder = async () => {
-    const now = new Date();
-    const item = {
-      id: newId(),
-      createdAt: now.toISOString(),
-      updatedAt: now.toISOString(),
-      date: toDateKey(now),
-      title: t('testReminderTaskTitle'),
-      category: null,
-      categoryColor: null,
-      reminderAt: null,
-      status: 'scheduled' as const,
-      type: 'task' as const,
-      priority: 'none' as const,
-      repeatRule: null,
-      link: null,
-    };
-    await dayItemRepository.upsert(item);
-    useDayItemsStore.getState().reload();
-    await scheduleTestReminder(item);
-  };
 
   const handleNotificationsToggle = async (next: boolean) => {
     if (!next) {
@@ -307,16 +281,6 @@ export function SettingsScreen() {
             showBorder
             right={<Toggle value={notificationsEnabled} onValueChange={handleNotificationsToggle} />}
           />
-          {(isDev || isTest) && (
-            <SettingRow
-              icon="notifications"
-              title={t('settingsTestReminder')}
-              subtitle={t('settingsTestReminderSubtitle')}
-              showBorder
-              onPress={handleTestReminder}
-              right={<Icon name="chevron-right" size={18} color={palette.textDim} />}
-            />
-          )}
           <SettingRow
             icon="repeat"
             title={t('settingsHabitsInToday')}

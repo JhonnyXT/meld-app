@@ -374,9 +374,6 @@ export const es = {
   settingsSimBackToFree: 'Volver a Free',
   settingsSimTrialEnd: 'Simular fin de la prueba',
   settingsSimSubtitle: 'Solo para pruebas · sin cobro real',
-  settingsTestReminder: 'Probar recordatorio',
-  settingsTestReminderSubtitle: 'Crea una tarea de prueba y avisa en 10 s',
-  testReminderTaskTitle: 'Tarea de prueba',
   settingsSimTrialEndSubtitle: 'Solo para pruebas · cierra y vuelve a abrir la app',
   trialEndedTitle: 'Tu prueba de Pro terminó',
   trialEndedMessage:
@@ -829,9 +826,6 @@ export const en: Record<keyof typeof es, string> = {
   settingsSimBackToFree: 'Back to Free',
   settingsSimTrialEnd: 'Simulate trial ending',
   settingsSimSubtitle: 'Testing only · no real charge',
-  settingsTestReminder: 'Test reminder',
-  settingsTestReminderSubtitle: 'Creates a test task and alerts in 10 s',
-  testReminderTaskTitle: 'Test task',
   settingsSimTrialEndSubtitle: 'Testing only · close and reopen the app',
   trialEndedTitle: 'Your Pro trial has ended',
   trialEndedMessage:
