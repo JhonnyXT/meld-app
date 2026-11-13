@@ -18,6 +18,7 @@ import { cancelReminderNotification, syncReminderNotification } from '@/services
 import { refreshAppBadge } from '@/services/appBadge';
 import { refreshWidgets } from '@/widget/refreshWidgets';
 import { ensureFirebase } from './firebase';
+import { myRole, resolveCompletedByUidForPush } from './engineHelpers';
 import { pickWinner } from './merge';
 import {
   categoryToDoc,
@@ -33,7 +34,6 @@ import {
   type CategoryDoc,
   type DayItemDoc,
   type HabitCompletionDoc,
-  type SpaceDoc,
   type SpaceItemDoc,
   type TaskCompletionDoc,
 } from './mappers';
@@ -221,10 +221,6 @@ async function push(uid: string): Promise<void> {
   await pushCategories(uid);
 }
 
-function myRole(data: SpaceDoc, uid: string): SpaceRole {
-  return (data.editorUids ?? data.memberUids).includes(uid) ? 'editor' : 'viewer';
-}
-
 async function pullSpaceItems(spaceId: string, meta: SyncMeta): Promise<{ meta: SyncMeta; changed: boolean }> {
   const key = spaceCursorKey(spaceId, 'items');
   const docs = await withTimeout(pullSpaceCollection<SpaceItemDoc>(spaceId, 'items', meta.cursors[key] ?? 0));
@@ -349,18 +345,6 @@ function spaceGroup(map: Map<string, SpacePushGroup>, spaceId: string): SpacePus
   return g;
 }
 
-async function resolveCompletedByUidForPush(
-  current: string | null,
-  isDone: boolean,
-  persist: (uid: string) => Promise<void>,
-): Promise<string | null> {
-  if (!isDone || current) return isDone ? current : null;
-  const uid = currentUid();
-  if (!uid) return null;
-  await persist(uid);
-  return uid;
-}
-
 async function pushSpaces(): Promise<void> {
   const [items, habits, tasks, cats] = await Promise.all([
     dayItemRepository.listPendingSync(),
@@ -369,6 +353,7 @@ async function pushSpaces(): Promise<void> {
     categoryRepository.listPendingSync(),
   ]);
 
+  const uid = currentUid();
   const bySpace = new Map<string, SpacePushGroup>();
   for (const p of items) if (p.spaceId) spaceGroup(bySpace, p.spaceId).items.push(p);
   for (const p of habits) if (p.spaceId) spaceGroup(bySpace, p.spaceId).habits.push(p);
@@ -381,9 +366,10 @@ async function pushSpaces(): Promise<void> {
         ops.push({ kind: 'items', id: p.id, data: tombstoneDoc(p.deletedAt!) });
         continue;
       }
-      const completedByUid = await resolveCompletedByUidForPush(p.completedByUid, p.item.status === 'done', async (uid) => {
-        await dayItemRepository.setCompletedByUid(p.id, uid);
-      });
+      const completedByUid = resolveCompletedByUidForPush(p.completedByUid, p.item.status === 'done', uid);
+      if (completedByUid && completedByUid !== p.completedByUid) {
+        await dayItemRepository.setCompletedByUid(p.id, completedByUid);
+      }
       ops.push({ kind: 'items', id: p.id, data: dayItemToSpaceDoc(p.item, completedByUid) });
     }
     for (const p of group.habits) {
@@ -391,9 +377,10 @@ async function pushSpaces(): Promise<void> {
         ops.push({ kind: 'habitCompletions', id: p.id, data: tombstoneDoc(p.deletedAt) });
         continue;
       }
-      const byUid = await resolveCompletedByUidForPush(p.completedByUid, true, async (uid) => {
-        await habitCompletionSyncRepository.setCompletedByUid(p.id, uid);
-      });
+      const byUid = resolveCompletedByUidForPush(p.completedByUid, true, uid);
+      if (byUid && byUid !== p.completedByUid) {
+        await habitCompletionSyncRepository.setCompletedByUid(p.id, byUid);
+      }
       ops.push({
         kind: 'habitCompletions',
         id: p.id,
@@ -405,9 +392,10 @@ async function pushSpaces(): Promise<void> {
         ops.push({ kind: 'taskCompletions', id: p.id, data: tombstoneDoc(p.deletedAt) });
         continue;
       }
-      const byUid = await resolveCompletedByUidForPush(p.completedByUid, true, async (uid) => {
-        await taskCompletionSyncRepository.setCompletedByUid(p.id, uid);
-      });
+      const byUid = resolveCompletedByUidForPush(p.completedByUid, true, uid);
+      if (byUid && byUid !== p.completedByUid) {
+        await taskCompletionSyncRepository.setCompletedByUid(p.id, byUid);
+      }
       ops.push({
         kind: 'taskCompletions',
         id: p.id,
