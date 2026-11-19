@@ -20,6 +20,7 @@ import { WeekHourGrid } from '@/components/calendar/WeekHourGrid';
 import { ListSkeleton } from '@/components/ListSkeleton';
 import { useWeekAgenda } from './useWeekAgenda';
 import { useItemDetailStore } from '@/store/itemDetailStore';
+import { useQuickAddStore } from '@/store/quickAddStore';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useTranslation } from '@/i18n';
 import {
@@ -382,6 +383,18 @@ export function CalendarScreen() {
                   days={weekAgenda.days}
                   itemsByDate={filteredWeekItemsByDate}
                   onPressItem={(id) => useItemDetailStore.getState().open(id)}
+                  onCreateAt={(dateKey, timeMinutes) =>
+                    useQuickAddStore.getState().openWithPrefill({
+                      type: 'event',
+                      title: '',
+                      dateKey,
+                      timeMinutes,
+                      priority: null,
+                      category: null,
+                      repeat: null,
+                      transcript: '',
+                    })
+                  }
                 />
               </View>
             )

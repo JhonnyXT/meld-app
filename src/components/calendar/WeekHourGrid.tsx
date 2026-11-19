@@ -20,6 +20,7 @@ interface WeekHourGridProps {
   days: Date[];
   itemsByDate: Record<string, DayItem[]>;
   onPressItem: (id: string) => void;
+  onCreateAt: (dateKey: string, timeMinutes: number) => void;
 }
 
 function blockColor(item: DayItem): string {
@@ -30,7 +31,7 @@ function isMultiDay(item: DayItem): boolean {
   return item.type === 'event' && !!item.endDate;
 }
 
-export function WeekHourGrid({ days, itemsByDate, onPressItem }: WeekHourGridProps) {
+export function WeekHourGrid({ days, itemsByDate, onPressItem, onCreateAt }: WeekHourGridProps) {
   const { palette, font } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   const todayKey = toDateKey(new Date());
@@ -137,7 +138,11 @@ export function WeekHourGrid({ days, itemsByDate, onPressItem }: WeekHourGridPro
             {perDay.map((d) => (
               <View key={d.dateKey} style={[styles.dayGridCol, { borderColor: palette.border }]}>
                 {HOURS.map((h) => (
-                  <View key={h} style={[styles.hourLine, { height: HOUR_HEIGHT, borderColor: palette.border }]} />
+                  <Pressable
+                    key={h}
+                    onPress={() => onCreateAt(d.dateKey, h * 60)}
+                    style={[styles.hourLine, { height: HOUR_HEIGHT, borderColor: palette.border }]}
+                  />
                 ))}
                 {d.timed.map((block) => {
                   const color = blockColor(block.item);
