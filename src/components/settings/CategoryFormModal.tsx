@@ -56,7 +56,7 @@ export function CategoryFormModal({ visible, initial, onClose, onSave, onDelete 
           </GestureDetector>
 
           <View style={styles.header}>
-            <Text style={{ fontFamily: font.extrabold, fontSize: 22, color: palette.text }}>
+            <Text style={{ fontFamily: font.extrabold, fontSize: 22, color: palette.text, letterSpacing: -0.3 }}>
               {initial ? t('categoryEditTitle') : t('categoryNewTitle')}
             </Text>
             <Pressable
@@ -71,11 +71,14 @@ export function CategoryFormModal({ visible, initial, onClose, onSave, onDelete 
 
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.preview}>
-              <View style={[styles.previewCircle, { backgroundColor: color }]}>
-                <Icon name={icon} size={24} color="#fff" />
+              <View style={[styles.previewRing, { backgroundColor: `${color}26` }]}>
+                <View style={[styles.previewCircle, { backgroundColor: color }]}>
+                  <Icon name={icon} size={26} color="#fff" />
+                </View>
               </View>
             </View>
 
+            <Text style={[styles.sectionLabel, { fontFamily: font.semibold, color: palette.textDim }]}>{t('categoryNamePlaceholder')}</Text>
             <View style={[styles.inputBox, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
               <TextInput
                 value={label}
@@ -87,47 +90,54 @@ export function CategoryFormModal({ visible, initial, onClose, onSave, onDelete 
               />
             </View>
 
-            <Text style={{ fontFamily: font.semibold, fontSize: 13, color: palette.textDim, marginBottom: 10 }}>
-              {t('categoryIconLabel')}
-            </Text>
-            <View style={styles.grid}>
-              {CATEGORY_ICON_OPTIONS.map((opt) => {
-                const active = opt === icon;
-                return (
-                  <Pressable
-                    key={opt}
-                    onPress={() => setIcon(opt)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: active }}
-                    style={[
-                      styles.iconSwatch,
-                      { backgroundColor: active ? color : palette.surfaceLow, borderColor: active ? color : palette.border },
-                    ]}
-                  >
-                    <Icon name={opt} size={18} color={active ? '#fff' : palette.textDim} />
-                  </Pressable>
-                );
-              })}
+            <Text style={[styles.sectionLabel, { fontFamily: font.semibold, color: palette.textDim }]}>{t('categoryIconLabel')}</Text>
+            <View style={[styles.optionsCard, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
+              <View style={styles.grid}>
+                {CATEGORY_ICON_OPTIONS.map((opt) => {
+                  const active = opt === icon;
+                  return (
+                    <Pressable
+                      key={opt}
+                      onPress={() => setIcon(opt)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: active }}
+                      style={[
+                        styles.iconSwatch,
+                        {
+                          backgroundColor: active ? color : palette.surfaceHigh,
+                          borderColor: active ? color : 'transparent',
+                        },
+                      ]}
+                    >
+                      <Icon name={opt} size={18} color={active ? '#fff' : palette.textDim} />
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
 
-            <Text style={{ fontFamily: font.semibold, fontSize: 13, color: palette.textDim, marginTop: 20, marginBottom: 10 }}>
-              {t('categoryColorLabel')}
-            </Text>
-            <View style={styles.grid}>
-              {CATEGORY_COLOR_PALETTE.map((opt) => {
-                const active = opt === color;
-                return (
-                  <Pressable
-                    key={opt}
-                    onPress={() => setColor(opt)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: active }}
-                    style={[styles.colorSwatch, { backgroundColor: opt }, active && { borderColor: palette.text, borderWidth: 2 }]}
-                  >
-                    {active ? <Icon name="check" size={14} color="#fff" /> : null}
-                  </Pressable>
-                );
-              })}
+            <Text style={[styles.sectionLabel, { fontFamily: font.semibold, color: palette.textDim }]}>{t('categoryColorLabel')}</Text>
+            <View style={[styles.optionsCard, { backgroundColor: palette.surfaceLow, borderColor: palette.border }]}>
+              <View style={styles.grid}>
+                {CATEGORY_COLOR_PALETTE.map((opt) => {
+                  const active = opt === color;
+                  return (
+                    <Pressable
+                      key={opt}
+                      onPress={() => setColor(opt)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: active }}
+                      style={[styles.colorSwatch, { backgroundColor: opt }]}
+                    >
+                      {active ? (
+                        <View style={styles.colorCheckRing}>
+                          <Icon name="check" size={14} color="#fff" />
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
 
             <Pressable
@@ -140,7 +150,10 @@ export function CategoryFormModal({ visible, initial, onClose, onSave, onDelete 
             </Pressable>
 
             {initial ? (
-              <Pressable onPress={onDelete} style={styles.deleteRow}>
+              <Pressable
+                onPress={onDelete}
+                style={[styles.deleteRow, { backgroundColor: `${palette.danger}14`, borderColor: `${palette.danger}33` }]}
+              >
                 <Icon name="delete-outline" size={18} color={palette.danger} />
                 <Text style={{ fontFamily: font.semibold, fontSize: 15, color: palette.danger }}>
                   {t('categoryDelete')}
@@ -166,15 +179,23 @@ const styles = StyleSheet.create({
   },
   handleGrabArea: { paddingTop: 12, paddingBottom: 16, alignItems: 'center' },
   handle: { width: 36, height: 4, borderRadius: 2 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   closeButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  preview: { alignItems: 'center', marginBottom: 20 },
-  previewCircle: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
+  preview: { alignItems: 'center', marginBottom: 24 },
+  previewRing: { width: 92, height: 92, borderRadius: 46, alignItems: 'center', justifyContent: 'center' },
+  previewCircle: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  sectionLabel: { fontSize: 13, marginBottom: 10 },
   inputBox: {
     borderRadius: 16,
     padding: 16,
     marginBottom: 22,
     borderWidth: 1,
+  },
+  optionsCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 22,
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   iconSwatch: {
@@ -185,7 +206,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
   },
-  colorSwatch: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  colorSwatch: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  colorCheckRing: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
   cta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -193,14 +223,17 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 16,
     borderRadius: 20,
-    marginTop: 28,
+    marginTop: 6,
   },
   deleteRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 14,
     marginBottom: 8,
   },
 });

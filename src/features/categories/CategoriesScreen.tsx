@@ -11,6 +11,7 @@ import { useTranslation } from '@/i18n';
 import { useCategoriesStore } from '@/store/categoriesStore';
 import { useNavigateMenuStore } from '@/store/navigateMenuStore';
 import { CategoryFormModal } from '@/components/settings/CategoryFormModal';
+import { CategoryItemsModal } from '@/components/settings/CategoryItemsModal';
 import { ShareCategorySheet } from '@/components/settings/ShareCategorySheet';
 import { JoinCategorySheet } from '@/components/settings/JoinCategorySheet';
 import type { Category } from '@/domain/category';
@@ -31,6 +32,7 @@ export function CategoriesScreen() {
   const [pendingDelete, setPendingDelete] = useState<Category | null>(null);
   const [sharing, setSharing] = useState<Category | null>(null);
   const [joinVisible, setJoinVisible] = useState(false);
+  const [viewingItemsOf, setViewingItemsOf] = useState<Category | null>(null);
 
   useEffect(() => {
     load();
@@ -125,7 +127,11 @@ export function CategoriesScreen() {
               <Pressable
                 key={cat.id}
                 onPress={() => openEdit(cat)}
-                style={[styles.card, { backgroundColor: palette.surfaceLow }]}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.card,
+                  { backgroundColor: palette.surfaceLow, borderColor: palette.border, opacity: pressed ? 0.85 : 1 },
+                ]}
               >
                 <View style={[styles.rowIcon, { backgroundColor: cat.color }]}>
                   <Icon name={cat.icon} size={20} color="#fff" />
@@ -147,18 +153,28 @@ export function CategoriesScreen() {
                     </Text>
                   ) : null}
                 </View>
-                {canShare ? (
+                <View style={styles.cardActions}>
+                  {canShare ? (
+                    <Pressable
+                      onPress={() => setSharing(cat)}
+                      hitSlop={8}
+                      style={[styles.actionButton, { backgroundColor: palette.surfaceHigh }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('a11yShareCategory')}
+                    >
+                      <Icon name={cat.space ? 'users' : 'share'} size={16} color={cat.space ? palette.accent : palette.textDim} />
+                    </Pressable>
+                  ) : null}
                   <Pressable
-                    onPress={() => setSharing(cat)}
+                    onPress={() => setViewingItemsOf(cat)}
                     hitSlop={8}
-                    style={[styles.shareButton, { backgroundColor: palette.surfaceHigh }]}
+                    style={[styles.actionButton, { backgroundColor: palette.surfaceHigh }]}
                     accessibilityRole="button"
-                    accessibilityLabel={t('a11yShareCategory')}
+                    accessibilityLabel={t('a11yViewCategoryItems')}
                   >
-                    <Icon name={cat.space ? 'users' : 'share'} size={16} color={cat.space ? palette.accent : palette.textDim} />
+                    <Icon name="chevron-right" size={18} color={palette.textDim} />
                   </Pressable>
-                ) : null}
-                <Icon name="chevron-right" size={18} color={palette.textDim} />
+                </View>
               </Pressable>
             );
           })}
@@ -199,14 +215,27 @@ export function CategoriesScreen() {
       <ShareCategorySheet visible={!!sharing} category={sharing} onClose={() => setSharing(null)} />
 
       <JoinCategorySheet visible={joinVisible} onClose={() => setJoinVisible(false)} />
+
+      <CategoryItemsModal
+        visible={!!viewingItemsOf}
+        category={viewingItemsOf}
+        onClose={() => setViewingItemsOf(null)}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   roundButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  list: { paddingBottom: 160, gap: 10 },
-  card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, padding: 14 },
+  list: { paddingBottom: 160, gap: 12 },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+  },
   rowIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   cardBody: { flex: 1, gap: 2 },
   sharedBadge: {
@@ -219,6 +248,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginTop: 4,
   },
-  shareButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  actionButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   pill: { flex: 1, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
 });
