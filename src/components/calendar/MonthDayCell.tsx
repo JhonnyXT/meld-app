@@ -5,19 +5,28 @@ import { typeColors } from '@/theme/tokens';
 import type { MonthGridCell } from '@/domain/calendarGrid';
 import type { DayItem } from '@/domain/dayItem';
 
-const MAX_DOTS = 3;
+// ver docs/adr/0025-calendario-scroll-continuo.md
+const MAX_VISIBLE_CHIPS = 3;
 
 interface MonthDayCellProps {
   cell: MonthGridCell;
   items: DayItem[];
-  onPress?: (dateKey: string) => void;
+  onPressDay?: (dateKey: string) => void;
+  onPressItem?: (id: string) => void;
+  onPressOverflow?: (dateKey: string) => void;
 }
 
-export function MonthDayCell({ cell, items, onPress }: MonthDayCellProps) {
+function chipColor(item: DayItem): string {
+  return item.categoryColor ?? typeColors[item.type];
+}
+
+export function MonthDayCell({ cell, items, onPressDay, onPressItem, onPressOverflow }: MonthDayCellProps) {
   const { palette, font } = useTheme();
 
   const moment = items.find((item) => item.type === 'moment');
   const otherItems = items.filter((item) => item.type !== 'moment');
+  const visibleItems = otherItems.slice(0, MAX_VISIBLE_CHIPS);
+  const overflowCount = otherItems.length - visibleItems.length;
 
   const textColor = !cell.inCurrentMonth
     ? `${palette.textDim}4d`
@@ -28,33 +37,55 @@ export function MonthDayCell({ cell, items, onPress }: MonthDayCellProps) {
         : palette.text;
 
   return (
-    <Pressable style={styles.cell} onPress={onPress ? () => onPress(cell.dateKey) : undefined}>
-      <View style={styles.dotsRow}>
-        {otherItems.slice(0, MAX_DOTS).map((item, i) => (
-          <View key={item.id ?? i} style={[styles.dot, { backgroundColor: typeColors[item.type] }]} />
-        ))}
+    <Pressable style={styles.cell} onPress={onPressDay ? () => onPressDay(cell.dateKey) : undefined}>
+      <View style={styles.headerRow}>
+        {cell.isToday ? (
+          <View style={[styles.todayCircle, { backgroundColor: palette.accent }]}>
+            <Text style={{ fontFamily: font.bold, fontSize: 16, color: textColor }}>{cell.day}</Text>
+          </View>
+        ) : (
+          <Text style={{ fontFamily: font.medium, fontSize: 16, color: textColor }}>{cell.day}</Text>
+        )}
+        {moment ? <Image source={{ uri: moment.mediaUri }} style={styles.thumb} /> : null}
       </View>
-      {cell.isToday ? (
-        <View style={[styles.todayCircle, { backgroundColor: palette.accent }]}>
-          <Text style={{ fontFamily: font.medium, fontSize: 13, color: textColor }}>{cell.day}</Text>
-        </View>
-      ) : (
-        <Text style={{ fontFamily: font.medium, fontSize: 13, color: textColor }}>{cell.day}</Text>
-      )}
-      {moment ? (
-        <Image source={{ uri: moment.mediaUri }} style={styles.thumb} />
-      ) : (
-        <View style={styles.thumbPlaceholder} />
-      )}
+
+      <View style={styles.chips}>
+        {visibleItems.map((item, i) => {
+          const color = chipColor(item);
+          return (
+            <Pressable
+              key={item.id ?? i}
+              onPress={onPressItem ? () => onPressItem(item.id) : undefined}
+              hitSlop={2}
+              style={[styles.chip, { backgroundColor: `${color}26` }]}
+            >
+              <Text style={[styles.chipText, { fontFamily: font.medium, color }]} numberOfLines={1}>
+                {item.title}
+              </Text>
+            </Pressable>
+          );
+        })}
+        {overflowCount > 0 ? (
+          <Pressable
+            onPress={onPressOverflow ? () => onPressOverflow(cell.dateKey) : undefined}
+            hitSlop={4}
+            style={styles.overflowBtn}
+          >
+            <Text style={{ fontFamily: font.semibold, fontSize: 11, color: palette.textDim }}>+{overflowCount}</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  cell: { width: `${100 / 7}%`, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2, gap: 2, minHeight: 50 },
-  dotsRow: { flexDirection: 'row', gap: 2, height: 4, alignItems: 'center' },
-  dot: { width: 4, height: 4, borderRadius: 2 },
-  todayCircle: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  thumb: { width: 18, height: 18, borderRadius: 4 },
-  thumbPlaceholder: { width: 18, height: 18 },
+  cell: { width: `${100 / 7}%`, paddingHorizontal: 3, paddingTop: 8, paddingBottom: 10, gap: 7 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 2 },
+  todayCircle: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  thumb: { width: 17, height: 17, borderRadius: 3 },
+  chips: { gap: 4 },
+  chip: { borderRadius: 5, paddingHorizontal: 4, paddingVertical: 3 },
+  chipText: { fontSize: 11, lineHeight: 14 },
+  overflowBtn: { paddingHorizontal: 2, paddingVertical: 1 },
 });

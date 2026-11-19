@@ -30,6 +30,8 @@ export interface Event extends DayItemBase {
   endTime: string;
   calendarSource: string | null;
   link: string | null;
+  // ver docs/adr/0024-eventos-multi-dia.md
+  endDate: string | null;
 }
 
 export type HabitColorStyle = 'default' | 'cool';

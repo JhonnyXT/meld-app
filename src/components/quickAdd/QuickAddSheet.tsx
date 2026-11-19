@@ -88,6 +88,7 @@ export function QuickAddSheet() {
   const [eventStartMinutes, setEventStartMinutes] = useState(DEFAULT_EVENT_START_MINUTES);
   const [eventDurationMinutes, setEventDurationMinutes] = useState(60);
   const [eventEarlyAlert, setEventEarlyAlert] = useState('10 min before');
+  const [eventEndDate, setEventEndDate] = useState<string | null>(null);
 
   const [voiceReminderMinutes, setVoiceReminderMinutes] = useState<number | null>(null);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
@@ -113,6 +114,7 @@ export function QuickAddSheet() {
     setEventStartMinutes(DEFAULT_EVENT_START_MINUTES);
     setEventDurationMinutes(60);
     setEventEarlyAlert('10 min before');
+    setEventEndDate(null);
     setVoiceReminderMinutes(null);
     setRecordedUri(null);
     setRecordedSeconds(0);
@@ -215,6 +217,7 @@ export function QuickAddSheet() {
         endTime: end24,
         calendarSource: null,
         link: link.trim() || null,
+        endDate: eventEndDate,
       };
     } else if (type === 'voiceMemo') {
       const reminderAt = reminderAtFromMinutes(dateKey, voiceReminderMinutes);
@@ -369,7 +372,16 @@ export function QuickAddSheet() {
             )}
 
             <FieldSection>
-              <DateFieldRow icon="calendar-month" label={t('fieldDay')} dateKey={dateKey} onChange={(k) => setDateKey(k ?? dateKey)} />
+              <DateFieldRow
+                icon="calendar-month"
+                label={t('fieldDay')}
+                dateKey={dateKey}
+                onChange={(k) => {
+                  const next = k ?? dateKey;
+                  setDateKey(next);
+                  if (eventEndDate && eventEndDate < next) setEventEndDate(null);
+                }}
+              />
 
               {type === 'task' && (
                 <>
@@ -382,6 +394,12 @@ export function QuickAddSheet() {
                 <>
                   <TimeFieldRow icon="schedule" label={t('fieldStarts')} minutes={eventStartMinutes} onChange={(m) => setEventStartMinutes(m ?? DEFAULT_EVENT_START_MINUTES)} offLabel="" />
                   <DurationFieldRow icon="schedule" label={t('fieldDuration')} minutes={eventDurationMinutes} onChange={setEventDurationMinutes} />
+                  <DateFieldRow
+                    icon="calendar-month"
+                    label={t('fieldEndDate')}
+                    dateKey={eventEndDate ?? dateKey}
+                    onChange={(k) => setEventEndDate(k && k > dateKey ? k : null)}
+                  />
                   <PresetFieldRow icon="notifications" label={t('fieldEarlyAlert')} options={EARLY_ALERT_OPTIONS} value={eventEarlyAlert} onChange={setEventEarlyAlert} lang={lang} showBorder={false} />
                 </>
               )}

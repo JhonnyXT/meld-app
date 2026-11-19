@@ -52,7 +52,8 @@ export function initDb(conn: SqliteLike = sqlite) {
       deleted_at TEXT,
       sync_state TEXT NOT NULL DEFAULT 'pending',
       space_id TEXT,
-      completed_by_uid TEXT
+      completed_by_uid TEXT,
+      end_date TEXT
     );
   `);
   conn.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_date ON day_items(date);');
@@ -66,6 +67,7 @@ export function initDb(conn: SqliteLike = sqlite) {
   addColumnIfMissing(conn, 'day_items', 'space_id TEXT');
   conn.execSync('CREATE INDEX IF NOT EXISTS idx_day_items_space_id ON day_items(space_id);');
   addColumnIfMissing(conn, 'day_items', 'completed_by_uid TEXT');
+  addColumnIfMissing(conn, 'day_items', 'end_date TEXT');
 
   conn.execSync(`
     CREATE TABLE IF NOT EXISTS habit_completions (

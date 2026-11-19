@@ -1,27 +1,38 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Text, View, Pressable, StyleSheet } from 'react-native';
+import { FlashList, type ViewToken } from '@shopify/flash-list';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { Screen } from '@/components/Screen';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { FloatingBar } from '@/components/FloatingBar';
 import { Icon } from '@/components/Icon';
-import { SegmentedToggle } from '@/components/SegmentedToggle';
 import { DatePickerModal } from '@/components/datePicker/DatePickerModal';
 import { CalendarFilterSheet } from '@/components/calendar/CalendarFilterSheet';
+import { DayItemsModal } from '@/components/calendar/DayItemsModal';
 import { MonthHeatmapCard } from '@/components/calendar/MonthHeatmapCard';
 import { WeekdayHeaderRow } from '@/components/calendar/WeekdayHeaderRow';
-import { MonthDayCell } from '@/components/calendar/MonthDayCell';
+import { MonthWeekRow } from '@/components/calendar/MonthWeekRow';
+import { MonthDividerRow } from '@/components/calendar/MonthDividerRow';
 import { WeekDaySelector } from '@/components/calendar/WeekDaySelector';
+import { WeekHourGrid } from '@/components/calendar/WeekHourGrid';
 import { ListSkeleton } from '@/components/ListSkeleton';
-import { WeekAgendaView } from './WeekAgendaView';
 import { useWeekAgenda } from './useWeekAgenda';
+import { useItemDetailStore } from '@/store/itemDetailStore';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useTranslation } from '@/i18n';
-import { formatMonthYearLabel, formatFullMonthYear, formatHeaderDate, toDateKey, fromDateKey } from '@/domain/date';
+import {
+  formatMonthYearLabel,
+  formatFullMonthYear,
+  formatHeaderDate,
+  toDateKey,
+  fromDateKey,
+  MONTH_SHORT,
+} from '@/domain/date';
 import { buildMonthHeatmap } from '@/domain/calendarHeatmap';
 import { computeHeatmapDotState, isHabitScheduledOn } from '@/domain/habit';
-import { buildMonthGrid } from '@/domain/calendarGrid';
+import { buildWeekRows, type WeekRow } from '@/domain/calendarGrid';
 import { dayItemRepository } from '@/data/local/dayItemRepository';
 import { useAddMenuStore } from '@/store/addMenuStore';
 import { useNavigateMenuStore } from '@/store/navigateMenuStore';
@@ -29,7 +40,22 @@ import { useCalendarFilterStore, matchesCalendarFilter } from '@/store/calendarF
 import { CalendarTodayCard } from '@/components/calendar/CalendarTodayCard';
 import { useRouter } from 'expo-router';
 import type { DayItem, Habit } from '@/domain/dayItem';
-import { CALENDAR_VIEW_ORDER, type CalendarView } from './calendarView';
+import { CALENDAR_VIEW_ORDER, CALENDAR_ZOOM_ORDER, type CalendarView } from './calendarView';
+
+const PINCH_IN_THRESHOLD = 1.25;
+const PINCH_OUT_THRESHOLD = 0.8;
+
+// ver docs/adr/0025-calendario-scroll-continuo.md
+const WEEKS_BACK = 26;
+const WEEKS_FORWARD = 26;
+
+type MonthScrollRow =
+  | { kind: 'divider'; key: string; label: string }
+  | { kind: 'week'; key: string; week: WeekRow };
+
+function monthKeyOf(dateKey: string): string {
+  return dateKey.slice(0, 7);
+}
 
 export function CalendarScreen() {
   const { palette, font } = useTheme();
@@ -43,10 +69,15 @@ export function CalendarScreen() {
   };
   const [viewedMonth, setViewedMonth] = useState(() => new Date());
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const [dayItemsModalKey, setDayItemsModalKey] = useState<string | null>(null);
 
-  const monthGrid = useMemo(
-    () => buildMonthGrid(viewedMonth.getFullYear(), viewedMonth.getMonth(), today),
-    [viewedMonth, today],
+  // El centro de la ventana de semanas cargadas solo cambia con un salto deliberado
+  // (elegir un mes en el selector) — nunca con el scroll normal, que solo actualiza
+  // `viewedMonth` (el label del header). Ver docs/adr/0025-calendario-scroll-continuo.md
+  const [windowCenter, setWindowCenter] = useState(() => new Date());
+  const weekRows = useMemo(
+    () => buildWeekRows(windowCenter, WEEKS_BACK, WEEKS_FORWARD, today),
+    [windowCenter, today],
   );
   const [itemsByDate, setItemsByDate] = useState<Record<string, DayItem[]>>({});
   const calendarFilter = useCalendarFilterStore((s) => s.filter);
@@ -91,12 +122,6 @@ export function CalendarScreen() {
   }, [habitHeatmapData, year, today, lang]);
 
   const weekAgenda = useWeekAgenda(today);
-  const weekScrollRef = useRef<ScrollView>(null);
-  const weekSectionOffsets = useRef<Record<string, number>>({});
-  const scrollToWeekDay = (dateKey: string) => {
-    const y = weekSectionOffsets.current[dateKey];
-    if (y != null) weekScrollRef.current?.scrollTo({ y: Math.max(y - 8, 0), animated: true });
-  };
 
   const stepView = (direction: 1 | -1) => {
     const index = CALENDAR_VIEW_ORDER.indexOf(view);
@@ -115,10 +140,37 @@ export function CalendarScreen() {
       }
     });
 
+  const stepZoom = (direction: 1 | -1) => {
+    const index = CALENDAR_ZOOM_ORDER.indexOf(view);
+    const next = CALENDAR_ZOOM_ORDER[index + direction];
+    if (!next) return;
+    Haptics.selectionAsync().catch(() => {});
+    setView(next);
+  };
+
+  const pinchScale = useSharedValue(1);
+  const pinchFeedbackStyle = useAnimatedStyle(() => ({ transform: [{ scale: pinchScale.value }] }));
+
+  const pinchZoomGesture = Gesture.Pinch()
+    .onUpdate((e) => {
+      // Solo un guiño visual mientras se pellizca — ver docs/adr/0023-zoom-calendario.md
+      pinchScale.value = 1 + (e.scale - 1) * 0.06;
+    })
+    .onEnd((e) => {
+      pinchScale.value = withTiming(1, { duration: 180 });
+      if (e.scale > PINCH_IN_THRESHOLD) runOnJS(stepZoom)(1);
+      else if (e.scale < PINCH_OUT_THRESHOLD) runOnJS(stepZoom)(-1);
+    })
+    .onFinalize(() => {
+      pinchScale.value = withTiming(1, { duration: 180 });
+    });
+
+  const calendarGesture = Gesture.Simultaneous(swipeViewGesture, pinchZoomGesture);
+
   useEffect(() => {
-    if (view !== 'month' || monthGrid.length === 0) return;
-    const startKey = monthGrid[0].dateKey;
-    const endKey = monthGrid[monthGrid.length - 1].dateKey;
+    if (view !== 'month' || weekRows.length === 0) return;
+    const startKey = weekRows[0].cells[0].dateKey;
+    const endKey = weekRows[weekRows.length - 1].cells[6].dateKey;
     dayItemRepository.listByDateRange(startKey, endKey).then((items) => {
       const grouped: Record<string, DayItem[]> = {};
       for (const item of items) {
@@ -127,7 +179,72 @@ export function CalendarScreen() {
       }
       setItemsByDate(grouped);
     });
-  }, [view, monthGrid]);
+  }, [view, weekRows]);
+
+  const monthCounts = useMemo(() => {
+    const counts: Record<string, { events: number; tasks: number }> = {};
+    for (const dateKey in itemsByDate) {
+      const monthKey = monthKeyOf(dateKey);
+      const entry = (counts[monthKey] ??= { events: 0, tasks: 0 });
+      for (const item of itemsByDate[dateKey]) {
+        if (item.type === 'event') entry.events += 1;
+        else if (item.type === 'task') entry.tasks += 1;
+      }
+    }
+    return counts;
+  }, [itemsByDate]);
+
+  const filteredItemsByDate = useMemo(() => {
+    const result: Record<string, DayItem[]> = {};
+    for (const dateKey in itemsByDate) {
+      result[dateKey] = itemsByDate[dateKey].filter((item) => matchesCalendarFilter(item, calendarFilter));
+    }
+    return result;
+  }, [itemsByDate, calendarFilter]);
+
+  const filteredWeekItemsByDate = useMemo(() => {
+    const result: Record<string, DayItem[]> = {};
+    for (const dateKey in weekAgenda.itemsByDate) {
+      result[dateKey] = weekAgenda.itemsByDate[dateKey].filter((item) => matchesCalendarFilter(item, calendarFilter));
+    }
+    return result;
+  }, [weekAgenda.itemsByDate, calendarFilter]);
+
+  const calendarRows = useMemo<MonthScrollRow[]>(() => {
+    const rows: MonthScrollRow[] = [];
+    let lastMonthKey: string | null = null;
+    for (const week of weekRows) {
+      for (const cell of week.cells) {
+        const monthKey = monthKeyOf(cell.dateKey);
+        if (monthKey !== lastMonthKey) {
+          rows.push({ kind: 'divider', key: `divider-${monthKey}`, label: MONTH_SHORT[lang][cell.date.getMonth()] });
+          lastMonthKey = monthKey;
+        }
+      }
+      rows.push({ kind: 'week', key: week.key, week });
+    }
+    return rows;
+  }, [weekRows, lang]);
+
+  const windowCenterKey = toDateKey(windowCenter);
+  const initialScrollIndex = useMemo(() => {
+    const index = calendarRows.findIndex(
+      (row) => row.kind === 'week' && row.week.cells.some((c) => c.dateKey === windowCenterKey),
+    );
+    return index >= 0 ? index : null;
+  }, [calendarRows, windowCenterKey]);
+
+  const handleViewableRowsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken<MonthScrollRow>[] }) => {
+      const firstWeek = viewableItems.find((v) => v.item?.kind === 'week')?.item;
+      if (!firstWeek || firstWeek.kind !== 'week') return;
+      const candidate = firstWeek.week.cells[0].date;
+      if (candidate.getFullYear() !== viewedMonth.getFullYear() || candidate.getMonth() !== viewedMonth.getMonth()) {
+        setViewedMonth(candidate);
+      }
+    },
+    [viewedMonth],
+  );
 
   const todayKey = toDateKey(today);
   const [todayHabitStats, setTodayHabitStats] = useState({ done: 0, total: 0 });
@@ -164,16 +281,47 @@ export function CalendarScreen() {
             <Icon name="chevron-down" size={20} color={palette.textDim} />
           </Pressable>
         }
+        subtitle={
+          view === 'month' ? (
+            <Text style={{ fontFamily: font.regular, fontSize: 14, color: palette.textDim }}>
+              {t('monthEventsCount', { count: monthCounts[toDateKey(viewedMonth).slice(0, 7)]?.events ?? 0 })}
+              {' · '}
+              {t('monthTasksCount', { count: monthCounts[toDateKey(viewedMonth).slice(0, 7)]?.tasks ?? 0 })}
+            </Text>
+          ) : view === 'week' && weekAgenda.days.length === 7 ? (
+            <Text style={{ fontFamily: font.regular, fontSize: 14, color: palette.textDim }}>
+              {MONTH_SHORT[lang][weekAgenda.days[0].getMonth()]} {weekAgenda.days[0].getDate()}
+              {' – '}
+              {weekAgenda.days[0].getMonth() !== weekAgenda.days[6].getMonth()
+                ? `${MONTH_SHORT[lang][weekAgenda.days[6].getMonth()]} `
+                : ''}
+              {weekAgenda.days[6].getDate()}, {weekAgenda.days[6].getFullYear()}
+            </Text>
+          ) : undefined
+        }
         right={
           <View style={styles.headerActions}>
-            <Pressable
-              onPress={() => setMonthPickerOpen(true)}
-              style={[styles.headerActionBtn, { backgroundColor: palette.surfaceLow }]}
-              accessibilityRole="button"
-              accessibilityLabel={t('a11yCalendarMonthView')}
-            >
-              <Icon name="calendar-month" size={18} color={palette.text} />
-            </Pressable>
+            <View style={[styles.viewSwitcher, { backgroundColor: palette.surfaceLow }]}>
+              {([
+                ['month', 'view-grid'],
+                ['week', 'view-week'],
+                ['year', 'calendar-month'],
+              ] as const).map(([v, icon]) => {
+                const active = view === v;
+                return (
+                  <Pressable
+                    key={v}
+                    onPress={() => setView(v)}
+                    style={[styles.viewSwitcherBtn, active && { backgroundColor: palette.accent }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={v === 'month' ? t('viewMonth') : v === 'week' ? t('viewWeek') : t('viewYear')}
+                    accessibilityState={{ selected: active }}
+                  >
+                    <Icon name={icon} size={16} color={active ? '#fff' : palette.textDim} />
+                  </Pressable>
+                );
+              })}
+            </View>
             <Pressable
               onPress={() => useCalendarFilterStore.getState().openSheet()}
               style={[styles.headerActionBtn, { backgroundColor: palette.surfaceLow }]}
@@ -186,24 +334,16 @@ export function CalendarScreen() {
         }
       />
 
-      <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
-        <SegmentedToggle
-          options={[
-            { value: 'month', label: t('viewMonth') },
-            { value: 'week', label: t('viewWeek') },
-            { value: 'year', label: t('viewYear') },
-          ]}
-          value={view}
-          onChange={setView}
-        />
-      </View>
-
       <DatePickerModal
         visible={monthPickerOpen}
         selectedDateKey={toDateKey(view === 'month' ? viewedMonth : today)}
         onCancel={() => setMonthPickerOpen(false)}
         onSelect={(dateKey) => {
-          if (dateKey) setViewedMonth(fromDateKey(dateKey));
+          if (dateKey) {
+            const picked = fromDateKey(dateKey);
+            setViewedMonth(picked);
+            setWindowCenter(picked);
+          }
           setView('month');
           setMonthPickerOpen(false);
         }}
@@ -215,37 +355,27 @@ export function CalendarScreen() {
             days={weekAgenda.days}
             itemsByDate={weekAgenda.itemsByDate}
             filter={calendarFilter}
-            onSelectDay={scrollToWeekDay}
+            onSelectDay={goToDay}
           />
         </View>
       ) : null}
 
-      <GestureDetector gesture={swipeViewGesture}>
-        <View style={{ flex: 1 }}>
+      <GestureDetector gesture={calendarGesture}>
+        <Animated.View style={[{ flex: 1 }, pinchFeedbackStyle]}>
           {view === 'week' ? (
-            <ScrollView
-              ref={weekScrollRef}
-              style={{ flex: 1, marginTop: 20 }}
-              contentContainerStyle={{ paddingHorizontal: 16 }}
-              showsVerticalScrollIndicator={false}
-            >
-              {weekAgenda.loading && Object.keys(weekAgenda.itemsByDate).length === 0 ? (
+            weekAgenda.loading && Object.keys(weekAgenda.itemsByDate).length === 0 ? (
+              <View style={{ paddingHorizontal: 16, marginTop: 20 }}>
                 <ListSkeleton count={6} />
-              ) : (
-                <WeekAgendaView
+              </View>
+            ) : (
+              <View style={{ flex: 1, marginTop: 12, paddingHorizontal: 16 }}>
+                <WeekHourGrid
                   days={weekAgenda.days}
-                  itemsByDate={weekAgenda.itemsByDate}
-                  completedByMap={weekAgenda.completedByMap}
-                  filter={calendarFilter}
-                  onToggleComplete={weekAgenda.toggleComplete}
-                  onDelete={weekAgenda.remove}
-                  onClearVoiceMemoAudio={weekAgenda.clearVoiceMemoAudio}
-                  onSectionLayout={(dateKey, y) => {
-                    weekSectionOffsets.current[dateKey] = y;
-                  }}
+                  itemsByDate={filteredWeekItemsByDate}
+                  onPressItem={(id) => useItemDetailStore.getState().open(id)}
                 />
-              )}
-            </ScrollView>
+              </View>
+            )
           ) : view === 'year' ? (
             <ScrollView
               style={{ flex: 1, marginTop: 32 }}
@@ -259,33 +389,51 @@ export function CalendarScreen() {
               ))}
             </ScrollView>
           ) : (
-            <ScrollView
-              style={{ flex: 1, marginTop: 18 }}
-              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 160 }}
-              showsVerticalScrollIndicator={false}
-            >
-              <WeekdayHeaderRow />
-              <View style={styles.monthGrid}>
-                {monthGrid.map((cell) => {
-                  const dayItems = (itemsByDate[cell.dateKey] ?? []).filter((item) => matchesCalendarFilter(item, calendarFilter));
-                  return <MonthDayCell key={cell.dateKey} cell={cell} items={dayItems} onPress={goToDay} />;
-                })}
+            <>
+              <View style={{ paddingHorizontal: 16, marginTop: 18 }}>
+                <WeekdayHeaderRow />
               </View>
-              <View style={{ marginTop: 18 }}>
-                <CalendarTodayCard
-                  dateLabel={formatHeaderDate(today, lang)}
-                  tasksDone={todayTasks.filter((i) => i.status === 'done').length}
-                  tasksTotal={todayTasks.length}
-                  habitsDone={todayHabitStats.done}
-                  habitsTotal={todayHabitStats.total}
-                  momentsCount={todayMoments.length}
-                  momentThumbUri={todayMoments[0]?.mediaUri ?? null}
-                  onViewDay={() => goToDay(toDateKey(today))}
-                />
-              </View>
-            </ScrollView>
+              <FlashList<MonthScrollRow>
+                key={windowCenterKey}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 160 }}
+                showsVerticalScrollIndicator={false}
+                data={calendarRows}
+                keyExtractor={(row) => row.key}
+                initialScrollIndex={initialScrollIndex ?? undefined}
+                onViewableItemsChanged={handleViewableRowsChanged}
+                viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
+                renderItem={({ item: row }) =>
+                  row.kind === 'divider' ? (
+                    <MonthDividerRow label={row.label} />
+                  ) : (
+                    <MonthWeekRow
+                      week={row.week}
+                      itemsByDate={filteredItemsByDate}
+                      onPressDay={goToDay}
+                      onPressItem={(id) => useItemDetailStore.getState().open(id)}
+                      onPressOverflow={setDayItemsModalKey}
+                    />
+                  )
+                }
+                ListFooterComponent={
+                  <View style={{ marginTop: 18 }}>
+                    <CalendarTodayCard
+                      dateLabel={formatHeaderDate(today, lang)}
+                      tasksDone={todayTasks.filter((i) => i.status === 'done').length}
+                      tasksTotal={todayTasks.length}
+                      habitsDone={todayHabitStats.done}
+                      habitsTotal={todayHabitStats.total}
+                      momentsCount={todayMoments.length}
+                      momentThumbUri={todayMoments[0]?.mediaUri ?? null}
+                      onViewDay={() => goToDay(toDateKey(today))}
+                    />
+                  </View>
+                }
+              />
+            </>
           )}
-        </View>
+        </Animated.View>
       </GestureDetector>
 
       <FloatingBar
@@ -303,6 +451,12 @@ export function CalendarScreen() {
         }
       />
       <CalendarFilterSheet />
+      <DayItemsModal
+        visible={!!dayItemsModalKey}
+        date={dayItemsModalKey ? fromDateKey(dayItemsModalKey) : null}
+        items={dayItemsModalKey ? (filteredItemsByDate[dayItemsModalKey] ?? []) : []}
+        onClose={() => setDayItemsModalKey(null)}
+      />
     </Screen>
   );
 }
@@ -310,9 +464,10 @@ export function CalendarScreen() {
 const styles = StyleSheet.create({
   yearGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingBottom: 160 },
   yearCell: { width: '31%' },
-  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8 },
   pill: { flex: 1, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   titleWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  headerActions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  headerActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   headerActionBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  viewSwitcher: { flexDirection: 'row', borderRadius: 12, padding: 2, gap: 2 },
+  viewSwitcherBtn: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 });

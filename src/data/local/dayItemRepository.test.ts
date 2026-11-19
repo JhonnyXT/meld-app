@@ -1,5 +1,5 @@
 import type { Database as BetterSqlite3Database } from 'better-sqlite3';
-import type { Task } from '@/domain/dayItem';
+import type { Event, Task } from '@/domain/dayItem';
 
 jest.mock('./db', () => {
   const Database = require('better-sqlite3');
@@ -43,6 +43,55 @@ function task(overrides: Partial<Task> = {}): Task {
     ...overrides,
   };
 }
+
+function event(overrides: Partial<Event> = {}): Event {
+  const now = new Date().toISOString();
+  return {
+    id: 'event-1',
+    createdAt: now,
+    updatedAt: now,
+    date: '2026-11-13',
+    title: 'Viaje',
+    category: null,
+    categoryColor: null,
+    reminderAt: null,
+    status: 'scheduled',
+    type: 'event',
+    priority: 'none',
+    startTime: '09:00',
+    endTime: '10:00',
+    calendarSource: null,
+    link: null,
+    endDate: null,
+    ...overrides,
+  };
+}
+
+describe('dayItemRepository — eventos multi-día', () => {
+  it('un evento de 3 días aparece en listByDate para cada uno de los 3 días', async () => {
+    await dayItemRepository.upsert(event({ id: 'trip', date: '2026-11-13', endDate: '2026-11-15' }));
+    expect((await dayItemRepository.listByDate('2026-11-12')).map((r) => r.id)).not.toContain('trip');
+    expect((await dayItemRepository.listByDate('2026-11-13')).map((r) => r.id)).toContain('trip');
+    expect((await dayItemRepository.listByDate('2026-11-14')).map((r) => r.id)).toContain('trip');
+    expect((await dayItemRepository.listByDate('2026-11-15')).map((r) => r.id)).toContain('trip');
+    expect((await dayItemRepository.listByDate('2026-11-16')).map((r) => r.id)).not.toContain('trip');
+  });
+
+  it('listByDateRange trae el evento con solapamiento parcial en cualquiera de los dos extremos', async () => {
+    await dayItemRepository.upsert(event({ id: 'trip', date: '2026-11-13', endDate: '2026-11-15' }));
+    expect((await dayItemRepository.listByDateRange('2026-11-14', '2026-11-20')).map((r) => r.id)).toContain('trip');
+    expect((await dayItemRepository.listByDateRange('2026-11-01', '2026-11-13')).map((r) => r.id)).toContain('trip');
+    expect((await dayItemRepository.listByDateRange('2026-11-16', '2026-11-20')).map((r) => r.id)).not.toContain(
+      'trip',
+    );
+  });
+
+  it('un evento de un solo día (endDate null) se comporta igual que antes', async () => {
+    await dayItemRepository.upsert(event({ id: 'single', date: '2026-11-13', endDate: null }));
+    expect((await dayItemRepository.listByDate('2026-11-13')).map((r) => r.id)).toContain('single');
+    expect((await dayItemRepository.listByDate('2026-11-14')).map((r) => r.id)).not.toContain('single');
+  });
+});
 
 describe('dayItemRepository — upsert/getById/listByDate', () => {
   it('guarda y relee un ítem sin perder campos', async () => {

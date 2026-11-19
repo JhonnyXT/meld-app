@@ -58,6 +58,7 @@ export function useItemDetailForm() {
   const [eventStartMinutes, setEventStartMinutes] = useState(9 * 60);
   const [eventDurationMinutes, setEventDurationMinutes] = useState(60);
   const [eventEarlyAlert, setEventEarlyAlert] = useState('Off');
+  const [eventEndDate, setEventEndDate] = useState<string | null>(null);
 
   const [voiceReminderMinutes, setVoiceReminderMinutes] = useState<number | null>(null);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
@@ -84,6 +85,7 @@ export function useItemDetailForm() {
     setEventStartMinutes(9 * 60);
     setEventDurationMinutes(60);
     setEventEarlyAlert('Off');
+    setEventEndDate(null);
     setVoiceReminderMinutes(null);
     setRecordedUri(null);
     setRecordedSeconds(0);
@@ -128,6 +130,7 @@ export function useItemDetailForm() {
       setEventStartMinutes(9 * 60);
       setEventDurationMinutes(60);
       setEventEarlyAlert('Off');
+      setEventEndDate(null);
       setVoiceReminderMinutes(null);
       setRecordedUri(null);
       setRecordedSeconds(0);
@@ -157,6 +160,7 @@ export function useItemDetailForm() {
         } else {
           setEventEarlyAlert('Off');
         }
+        setEventEndDate(loaded.endDate);
       } else if (loaded.type === 'voiceMemo') {
         setVoiceReminderMinutes(reminderMinutesOrNull(loaded.reminderAt));
         setRecordedUri(loaded.audioFileUri || null);
@@ -228,6 +232,7 @@ export function useItemDetailForm() {
         endTime: end24,
         calendarSource: item.type === 'event' ? item.calendarSource : null,
         link: link.trim() || null,
+        endDate: eventEndDate,
       };
     } else if (type === 'voiceMemo') {
       const reminderAt = reminderAtFromMinutes(dateKey, voiceReminderMinutes);
@@ -320,6 +325,8 @@ export function useItemDetailForm() {
     setEventDurationMinutes,
     eventEarlyAlert,
     setEventEarlyAlert,
+    eventEndDate,
+    setEventEndDate,
     voiceReminderMinutes,
     setVoiceReminderMinutes,
     recordedUri,

@@ -25,6 +25,7 @@ export const dayItems = sqliteTable('day_items', {
   startTime: text('start_time'),
   endTime: text('end_time'),
   calendarSource: text('calendar_source'),
+  endDate: text('end_date'),
 
   targetFrequency: text('target_frequency'),
   currentStreak: integer('current_streak'),

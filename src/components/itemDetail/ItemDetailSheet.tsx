@@ -136,7 +136,10 @@ export function ItemDetailSheet() {
                 icon="calendar-month"
                 label={t('fieldDate')}
                 dateKey={form.dateKey}
-                onChange={form.setDateKey}
+                onChange={(k) => {
+                  form.setDateKey(k);
+                  if (k && form.eventEndDate && form.eventEndDate < k) form.setEventEndDate(null);
+                }}
                 allowInbox
                 showBorder
               />
@@ -152,6 +155,14 @@ export function ItemDetailSheet() {
                 <>
                   <TimeFieldRow icon="schedule" label={t('fieldStarts')} minutes={form.eventStartMinutes} onChange={(m) => form.setEventStartMinutes(m ?? form.eventStartMinutes)} offLabel="" />
                   <DurationFieldRow icon="schedule" label={t('fieldDuration')} minutes={form.eventDurationMinutes} onChange={form.setEventDurationMinutes} />
+                  {form.dateKey ? (
+                    <DateFieldRow
+                      icon="calendar-month"
+                      label={t('fieldEndDate')}
+                      dateKey={form.eventEndDate ?? form.dateKey}
+                      onChange={(k) => form.setEventEndDate(k && form.dateKey && k > form.dateKey ? k : null)}
+                    />
+                  ) : null}
                   <PresetFieldRow icon="notifications" label={t('fieldEarlyAlert')} options={EARLY_ALERT_OPTIONS} value={form.eventEarlyAlert} onChange={form.setEventEarlyAlert} lang={lang} showBorder={false} />
                 </>
               )}

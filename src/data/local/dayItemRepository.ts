@@ -1,4 +1,4 @@
-import { eq, and, ne, lt, isNull, isNotNull, gte, lte, like, asc, inArray } from 'drizzle-orm';
+import { eq, and, ne, lt, isNull, isNotNull, gte, lte, like, asc, inArray, sql } from 'drizzle-orm';
 import { db } from './db';
 import { dayItems, habitCompletions, taskCompletions, categories } from './schema';
 import { emitLocalChange } from './localChanges';
@@ -42,6 +42,7 @@ function toDomain(row: Row): DayItem {
     startTime: row.startTime ?? undefined,
     endTime: row.endTime ?? undefined,
     calendarSource: row.calendarSource,
+    endDate: row.endDate,
     targetFrequency: row.targetFrequency ?? undefined,
     currentStreak: row.currentStreak ?? undefined,
     progress: row.progress ?? undefined,
@@ -108,7 +109,14 @@ function toRow(item: DayItem, categoryId: string | null, spaceId: string | null)
     case 'task':
       return { ...base, repeatRule: item.repeatRule, link: item.link };
     case 'event':
-      return { ...base, startTime: item.startTime, endTime: item.endTime, calendarSource: item.calendarSource, link: item.link };
+      return {
+        ...base,
+        startTime: item.startTime,
+        endTime: item.endTime,
+        calendarSource: item.calendarSource,
+        link: item.link,
+        endDate: item.endDate,
+      };
     case 'habit':
       return {
         ...base,
@@ -131,7 +139,17 @@ function toRow(item: DayItem, categoryId: string | null, spaceId: string | null)
 
 export const dayItemRepository = {
   async listByDate(date: string): Promise<DayItem[]> {
-    const rows = await db.select().from(dayItems).where(and(eq(dayItems.date, date), notDeleted));
+    // ver docs/adr/0024-eventos-multi-dia.md
+    const rows = await db
+      .select()
+      .from(dayItems)
+      .where(
+        and(
+          lte(dayItems.date, date),
+          sql`coalesce(${dayItems.endDate}, ${dayItems.date}) >= ${date}`,
+          notDeleted,
+        ),
+      );
     return rows.map(toDomain);
   },
 
@@ -152,10 +170,17 @@ export const dayItemRepository = {
   },
 
   async listByDateRange(startKey: string, endKey: string): Promise<DayItem[]> {
+    // ver docs/adr/0024-eventos-multi-dia.md
     const rows = await db
       .select()
       .from(dayItems)
-      .where(and(gte(dayItems.date, startKey), lte(dayItems.date, endKey), notDeleted));
+      .where(
+        and(
+          lte(dayItems.date, endKey),
+          sql`coalesce(${dayItems.endDate}, ${dayItems.date}) >= ${startKey}`,
+          notDeleted,
+        ),
+      );
     return rows.map(toDomain);
   },
 
@@ -333,6 +358,15 @@ export const dayItemRepository = {
         ),
       );
     return rows.map((r) => r.date);
+  },
+
+  async listByCategory(label: string): Promise<DayItem[]> {
+    const rows = await db
+      .select()
+      .from(dayItems)
+      .where(and(eq(dayItems.category, label), notDeleted))
+      .orderBy(asc(dayItems.date));
+    return rows.map(toDomain);
   },
 
   async listCategoryUsage(): Promise<{ category: string; status: 'inbox' | 'scheduled' | 'done' }[]> {
