@@ -835,7 +835,7 @@ todos (ver "Roadmap Pro").
 
 ### Calendario
 
-Rediseño estilo Google Calendar (2026-11) — ver `docs/adr/0023` a `0027` para el detalle de cada
+Rediseño estilo Google Calendar (2026-11) — ver `docs/adr/0023` a `0030` para el detalle de cada
 decisión. 3 vistas (Mes/Semana/Año), cambiadas con swipe horizontal (`swipeViewGesture`,
 ±40px/600px·s, orden `CALENDAR_VIEW_ORDER`), con **pellizco (pinch) para hacer zoom** entre
 Año↔Mes↔Semana (`pinchZoomGesture`, orden distinto `CALENDAR_ZOOM_ORDER` = de menos a más detalle),
@@ -846,32 +846,55 @@ compuesto con el swipe vía `Gesture.Simultaneous` — no compiten porque pelliz
   sembrado con `viewedMonth` (salta de mes, fuerza `view='month'`). "•••" abre
   `CalendarFilterSheet`. Subtítulo dinámico: en Mes, "{N} eventos · {M} tareas" del mes visible
   (`monthCounts`); en Semana, el rango de fechas de esa semana.
-- **Mes — scroll continuo de semanas** (NO una grilla fija de un solo mes):
-  `buildWeekRows(centro, weeksBack, weeksForward, today)` (`src/domain/calendarGrid.ts`) genera una
-  ventana ACOTADA (`WEEKS_BACK`/`WEEKS_FORWARD` = 26, ≈1 año total, no infinita de verdad — ver ADR
-  0025) de filas de 7 días, renderizadas con `FlashList` (`MonthWeekRow` por fila-semana +
+- **Mes — scroll continuo de semanas, realmente infinito** (NO una grilla fija de un solo mes):
+  `buildWeekRows(windowCenter, weeksBack, weeksForward, today)` (`src/domain/calendarGrid.ts`)
+  genera filas de 7 días, renderizadas con `FlashList` (`MonthWeekRow` por fila-semana +
   `MonthDividerRow` cuando cruza a un mes nuevo) — segundo lugar del proyecto que usa `FlashList`
-  después de `InboxScreen`. **Dos estados separados a propósito**: `windowCenter` (el centro real de
-  la ventana cargada, solo cambia en un salto deliberado por `DatePickerModal`) vs. `viewedMonth`
-  (solo pinta el header, se actualiza en cada scroll vía `onViewableItemsChanged`) — mezclarlos causa
-  un loop de recentrado constante (bug real, ver ADR 0025). `initialScrollIndex` + `key={windowCenterKey}`
-  (fuerza remount) posicionan la lista en la semana de hoy al abrir o al saltar de mes.
+  después de `InboxScreen`. `weeksBack`/`weeksForward` arrancan en `INITIAL_WEEKS` (26, ≈1 año total)
+  y CRECEN solos sin tope al acercarse a cualquier borde (`onStartReached`/`onEndReached`, +
+  `GROW_WEEKS` cada vez) — se apoya en `maintainVisibleContentPosition` (activo por default en
+  `FlashList` v2 + New Architecture, que Meld ya usa) para no saltar al anteponer semanas arriba.
+  **Dos estados separados a propósito**: `windowCenter` (el centro real de la ventana cargada, solo
+  cambia —junto con un reset de `weeksBack`/`weeksForward` a `INITIAL_WEEKS`— en un salto deliberado
+  por `DatePickerModal`) vs. `viewedMonth` (solo pinta el header, se actualiza en cada scroll vía
+  `onViewableItemsChanged`) — mezclarlos causa un loop de recentrado constante (bug real, ver ADR
+  0025). `initialScrollIndex` + `key={windowCenterKey}` (fuerza remount) posicionan la lista en la
+  semana de hoy al abrir o al saltar de mes.
 - **`MonthDayCell`**: hasta `MAX_VISIBLE_CHIPS = 3` chips de texto coloreados (prioriza
   `item.categoryColor`, cae a `typeColors[item.type]`) en vez de puntos; el Momento sigue como
   miniatura aparte. Tres zonas táctiles independientes (`Pressable` anidados, no hace falta
   `stopPropagation` — ver ADR 0027): el fondo/número navega a Today (`onPressDay`), cada chip abre
   el detalle del ítem (`onPressItem`), y "+N" abre `DayItemsModal` con la lista completa de ese día
-  (`onPressOverflow`). Un evento multi-día (`Event.endDate`, ver abajo) se repite como el mismo chip
-  en cada día de su rango — no hay una barra real que cruce celdas (simplificación visual
-  intencional, ver ADR 0025).
+  (`onPressOverflow`).
+- **Eventos multi-día — barra continua real** (no un chip repetido por día, ver ADR 0028):
+  `src/domain/monthMultiDayBars.ts` → `buildMultiDayBars(sevenDayRow, itemsByDate)` calcula, por
+  cada fila de 7 días, qué `Event` con `endDate` cruzan esa semana (recortados a sus bordes) y les
+  asigna un "carril" (lane, empaquetado tipo scheduler de intervalos cuando hay solapamiento).
+  `MonthWeekRow` la dibuja como overlay absoluto ENCIMA de las 7 celdas (no dentro de cada una), con
+  su posición vertical exacta anclada a `CELL_TOP_OFFSET` (exportado desde `MonthDayCell.tsx` —
+  cualquier cambio a `CELL_PADDING_TOP`/`CELL_HEADER_HEIGHT`/`CELL_HEADER_MARGIN_BOTTOM` hay que
+  verificar que la barra siga alineada bajo el número de día). `MonthDayCell` excluye estos eventos
+  de sus chips normales y reserva el espacio (`multiDayReservedHeight`) para que no se superpongan.
+  `buildMultiDayBars` se generalizó (tipo `SevenDayRow`) para reusarse tal cual desde la grilla de
+  Semana (ver abajo, ADR 0029) — ambas vistas dibujan la misma barra con la misma función.
 - **Semana — grilla horaria real** (`WeekHourGrid.tsx`, reemplazó la agenda vertical vieja que usaba
   `TodayItemRow`; `WeekAgendaView.tsx` se borró por quedar sin uso): columna de horas (0-23) + 7
-  columnas de día, más una fila "sin hora" arriba para ítems sin horario puntual. Clasificación
-  tiempo/sin-tiempo en `src/domain/weekGrid.ts` → `timeRangeFor`: un `Event` usa su
-  `startTime`/`endTime` real; cualquier otro tipo con `reminderAt` en hora específica (no "Any Time")
-  se dibuja como bloque de 30 min fijos (Meld no modela duración fuera de `Event`); el resto va a
-  "sin hora". Tocar un bloque abre el detalle (mismo criterio que los chips de Mes). `useWeekAgenda`
-  (el hook de datos) no cambió, solo el componente que renderiza.
+  columnas de día. Tres filas por encima de la grilla, de arriba a abajo: barra(s) multi-día (misma
+  `buildMultiDayBars` que Mes, ADR 0029), fila "sin hora" para ítems sin horario puntual, y recién
+  después la grilla horaria. Clasificación tiempo/sin-tiempo en `src/domain/weekGrid.ts` →
+  `timeRangeFor`: un `Event` de UN SOLO día usa su `startTime`/`endTime` real; cualquier otro tipo
+  con `reminderAt` en hora específica (no "Any Time") se dibuja como bloque de 30 min fijos (Meld no
+  modela duración fuera de `Event`); el resto va a "sin hora". Un `Event` con `endDate` (multi-día)
+  se excluye de esta clasificación — lo dibuja la barra, no un bloque puntual.
+  **Indicador de "hora actual"**: línea + punto de `palette.accent` en la columna de HOY
+  (`top = nowMinutes()/60 * HOUR_HEIGHT`, calculado una sola vez por render, sin timer que la mueva
+  sola mientras la pantalla sigue abierta). Auto-scroll al abrir: arranca ~2h antes de la hora
+  actual, no en 12am. **Tocar una celda de hora VACÍA abre Quick Add** con tipo Evento pre-cargado
+  con ese día y esa hora en punto (`onCreateAt`, mismo mecanismo `openWithPrefill`/`VoicePrefill` que
+  ya usa "Agregar por voz" — ver ADR 0030); los bloques/barras existentes interceptan el toque antes
+  que la celda de abajo porque se dibujan después en el árbol. Tocar un bloque/barra abre el detalle
+  (mismo criterio que los chips de Mes). `useWeekAgenda` (el hook de datos) no cambió, solo el
+  componente que renderiza.
 - **`CalendarTodayCard`** (pie del `FlashList` de Mes vía `ListFooterComponent`): siempre datos de
   HOY, sin importar el mes visto. "Hoy · {fecha}" + "Ver día" (visual) + Tareas X/Y, Hábitos X/Y,
   Momentos + miniatura. Toda la card es un `Pressable`. Los hábitos se calculan aparte
@@ -881,8 +904,8 @@ compuesto con el swipe vía `Gesture.Simultaneous` — no compiten porque pelliz
   sección "HÁBITOS" con cada hábito existente por título (`listDistinctHabitTitles`; filtra por
   `type === 'habit' && title === X`). Aplica a los chips/bloques de Mes y Semana y al heatmap de
   Año. El ícono de embudo solo acompaña a un filtro específico, no a "Todo".
-- **Eventos multi-día** (`Event.endDate: string | null`, ver ADR 0024): `null` = evento de un solo
-  día (retrocompatible). `dayItemRepository.listByDate`/`listByDateRange` usan
+- **Eventos multi-día — modelo de datos** (`Event.endDate: string | null`, ver ADR 0024): `null` =
+  evento de un solo día (retrocompatible). `dayItemRepository.listByDate`/`listByDateRange` usan
   `COALESCE(end_date, date)` en SQL para que el ítem aparezca en TODOS los días de su rango — esto
   cambia el resultado para CUALQUIER caller existente (Today, agenda Semana, widgets), intencional.
   UI mínima: una segunda `DateFieldRow` "Termina" en Quick Add/`ItemDetailSheet`, solo para `event`.
