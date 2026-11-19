@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from '@/theme/ThemeProvider';
 import { typeColors } from '@/theme/tokens';
 import { splitTimedAndUntimed } from '@/domain/weekGrid';
 import { toDateKey } from '@/domain/date';
+import { nowMinutes } from '@/domain/time';
 import type { DayItem } from '@/domain/dayItem';
 
 // ver docs/adr/0026-semana-grilla-horaria.md
@@ -24,6 +25,14 @@ function blockColor(item: DayItem): string {
 
 export function WeekHourGrid({ days, itemsByDate, onPressItem }: WeekHourGridProps) {
   const { palette, font } = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
+  const todayKey = toDateKey(new Date());
+
+  // Al abrir, centra el scroll alrededor de la hora actual en vez de arrancar en 12am.
+  useEffect(() => {
+    const y = Math.max((nowMinutes() / 60) * HOUR_HEIGHT - HOUR_HEIGHT * 2, 0);
+    scrollRef.current?.scrollTo({ y, animated: false });
+  }, []);
 
   const perDay = days.map((day) => {
     const dateKey = toDateKey(day);
@@ -31,6 +40,7 @@ export function WeekHourGrid({ days, itemsByDate, onPressItem }: WeekHourGridPro
   });
 
   const hasUntimed = perDay.some((d) => d.untimed.length > 0);
+  const currentTimeTop = (nowMinutes() / 60) * HOUR_HEIGHT;
 
   return (
     <View style={{ flex: 1 }}>
@@ -61,7 +71,7 @@ export function WeekHourGrid({ days, itemsByDate, onPressItem }: WeekHourGridPro
         </View>
       ) : null}
 
-      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row' }}>
           <View style={{ width: TIME_COL_WIDTH }}>
             {HOURS.map((h) => (
@@ -99,6 +109,11 @@ export function WeekHourGrid({ days, itemsByDate, onPressItem }: WeekHourGridPro
                     </Pressable>
                   );
                 })}
+                {d.dateKey === todayKey ? (
+                  <View style={[styles.nowLine, { top: currentTimeTop, backgroundColor: palette.accent }]} pointerEvents="none">
+                    <View style={[styles.nowDot, { backgroundColor: palette.accent }]} />
+                  </View>
+                ) : null}
               </View>
             ))}
           </View>
@@ -123,4 +138,6 @@ const styles = StyleSheet.create({
     padding: 3,
     overflow: 'hidden',
   },
+  nowLine: { position: 'absolute', left: 0, right: 0, height: 1.5 },
+  nowDot: { position: 'absolute', left: -3, top: -3, width: 7, height: 7, borderRadius: 3.5 },
 });

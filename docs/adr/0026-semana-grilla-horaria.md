@@ -35,8 +35,14 @@ bloques como "Video...").
   día en el selector de arriba (`WeekDaySelector`) navega a Today de ese día (`goToDay`) — ya no
   hace scroll a una sección (no existen "secciones por día" en una grilla, todas las columnas son
   siempre visibles a la vez; solo se scrollea verticalmente por hora).
-- **Sin indicador de "hora actual"** (la línea roja horizontal que tiene Google Calendar) en esta
-  pasada — posible mejora futura, no bloquea esta fase.
+- **Indicador de "hora actual"** (actualizado 2026-11-19): línea + punto de `palette.accent` en la
+  columna de HOY, con `top = (nowMinutes()/60) * HOUR_HEIGHT` — calculada una vez por render, sin
+  timer que la mueva sola mientras la pantalla queda abierta (alcanza con que esté bien ubicada al
+  entrar/volver a la vista; agregar un intervalo que la reposicione en vivo sería la mejora
+  siguiente si hace falta). El punto sangra levemente a la izquierda de la columna
+  (`left: -3`) hacia la franja de horas — no se recorta porque las columnas no tienen
+  `overflow:'hidden'`. También se agregó auto-scroll al abrir: la grilla arranca centrada ~2 horas
+  antes de la hora actual en vez de en 12am.
 
 ## Consecuencias
 

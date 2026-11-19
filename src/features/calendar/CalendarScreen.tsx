@@ -46,8 +46,8 @@ const PINCH_IN_THRESHOLD = 1.25;
 const PINCH_OUT_THRESHOLD = 0.8;
 
 // ver docs/adr/0025-calendario-scroll-continuo.md
-const WEEKS_BACK = 26;
-const WEEKS_FORWARD = 26;
+const INITIAL_WEEKS = 26;
+const GROW_WEEKS = 26;
 
 type MonthScrollRow =
   | { kind: 'divider'; key: string; label: string }
@@ -75,9 +75,13 @@ export function CalendarScreen() {
   // (elegir un mes en el selector) — nunca con el scroll normal, que solo actualiza
   // `viewedMonth` (el label del header). Ver docs/adr/0025-calendario-scroll-continuo.md
   const [windowCenter, setWindowCenter] = useState(() => new Date());
+  // Scroll "infinito": crecen al acercarse a cualquiera de los dos bordes
+  // (onStartReached/onEndReached), nunca se achican — ver docs/adr/0025.
+  const [weeksBack, setWeeksBack] = useState(INITIAL_WEEKS);
+  const [weeksForward, setWeeksForward] = useState(INITIAL_WEEKS);
   const weekRows = useMemo(
-    () => buildWeekRows(windowCenter, WEEKS_BACK, WEEKS_FORWARD, today),
-    [windowCenter, today],
+    () => buildWeekRows(windowCenter, weeksBack, weeksForward, today),
+    [windowCenter, weeksBack, weeksForward, today],
   );
   const [itemsByDate, setItemsByDate] = useState<Record<string, DayItem[]>>({});
   const calendarFilter = useCalendarFilterStore((s) => s.filter);
@@ -246,6 +250,9 @@ export function CalendarScreen() {
     [viewedMonth],
   );
 
+  const handleReachStart = useCallback(() => setWeeksBack((w) => w + GROW_WEEKS), []);
+  const handleReachEnd = useCallback(() => setWeeksForward((w) => w + GROW_WEEKS), []);
+
   const todayKey = toDateKey(today);
   const [todayHabitStats, setTodayHabitStats] = useState({ done: 0, total: 0 });
 
@@ -343,6 +350,8 @@ export function CalendarScreen() {
             const picked = fromDateKey(dateKey);
             setViewedMonth(picked);
             setWindowCenter(picked);
+            setWeeksBack(INITIAL_WEEKS);
+            setWeeksForward(INITIAL_WEEKS);
           }
           setView('month');
           setMonthPickerOpen(false);
@@ -401,6 +410,8 @@ export function CalendarScreen() {
                 data={calendarRows}
                 keyExtractor={(row) => row.key}
                 initialScrollIndex={initialScrollIndex ?? undefined}
+                onStartReached={handleReachStart}
+                onEndReached={handleReachEnd}
                 onViewableItemsChanged={handleViewableRowsChanged}
                 viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
                 renderItem={({ item: row }) =>

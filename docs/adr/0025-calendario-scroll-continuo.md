@@ -9,14 +9,16 @@ Fase B2/B3 del rediseño de Calendario estilo Google Calendar: reemplazar la gri
 
 ## Decisiones
 
-- **Ventana acotada, no scroll infinito real**: `buildWeekRows(centerDate, weeksBack, weeksForward,
-  today)` genera un rango FIJO de `WEEKS_BACK` + `WEEKS_FORWARD` semanas (26 + 26 ≈ un año) centrado
-  en `viewedMonth`, cargado una sola vez por cambio de mes/vista — no hay `onStartReached`/
-  `onEndReached` agregando más semanas al llegar al borde. Un año de scroll continuo ya cumple la
-  sensación pedida ("unificada, simple") sin la complejidad real de anteponer contenido en una lista
-  virtualizada preservando la posición de scroll (`maintainVisibleContentPosition`), que es un área
-  conocida por ser frágil. Si en el futuro hace falta scroll realmente infinito, se agrega como una
-  mejora aparte sobre esta base, no hace falta rehacer nada de lo ya construido.
+- **Ventana que crece sola al acercarse a cualquiera de los dos bordes** (actualizado 2026-11-19 —
+  la primera versión era una ventana fija de 26+26 semanas, sin crecer; ver razón original más
+  abajo). `weeksBack`/`weeksForward` son ahora estado (`INITIAL_WEEKS` = 26 cada uno al abrir,
+  `GROW_WEEKS` = 26 más por vez), y `onStartReached`/`onEndReached` de `FlashList` los agrandan sin
+  límite superior — nunca se achican. Esto es seguro porque `FlashList` v2 trae
+  `maintainVisibleContentPosition` activado por defecto (New Architecture, que Meld ya usa) — no
+  hizo falta ninguna lógica manual para no saltar al anteponer semanas arriba, algo que originalmente
+  se había descartado por considerarlo frágil. Saltar de mes (`DatePickerModal`) resetea ambas a
+  `INITIAL_WEEKS` junto con `windowCenter` — un salto deliberado siempre arranca una ventana fresca
+  del tamaño normal, no una acumulada de scrollear mucho antes.
 - **El header dinámico ("Nov 2026 · 5 eventos · 49 tareas") sigue el mes dominante visible** vía
   `onViewableItemsChanged` de `FlashList` (`viewabilityConfig.itemVisiblePercentThreshold: 60`),
   actualizando `viewedMonth` — los conteos salen de `monthCounts`, calculado una vez por fetch sobre
