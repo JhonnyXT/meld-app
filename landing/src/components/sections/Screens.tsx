@@ -6,7 +6,7 @@ import { useRef, useState, type KeyboardEvent } from 'react';
 import type { Dictionary } from '@/i18n/config';
 import { SectionHead } from './shared';
 
-const SRC = ['/img/screen-today.png', '/img/screen-inbox.png', '/img/screen-calendar.png', '/img/screen-moments-v2.png'];
+const SRC = ['/img/screen-today.png', '/img/screen-inbox.png', '/img/screen-calendar2.png', '/img/screen-moments-v2.png'];
 
 // ver docs/adr/0005-relleno-lateral-del-carrusel-de-pantallas.md
 export function Screens({ t }: { t: Dictionary['screens'] }) {
