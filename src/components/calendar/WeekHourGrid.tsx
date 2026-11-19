@@ -140,7 +140,11 @@ export function WeekHourGrid({ days, itemsByDate, onPressItem, onCreateAt }: Wee
                 {HOURS.map((h) => (
                   <Pressable
                     key={h}
-                    onPress={() => onCreateAt(d.dateKey, h * 60)}
+                    onPress={(e) => {
+                      // Mitad de arriba = :00, mitad de abajo = :30 — ver docs/adr/0030.
+                      const half = e.nativeEvent.locationY < HOUR_HEIGHT / 2 ? 0 : 30;
+                      onCreateAt(d.dateKey, h * 60 + half);
+                    }}
                     style={[styles.hourLine, { height: HOUR_HEIGHT, borderColor: palette.border }]}
                   />
                 ))}

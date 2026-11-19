@@ -11,9 +11,11 @@ abrir Quick Add y configurar todo a mano.
 ## Decisión
 
 - Cada celda de hora (`HOURS.map` dentro de cada columna de día en `WeekHourGrid`) pasó de ser un
-  `View` decorativo a un `Pressable` que llama a `onCreateAt(dateKey, h * 60)` — sin precisión de
-  media hora, se ancla a la hora en punto de la fila tocada (el usuario puede ajustar la hora exacta
-  después en Quick Add, como ya hace con cualquier otro campo).
+  `View` decorativo a un `Pressable` que llama a `onCreateAt(dateKey, h * 60 + half)`. Precisión de
+  media hora (actualizado 2026-11-19): `e.nativeEvent.locationY` (posición del toque dentro de la
+  celda, relativa a su propio alto `HOUR_HEIGHT`) decide si tocaste la mitad de arriba (`:00`) o la
+  de abajo (`:30`) — no hace falta medir nada con `onLayout`, `locationY` ya viene relativo al
+  `Pressable` tocado.
 - `CalendarScreen` resuelve `onCreateAt` abriendo Quick Add PRE-LLENADO vía
   `useQuickAddStore.getState().openWithPrefill(...)`, el mismo mecanismo que ya usa "Agregar por
   voz" (`VoicePrefill`) — se reusa esa ruta en vez de crear un mecanismo nuevo. Tipo fijo `'event'`
