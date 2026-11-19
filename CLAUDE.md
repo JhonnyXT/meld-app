@@ -835,34 +835,57 @@ todos (ver "Roadmap Pro").
 
 ### Calendario
 
-- **3 vistas** (`SegmentedToggle` de texto Mes/Semana/Año; Mes es la inicial).
-  También se cambia con swipe horizontal (`swipeViewGesture`, ±40px/600px·s, sin
-  wrap-around, orden `CALENDAR_VIEW_ORDER`). Las 3 `ScrollView` se importan de
-  `react-native-gesture-handler` (un `ScrollView` nativo no compone con un
-  `Gesture.Pan` ancestro).
-- **Semana**: agenda vertical por día que reusa `TodayItemRow` con handlers de
-  `useWeekAgenda` (sus ítems son de varios días). El selector de días vive en el
-  header fijo; tocar un día hace scroll a su sección (offsets medidos con
-  `onLayout`, guardados en un `ref` de `CalendarScreen`). Momentos no aparecen acá.
-- **Header**: título de 26px con chevron + botones `calendar-month` y
-  `more-horiz`. Título/chevron o `calendar-month` abren `DatePickerModal` sembrado
-  con `viewedMonth`; se usa solo el mes/año elegido y fuerza `view = 'month'`.
-  "•••" abre `CalendarFilterSheet`. `viewedMonth` es independiente de `today` y
-  solo afecta a Mes; Año sigue anclado al año actual.
-- **Grid de Mes** (`MonthDayCell.tsx`): el primer `Moment` del día se muestra como
-  miniatura real (`Image` con `mediaUri`) debajo del número; el resto de ítems
-  como puntos `typeColors[item.type]` (tope `MAX_DOTS = 3`). Cada celda es tocable
-  y navega a Today en ese día (ver "Ir a un día puntual").
-- **`CalendarTodayCard`** (debajo del grid): siempre datos de HOY, sin importar el
-  mes visto. "Hoy · {fecha}" + "Ver día" (visual) + Tareas X/Y, Hábitos X/Y,
-  Momentos + miniatura. Toda la card es un `Pressable`. Los hábitos se calculan
-  aparte (`isHabitScheduledOn` + `listAllHabitCompletionsInRange`), porque un
-  hábito solo figura en `itemsByDate` en su fecha de creación.
-- **Filtro** (`calendarFilterStore.ts` + `CalendarFilterSheet.tsx`): "Todo" + un
-  tipo por fila + sección "HÁBITOS" con cada hábito existente por título
-  (`listDistinctHabitTitles`; filtra por `type === 'habit' && title === X`). Aplica
-  a puntos y miniaturas del grid, a la agenda semanal y al heatmap de Año. El
-  ícono de embudo solo acompaña a un filtro específico, no a "Todo".
+Rediseño estilo Google Calendar (2026-11) — ver `docs/adr/0023` a `0027` para el detalle de cada
+decisión. 3 vistas (Mes/Semana/Año), cambiadas con swipe horizontal (`swipeViewGesture`,
+±40px/600px·s, orden `CALENDAR_VIEW_ORDER`), con **pellizco (pinch) para hacer zoom** entre
+Año↔Mes↔Semana (`pinchZoomGesture`, orden distinto `CALENDAR_ZOOM_ORDER` = de menos a más detalle),
+compuesto con el swipe vía `Gesture.Simultaneous` — no compiten porque pellizco necesita 2 dedos.
+
+- **Header**: selector de vista con 3 íconos (`view-grid`=Mes, `view-week`=Semana,
+  `calendar-month`=Año) en vez de un toggle de texto; tocar el título/chevron abre `DatePickerModal`
+  sembrado con `viewedMonth` (salta de mes, fuerza `view='month'`). "•••" abre
+  `CalendarFilterSheet`. Subtítulo dinámico: en Mes, "{N} eventos · {M} tareas" del mes visible
+  (`monthCounts`); en Semana, el rango de fechas de esa semana.
+- **Mes — scroll continuo de semanas** (NO una grilla fija de un solo mes):
+  `buildWeekRows(centro, weeksBack, weeksForward, today)` (`src/domain/calendarGrid.ts`) genera una
+  ventana ACOTADA (`WEEKS_BACK`/`WEEKS_FORWARD` = 26, ≈1 año total, no infinita de verdad — ver ADR
+  0025) de filas de 7 días, renderizadas con `FlashList` (`MonthWeekRow` por fila-semana +
+  `MonthDividerRow` cuando cruza a un mes nuevo) — segundo lugar del proyecto que usa `FlashList`
+  después de `InboxScreen`. **Dos estados separados a propósito**: `windowCenter` (el centro real de
+  la ventana cargada, solo cambia en un salto deliberado por `DatePickerModal`) vs. `viewedMonth`
+  (solo pinta el header, se actualiza en cada scroll vía `onViewableItemsChanged`) — mezclarlos causa
+  un loop de recentrado constante (bug real, ver ADR 0025). `initialScrollIndex` + `key={windowCenterKey}`
+  (fuerza remount) posicionan la lista en la semana de hoy al abrir o al saltar de mes.
+- **`MonthDayCell`**: hasta `MAX_VISIBLE_CHIPS = 3` chips de texto coloreados (prioriza
+  `item.categoryColor`, cae a `typeColors[item.type]`) en vez de puntos; el Momento sigue como
+  miniatura aparte. Tres zonas táctiles independientes (`Pressable` anidados, no hace falta
+  `stopPropagation` — ver ADR 0027): el fondo/número navega a Today (`onPressDay`), cada chip abre
+  el detalle del ítem (`onPressItem`), y "+N" abre `DayItemsModal` con la lista completa de ese día
+  (`onPressOverflow`). Un evento multi-día (`Event.endDate`, ver abajo) se repite como el mismo chip
+  en cada día de su rango — no hay una barra real que cruce celdas (simplificación visual
+  intencional, ver ADR 0025).
+- **Semana — grilla horaria real** (`WeekHourGrid.tsx`, reemplazó la agenda vertical vieja que usaba
+  `TodayItemRow`; `WeekAgendaView.tsx` se borró por quedar sin uso): columna de horas (0-23) + 7
+  columnas de día, más una fila "sin hora" arriba para ítems sin horario puntual. Clasificación
+  tiempo/sin-tiempo en `src/domain/weekGrid.ts` → `timeRangeFor`: un `Event` usa su
+  `startTime`/`endTime` real; cualquier otro tipo con `reminderAt` en hora específica (no "Any Time")
+  se dibuja como bloque de 30 min fijos (Meld no modela duración fuera de `Event`); el resto va a
+  "sin hora". Tocar un bloque abre el detalle (mismo criterio que los chips de Mes). `useWeekAgenda`
+  (el hook de datos) no cambió, solo el componente que renderiza.
+- **`CalendarTodayCard`** (pie del `FlashList` de Mes vía `ListFooterComponent`): siempre datos de
+  HOY, sin importar el mes visto. "Hoy · {fecha}" + "Ver día" (visual) + Tareas X/Y, Hábitos X/Y,
+  Momentos + miniatura. Toda la card es un `Pressable`. Los hábitos se calculan aparte
+  (`isHabitScheduledOn` + `listAllHabitCompletionsInRange`), porque un hábito solo figura en
+  `itemsByDate` en su fecha de creación.
+- **Filtro** (`calendarFilterStore.ts` + `CalendarFilterSheet.tsx`): "Todo" + un tipo por fila +
+  sección "HÁBITOS" con cada hábito existente por título (`listDistinctHabitTitles`; filtra por
+  `type === 'habit' && title === X`). Aplica a los chips/bloques de Mes y Semana y al heatmap de
+  Año. El ícono de embudo solo acompaña a un filtro específico, no a "Todo".
+- **Eventos multi-día** (`Event.endDate: string | null`, ver ADR 0024): `null` = evento de un solo
+  día (retrocompatible). `dayItemRepository.listByDate`/`listByDateRange` usan
+  `COALESCE(end_date, date)` en SQL para que el ítem aparezca en TODOS los días de su rango — esto
+  cambia el resultado para CUALQUIER caller existente (Today, agenda Semana, widgets), intencional.
+  UI mínima: una segunda `DateFieldRow` "Termina" en Quick Add/`ItemDetailSheet`, solo para `event`.
 
 ### Momentos
 
@@ -1077,10 +1100,10 @@ releerlo antes de empezar cualquiera de estas.
   ocurrencia puntual ya se completó — sigue sonando igual sin importar que
   ya la hayas marcado hecha. Es una limitación real de los disparadores
   nativos repetitivos (ver "Notificaciones locales reales"), no un bug.
-- `Event` no soporta multi-día (solo `startTime`/`endTime` del mismo día).
-- **`FlashList` solo en `InboxScreen`**. Today, agenda Semana y Moments son listas
-  acotadas y siguen con `ScrollView`: el reciclado de `FlashList` no es compatible
-  con las animaciones de salida por fila de Today. No migrarlas sin que se pida.
+- **`FlashList` en `InboxScreen` y en la vista Mes de Calendario** (ventana acotada de semanas, no
+  scroll infinito real — ver "Calendario"). Today y Moments siguen con `ScrollView`: el reciclado de
+  `FlashList` no es compatible con las animaciones de salida por fila de Today. No migrarlas sin que
+  se pida.
 - Moments guarda la URI de `expo-image-picker` sin copiarla a almacenamiento propio.
 - Presets fijos (`PresetFieldRow`) a propósito: Repetir y Alerta previa de Event,
   Hora preferida y Auto-track de Habit.
