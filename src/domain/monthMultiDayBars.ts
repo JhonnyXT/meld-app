@@ -1,5 +1,4 @@
 import type { DayItem } from './dayItem';
-import type { WeekRow } from './calendarGrid';
 
 export interface MultiDayBar {
   item: DayItem;
@@ -8,9 +7,15 @@ export interface MultiDayBar {
   lane: number;
 }
 
-// ver docs/adr/0028-barra-continua-multi-dia.md
+// Cualquier fila de 7 días con dateKey alcanza — la usan tanto MonthWeekRow
+// (WeekRow de calendarGrid.ts) como WeekHourGrid (su propio array de Date).
+export interface SevenDayRow {
+  cells: { dateKey: string }[];
+}
+
+// ver docs/adr/0028-barra-continua-multi-dia.md y docs/adr/0029-multi-dia-en-semana.md
 export function buildMultiDayBars(
-  week: WeekRow,
+  week: SevenDayRow,
   itemsByDate: Record<string, DayItem[]>,
 ): { bars: MultiDayBar[]; laneCount: number } {
   const weekStartKey = week.cells[0].dateKey;
